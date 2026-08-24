@@ -1,0 +1,27 @@
+# Production Release Checklist
+
+- [ ] Separate development/staging/production databases
+- [ ] Production secrets stored outside Git
+- [ ] HTTPS
+- [ ] Restricted CORS
+- [ ] Rate limiting
+- [ ] Password hashing + reset
+- [ ] RBAC permissions
+- [ ] Audit logs
+- [ ] PostgreSQL backups + restore test
+- [ ] Prisma migration history committed
+- [ ] Staging migration test
+- [ ] Lead lifecycle
+- [ ] Follow-up automation
+- [ ] WhatsApp Business API
+- [ ] Course/batch capacity rules
+- [ ] Student/admission workflow
+- [ ] Attendance
+- [ ] Certificates
+- [ ] Payment reconciliation
+- [ ] Receipts
+- [ ] Fee reminders
+- [ ] Dashboard/reporting
+- [ ] Error monitoring
+- [ ] CI/CD
+- [ ] Load/security testing

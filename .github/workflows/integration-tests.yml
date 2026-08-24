@@ -1,0 +1,69 @@
+name: Integration tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: cadtest
+          POSTGRES_PASSWORD: cadtest
+          POSTGRES_DB: cadpoint_test
+        ports:
+          - 5432
+        options: >-
+          --health-cmd "pg_isready -U cadtest" --health-interval=5s --health-timeout=5s --health-retries=10
+    env:
+      DATABASE_URL: postgresql://cadtest:cadtest@localhost:5432/cadpoint_test
+      JWT_SECRET: test_jwt_secret
+      PORT: 5001
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Push Prisma schema and seed test DB
+        working-directory: server
+        run: |
+          npx prisma db push --schema=./prisma/schema.prisma
+          node prisma/seed.js
+
+      - name: Start server
+        working-directory: server
+        run: |
+          nohup npm run start &
+          npx wait-on http://localhost:5001/api/health
+
+      - name: Run integration tests
+        working-directory: server
+        run: npm run test:integration
+
+      - name: Upload test results (junit)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: |
+            server/**/junit*.xml
+            server/**/junit.xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-coverage
+          path: server/coverage/**
