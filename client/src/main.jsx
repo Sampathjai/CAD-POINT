@@ -22,7 +22,9 @@ import {
     Check,
     Edit,
     Trash2,
-    Download
+    Download,
+    Sun,
+    Moon
 } from 'lucide-react';
 import './styles.css';
 
@@ -31,6 +33,16 @@ function App() {
     const [token, setToken] = useState(() => localStorage.getItem('cadpoint_token') || '');
     const [user, setUser] = useState(null);
     const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+    const [theme, setTheme] = useState(() => localStorage.getItem('cadpoint_theme') || 'light');
+
+    useEffect(() => {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('cadpoint_theme', theme);
+    }, [theme]);
+
+    function toggleTheme() {
+        setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+    }
 
     // Entities State
     const [leads, setLeads] = useState([]);
@@ -788,6 +800,8 @@ function App() {
                         onDeleteAdmission={deleteAdmission}
                         currentUserId={user?.id}
                         token={token}
+                        theme={theme}
+                        toggleTheme={toggleTheme}
                     />
                 )}
             </main>
@@ -1425,7 +1439,7 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
     );
 }
 
-function Module({ page, leads, followups, courses, batches, students, admissions, payments, usersList, onOpenAddModal, onCompleteFollowup, onEditUser, onDeleteUser, onEditCourse, onDeleteStudent, onDeleteAdmission, currentUserId, token }) {
+function Module({ page, leads, followups, courses, batches, students, admissions, payments, usersList, onOpenAddModal, onCompleteFollowup, onEditUser, onDeleteUser, onEditCourse, onDeleteStudent, onDeleteAdmission, currentUserId, token, theme, toggleTheme }) {
     const itemSingular = page.slice(0, -1);
 
     return (
@@ -1706,7 +1720,7 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                     </table>
                 )}
 
-                {page === 'Settings' && <SettingsView token={token} />}
+                {page === 'Settings' && <SettingsView token={token} theme={theme} toggleTheme={toggleTheme} />}
 
                 {page === 'Reports' && (
                     <ReportsView
@@ -1947,7 +1961,7 @@ function ReportsView({ leads, followups, courses, batches, students, admissions,
     );
 }
 
-function SettingsView({ token }) {
+function SettingsView({ token, theme, toggleTheme }) {
     const [activeTab, setActiveTab] = useState('Profile');
     const [settingsData, setSettingsData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -2055,7 +2069,7 @@ function SettingsView({ token }) {
         <div className="settings-container">
             {/* Navigation sub-tabs */}
             <div className="settings-nav">
-                {['Profile', 'Enquiry Sources', 'WhatsApp & API', 'System Info'].map((tab) => (
+                {['Profile', 'Appearance', 'Enquiry Sources', 'WhatsApp & API', 'System Info'].map((tab) => (
                     <button
                         key={tab}
                         className={`settings-nav-btn ${activeTab === tab ? 'active' : ''}`}
@@ -2066,12 +2080,59 @@ function SettingsView({ token }) {
                 ))}
             </div>
 
+            {/* Appearance & Theme */}
+            {activeTab === 'Appearance' && (
+                <div className="settings-card">
+                    <div className="settings-card-header">
+                        <h3>Appearance & Workspace Theme</h3>
+                        <p>Customize the visual theme and color palette of your CRM workspace.</p>
+                    </div>
+                    <div className="toggle-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', background: theme === 'dark' ? '#1e293b' : '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                        <div className="toggle-card-info">
+                            <h4 style={{ margin: 0, fontSize: 16, color: theme === 'dark' ? '#f8fafc' : '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                {theme === 'dark' ? <Moon size={20} color="#38bdf8" /> : <Sun size={20} color="#f59e0b" />}
+                                {theme === 'dark' ? 'Dark Theme Active' : 'Light Theme Active'}
+                            </h4>
+                            <p style={{ margin: '6px 0 0', fontSize: 13, color: theme === 'dark' ? '#94a3b8' : '#64748b' }}>
+                                {theme === 'dark'
+                                    ? 'Dark theme reduces eye strain and provides a sleek dark interface.'
+                                    : 'Light theme offers crisp contrast for daytime usage.'}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            className="primary"
+                            onClick={toggleTheme}
+                            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', fontWeight: 600, cursor: 'pointer' }}
+                        >
+                            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                            {theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Institute Profile */}
             {activeTab === 'Profile' && (
                 <div className="settings-card">
                     <div className="settings-card-header">
-                        <h3>Institute Information</h3>
-                        <p>Configure public institute details, contact phone, and billing details.</p>
+                        <h3>Institute Information & Appearance</h3>
+                        <p>Configure public institute details, contact phone, and visual theme preference.</p>
+                    </div>
+                    <div className="toggle-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: theme === 'dark' ? '#1e293b' : '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0', marginBottom: 20 }}>
+                        <div>
+                            <strong style={{ fontSize: 14, color: theme === 'dark' ? '#f8fafc' : '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                {theme === 'dark' ? <Moon size={16} color="#38bdf8" /> : <Sun size={16} color="#f59e0b" />}
+                                CRM Workspace Theme ({theme === 'dark' ? 'Dark Mode' : 'Light Mode'})
+                            </strong>
+                            <span style={{ fontSize: 12, color: theme === 'dark' ? '#94a3b8' : '#64748b', display: 'block', marginTop: 2 }}>
+                                Toggle between light and dark visual themes across all CRM screens
+                            </span>
+                        </div>
+                        <button type="button" className="secondary" onClick={toggleTheme} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+                            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                        </button>
                     </div>
                     <form onSubmit={saveProfileSettings}>
                         <div className="form-grid">

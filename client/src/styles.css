@@ -804,6 +804,165 @@ td {
     padding: 20px;
 }
 
+/* Dark Theme Overlay */
+[data-theme="dark"] body {
+    background: #090d16;
+    color: #f1f5f9;
+}
+
+[data-theme="dark"] aside {
+    background: #0f172a;
+    border-right-color: #1e293b;
+}
+
+[data-theme="dark"] .brand b {
+    color: #f8fafc;
+}
+
+[data-theme="dark"] .nav {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .nav:hover {
+    background: #1e293b;
+    color: #f8fafc;
+}
+
+[data-theme="dark"] .nav.active {
+    background: #1e293b;
+    color: #38bdf8;
+}
+
+[data-theme="dark"] .sidecard {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+}
+
+[data-theme="dark"] .profile {
+    border-top-color: #1e293b;
+}
+
+[data-theme="dark"] .profile b {
+    color: #f8fafc;
+}
+
+[data-theme="dark"] header {
+    background: #0f172a;
+    border-bottom-color: #1e293b;
+}
+
+[data-theme="dark"] header h1,
+[data-theme="dark"] header b {
+    color: #f8fafc;
+}
+
+[data-theme="dark"] .panel,
+[data-theme="dark"] .card,
+[data-theme="dark"] .settings-card {
+    background: #0f172a;
+    border-color: #1e293b;
+    color: #f1f5f9;
+}
+
+[data-theme="dark"] .card span {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .card strong {
+    color: #f8fafc;
+}
+
+[data-theme="dark"] .panelhead b,
+[data-theme="dark"] .settings-card-header h3 {
+    color: #f8fafc;
+}
+
+[data-theme="dark"] table {
+    color: #cbd5e1;
+}
+
+[data-theme="dark"] th {
+    color: #64748b;
+    border-bottom-color: #1e293b;
+}
+
+[data-theme="dark"] td {
+    color: #cbd5e1;
+    border-bottom-color: #1e293b;
+}
+
+[data-theme="dark"] tr:hover {
+    background: #1e293b;
+}
+
+[data-theme="dark"] .form-field label,
+[data-theme="dark"] .modal form label {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .form-field input,
+[data-theme="dark"] .form-field select,
+[data-theme="dark"] .form-field textarea,
+[data-theme="dark"] .modal form input,
+[data-theme="dark"] .modal form select,
+[data-theme="dark"] .modal form textarea,
+[data-theme="dark"] .search input {
+    background: #1e293b;
+    border-color: #334155;
+    color: #f8fafc;
+}
+
+[data-theme="dark"] .form-field input:focus,
+[data-theme="dark"] .form-field select:focus,
+[data-theme="dark"] .form-field textarea:focus {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+}
+
+[data-theme="dark"] .settings-nav {
+    border-bottom-color: #1e293b;
+}
+
+[data-theme="dark"] .settings-nav-btn {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .settings-nav-btn:hover {
+    background: #1e293b;
+    color: #f8fafc;
+}
+
+[data-theme="dark"] .settings-nav-btn.active {
+    background: #1e293b;
+    color: #38bdf8;
+    border-bottom-color: #38bdf8;
+}
+
+[data-theme="dark"] .toggle-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-theme="dark"] .toggle-card-info h4 {
+    color: #f8fafc;
+}
+
+[data-theme="dark"] .modal .panel {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+}
+
+[data-theme="dark"] .login {
+    background: #090d16;
+}
+
+[data-theme="dark"] .loginbox {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    color: #f8fafc;
+}
+
 .loginbox {
     width: 100%;
     max-width: 400px;
