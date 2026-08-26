@@ -94,6 +94,57 @@ router.post('/sources', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (
   }
 });
 
+// POST /api/settings/whatsapp/send - Send WhatsApp message via Cloud API or fallback web link
+router.post('/whatsapp/send', authenticate, async (req, res) => {
+  try {
+    const { phone, message } = req.body;
+    if (!phone || !message) {
+      return res.status(400).json({ success: false, message: 'Phone number and message required' });
+    }
+
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const fullPhone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
+
+    if (systemSettings.whatsappEnabled && systemSettings.whatsappAccessToken && systemSettings.whatsappPhoneNumberId) {
+      try {
+        const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+        const apiUrl = `${systemSettings.whatsappApiUrl.replace(/\/$/, '')}/${systemSettings.whatsappPhoneNumberId}/messages`;
+
+        const apiRes = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${systemSettings.whatsappAccessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: fullPhone,
+            type: 'text',
+            text: { body: message }
+          })
+        });
+
+        const apiJson = await apiRes.json();
+        if (apiRes.ok) {
+          return res.json({ success: true, message: 'WhatsApp message sent via Cloud API', data: apiJson });
+        }
+      } catch (apiErr) {
+        console.error('WhatsApp API request error:', apiErr);
+      }
+    }
+
+    const waUrl = `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
+    res.json({
+      success: true,
+      message: 'WhatsApp link generated',
+      data: { waUrl }
+    });
+  } catch (err) {
+    console.error('settings.whatsapp.send', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // DELETE /api/settings/sources/:id - Delete an enquiry source (SUPER_ADMIN, ADMIN)
 router.delete('/sources/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {

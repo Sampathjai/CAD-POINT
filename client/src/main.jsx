@@ -56,6 +56,7 @@ function App() {
     const [notifications, setNotifications] = useState([]);
 
     // UI Modals
+    const [whatsAppModalData, setWhatsAppModalData] = useState(null);
     const [showAddLead, setShowAddLead] = useState(false);
     const [showSchedule, setShowSchedule] = useState(false);
     const [showAddCourse, setShowAddCourse] = useState(false);
@@ -778,6 +779,7 @@ function App() {
                         onAddLead={() => setShowAddLead(true)}
                         onSchedule={() => setShowSchedule(true)}
                         onCompleteFollowup={completeFollowup}
+                        onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
                         onNavigate={(targetPage) => setPage(targetPage)}
                     />
                 ) : (
@@ -793,6 +795,7 @@ function App() {
                         usersList={usersList}
                         onOpenAddModal={() => openAddModalForPage(page)}
                         onCompleteFollowup={completeFollowup}
+                        onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
                         onEditUser={openEditUser}
                         onDeleteUser={deleteUser}
                         onEditCourse={openEditCourse}
@@ -805,6 +808,15 @@ function App() {
                     />
                 )}
             </main>
+
+            {/* WhatsApp Messaging Modal */}
+            {whatsAppModalData && (
+                <WhatsAppModal
+                    data={whatsAppModalData}
+                    onClose={() => setWhatsAppModalData(null)}
+                    token={token}
+                />
+            )}
 
             {/* Modals */}
             {editingCourse && (
@@ -1258,7 +1270,7 @@ function App() {
     );
 }
 
-function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedule, onCompleteFollowup, onNavigate }) {
+function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedule, onCompleteFollowup, onOpenWhatsApp, onNavigate }) {
     const totalRevenue = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
     const totalAgreedFees = admissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
     const outstandingFees = Math.max(0, totalAgreedFees - totalRevenue);
@@ -1382,9 +1394,14 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
                                         <b>{leadName}</b>
                                         <span>{f.notes || f.type}</span>
                                     </div>
-                                    <button className="round" onClick={() => onCompleteFollowup(f.id)} title="Mark Complete">
-                                        {f.type === 'CALL' ? <Phone size={15} /> : <MessageCircle size={15} />}
-                                    </button>
+                                    <div style={{ display: 'flex', gap: 6 }}>
+                                        <button className="round" style={{ color: '#16a34a', borderColor: '#86efac' }} onClick={() => onOpenWhatsApp(f.lead, f)} title="Send WhatsApp Message">
+                                            <MessageCircle size={15} />
+                                        </button>
+                                        <button className="round" onClick={() => onCompleteFollowup(f.id)} title="Mark Complete">
+                                            <Check size={15} />
+                                        </button>
+                                    </div>
                                 </div>
                             );
                         })
@@ -1425,7 +1442,12 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
                                             </td>
                                             <td>{l.phone}</td>
                                             <td>
-                                                <span className={'status ' + (l.status || 'new').toString().replaceAll(' ', '').toLowerCase()}>{l.status || 'NEW'}</span>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    <span className={'status ' + (l.status || 'new').toString().replaceAll(' ', '').toLowerCase()}>{l.status || 'NEW'}</span>
+                                                    <button className="secondary" style={{ padding: '2px 6px', fontSize: 10, color: '#16a34a', borderColor: '#86efac' }} onClick={() => onOpenWhatsApp(l)} title="WhatsApp Lead">
+                                                        <MessageCircle size={12} />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     );
@@ -1439,7 +1461,7 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
     );
 }
 
-function Module({ page, leads, followups, courses, batches, students, admissions, payments, usersList, onOpenAddModal, onCompleteFollowup, onEditUser, onDeleteUser, onEditCourse, onDeleteStudent, onDeleteAdmission, currentUserId, token, theme, toggleTheme }) {
+function Module({ page, leads, followups, courses, batches, students, admissions, payments, usersList, onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onEditUser, onDeleteUser, onEditCourse, onDeleteStudent, onDeleteAdmission, currentUserId, token, theme, toggleTheme }) {
     const itemSingular = page.slice(0, -1);
 
     return (
@@ -1477,6 +1499,7 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                                 <th>Phone</th>
                                 <th>Status</th>
                                 <th>Value</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1495,6 +1518,11 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                                     </td>
                                     <td>
                                         <b>{l.estimatedValue ? `₹${Number(l.estimatedValue).toLocaleString()}` : '-'}</b>
+                                    </td>
+                                    <td>
+                                        <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#16a34a', borderColor: '#86efac' }} onClick={() => onOpenWhatsApp(l)}>
+                                            <MessageCircle size={13} /> WhatsApp
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
@@ -1523,11 +1551,16 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                                     <td>{f.notes || '-'}</td>
                                     <td><span className={'status ' + f.status.toLowerCase()}>{f.status}</span></td>
                                     <td>
-                                        {f.status === 'PENDING' && (
-                                            <button className="primary" style={{ padding: '4px 8px', fontSize: 12 }} onClick={() => onCompleteFollowup(f.id)}>
-                                                Complete
+                                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                            {f.status === 'PENDING' && (
+                                                <button className="primary" style={{ padding: '4px 8px', fontSize: 12 }} onClick={() => onCompleteFollowup(f.id)}>
+                                                    Complete
+                                                </button>
+                                            )}
+                                            <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#16a34a', borderColor: '#86efac' }} onClick={() => onOpenWhatsApp(f.lead, f)}>
+                                                <MessageCircle size={13} /> WhatsApp
                                             </button>
-                                        )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -2352,6 +2385,129 @@ function SettingsView({ token, theme, toggleTheme }) {
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+function WhatsAppModal({ data, onClose, token }) {
+    if (!data) return null;
+    const { lead, followup } = data;
+    const targetLead = lead || followup?.lead;
+    const leadName = targetLead ? `${targetLead.firstName || ''} ${targetLead.lastName || ''}`.trim() || 'Valued Prospect' : 'Valued Prospect';
+    const rawPhone = targetLead?.phone || followup?.lead?.phone || '';
+    const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+    const phone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
+    const courseName = targetLead?.interestedCourse || 'our CAD/BIM courses';
+    const courseFee = targetLead?.estimatedValue ? `₹${Number(targetLead.estimatedValue).toLocaleString()}` : 'our standard course fee';
+
+    const templates = {
+        WELCOME: `Hello ${leadName}! Thank you for contacting CAD Point Training Institute. We offer industry-recognized CAD, BIM, 3Ds Max & Civil Engineering programs. How can we assist your training goals today?`,
+        COURSE_FEE: `Hi ${leadName}! Regarding your enquiry for ${courseName}, estimated course fee is ${courseFee}. Our upcoming batches offer flexible morning & evening schedules. Would you like to reserve a seat?`,
+        FOLLOWUP: `Hello ${leadName}, this is a gentle follow-up from CAD Point regarding your course enquiry. Are you available for a brief discussion or demo session today?`,
+        DEMO_INVITE: `Hi ${leadName}! We invite you to attend a free live demo session at CAD Point Institute. Please reply with your convenient time slot!`
+    };
+
+    const [selectedTemplateKey, setSelectedTemplateKey] = useState('WELCOME');
+    const [messageText, setMessageText] = useState(templates.WELCOME);
+    const [sending, setSending] = useState(false);
+
+    function handleTemplateChange(key) {
+        setSelectedTemplateKey(key);
+        setMessageText(templates[key] || '');
+    }
+
+    function openDirectWhatsApp() {
+        if (!rawPhone) return alert('No phone number recorded for this lead.');
+        const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(messageText)}`;
+        window.open(waUrl, '_blank');
+        onClose();
+    }
+
+    async function sendViaCloudApi() {
+        if (!rawPhone) return alert('No phone number recorded for this lead.');
+        setSending(true);
+        try {
+            const res = await fetch(import.meta.env.VITE_API_URL + '/settings/whatsapp/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify({ phone, message: messageText })
+            });
+            const j = await res.json();
+            if (j.success) {
+                if (j.data?.waUrl) {
+                    window.open(j.data.waUrl, '_blank');
+                } else {
+                    alert('WhatsApp message dispatched successfully via Cloud API!');
+                }
+                onClose();
+            } else {
+                alert(j.message || 'Failed to send message');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Send failed');
+        } finally {
+            setSending(false);
+        }
+    }
+
+    return (
+        <div className="modal">
+            <div className="panel" style={{ maxWidth: 540 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#25D366', color: '#fff', display: 'grid', placeItems: 'center' }}>
+                            <MessageCircle size={20} />
+                        </div>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: 16, color: '#0f172a' }}>Send WhatsApp Message</h3>
+                            <span style={{ fontSize: 12, color: '#64748b' }}>Recipient: <b>{leadName}</b> ({rawPhone || 'No phone recorded'})</span>
+                        </div>
+                    </div>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: '#334155', display: 'block', marginBottom: 6 }}>
+                            Choose Message Template
+                        </label>
+                        <select
+                            value={selectedTemplateKey}
+                            onChange={(e) => handleTemplateChange(e.target.value)}
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13 }}
+                        >
+                            <option value="WELCOME">💬 Enquiry Welcome & Overview</option>
+                            <option value="COURSE_FEE">🎓 Course Fee & Batch Info</option>
+                            <option value="FOLLOWUP">⏰ Follow-up Reminder</option>
+                            <option value="DEMO_INVITE">✨ Free Demo Session Invitation</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: '#334155', display: 'block', marginBottom: 6 }}>
+                            Message Content (Editable)
+                        </label>
+                        <textarea
+                            rows={5}
+                            value={messageText}
+                            onChange={(e) => setMessageText(e.target.value)}
+                            style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, resize: 'vertical' }}
+                        />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                        <button className="primary" onClick={openDirectWhatsApp} style={{ flex: 1, background: '#25D366', color: '#ffffff', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, border: 'none' }}>
+                            <MessageCircle size={16} /> Open in WhatsApp (Web / App)
+                        </button>
+                        <button className="secondary" onClick={sendViaCloudApi} disabled={sending} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {sending ? 'Sending...' : 'Send via Cloud API'}
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
