@@ -1,5 +1,4 @@
-const fetch = require('node-fetch');
-const { v4: uuidv4 } = require('uuid');
+const fetch = globalThis.fetch;
 
 const API = process.env.TEST_API_URL || 'http://localhost:5001/api';
 

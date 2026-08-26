@@ -1,5 +1,5 @@
 const { execSync } = require('child_process');
-const fetch = require('node-fetch');
+const fetch = globalThis.fetch;
 const { PrismaClient } = require('@prisma/client');
 
 const API = process.env.TEST_API_URL || 'http://localhost:5001/api';
