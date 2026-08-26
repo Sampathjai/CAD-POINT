@@ -21,7 +21,8 @@ import {
     X,
     Check,
     Edit,
-    Trash2
+    Trash2,
+    Download
 } from 'lucide-react';
 import './styles.css';
 
@@ -1733,8 +1734,63 @@ function ReportsView({ leads, followups, courses, batches, students, admissions,
     const completedFollowups = followups.filter((f) => f.status === 'COMPLETED').length;
     const pendingFollowups = followups.filter((f) => f.status === 'PENDING').length;
 
+    function exportReportsToExcel() {
+        let csvContent = '\uFEFF';
+
+        csvContent += 'CAD POINT CRM - EXECUTIVE SUMMARY REPORT\n';
+        csvContent += `Generated Date,${new Date().toLocaleString()}\n\n`;
+
+        csvContent += 'Metric,Value\n';
+        csvContent += `Total Collections (₹),${totalRevenue}\n`;
+        csvContent += `Pending Fee Balance (₹),${totalPendingFees}\n`;
+        csvContent += `Lead Conversion Rate (%),${conversionRate}%\n`;
+        csvContent += `Total Admissions,${admissions.length}\n`;
+        csvContent += `Total Leads,${leads.length}\n\n`;
+
+        csvContent += 'COURSE ENROLLMENT & REVENUE PERFORMANCE\n';
+        csvContent += 'Course Code,Course Name,Enrolled Students,Agreed Revenue (₹)\n';
+        courses.forEach((c) => {
+            const courseAdmissions = admissions.filter((a) => a.courseId === c.id || a.course?.name === c.name);
+            const revenue = courseAdmissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
+            csvContent += `"${c.courseCode}","${c.name.replace(/"/g, '""')}",${courseAdmissions.length},${revenue}\n`;
+        });
+        csvContent += '\n';
+
+        csvContent += 'COLLECTIONS BY PAYMENT METHOD\n';
+        csvContent += 'Payment Method,Amount Collected (₹)\n';
+        Object.entries(paymentMethods).forEach(([method, amount]) => {
+            csvContent += `"${method}",${amount}\n`;
+        });
+        csvContent += '\n';
+
+        csvContent += 'LEAD PIPELINE BREAKDOWN\n';
+        csvContent += 'Status,Count\n';
+        Object.entries(leadStatuses).forEach(([status, count]) => {
+            csvContent += `"${status}",${count}\n`;
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `CAD_Point_CRM_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '16px 20px', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                <div>
+                    <h3 style={{ margin: 0, fontSize: 16, color: '#0f172a' }}>CRM Analytics & Performance Reports</h3>
+                    <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>Download summary breakdown and performance metrics in Excel spreadsheet format.</p>
+                </div>
+                <button className="primary" onClick={exportReportsToExcel} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Download size={16} /> Export as Excel
+                </button>
+            </div>
+
             <div className="cards">
                 <div className="card">
                     <span>Total Collections</span>
