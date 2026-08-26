@@ -2116,23 +2116,8 @@ function SettingsView({ token, theme, toggleTheme }) {
             {activeTab === 'Profile' && (
                 <div className="settings-card">
                     <div className="settings-card-header">
-                        <h3>Institute Information & Appearance</h3>
-                        <p>Configure public institute details, contact phone, and visual theme preference.</p>
-                    </div>
-                    <div className="toggle-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: theme === 'dark' ? '#1e293b' : '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0', marginBottom: 20 }}>
-                        <div>
-                            <strong style={{ fontSize: 14, color: theme === 'dark' ? '#f8fafc' : '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                {theme === 'dark' ? <Moon size={16} color="#38bdf8" /> : <Sun size={16} color="#f59e0b" />}
-                                CRM Workspace Theme ({theme === 'dark' ? 'Dark Mode' : 'Light Mode'})
-                            </strong>
-                            <span style={{ fontSize: 12, color: theme === 'dark' ? '#94a3b8' : '#64748b', display: 'block', marginTop: 2 }}>
-                                Toggle between light and dark visual themes across all CRM screens
-                            </span>
-                        </div>
-                        <button type="button" className="secondary" onClick={toggleTheme} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-                            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-                        </button>
+                        <h3>Institute Information</h3>
+                        <p>Configure public institute details, contact phone, and billing details.</p>
                     </div>
                     <form onSubmit={saveProfileSettings}>
                         <div className="form-grid">
