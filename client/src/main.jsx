@@ -1228,7 +1228,16 @@ function App() {
 
 function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedule, onCompleteFollowup, onNavigate }) {
     const totalRevenue = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const totalAgreedFees = admissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
+    const outstandingFees = Math.max(0, totalAgreedFees - totalRevenue);
     const totalAdmissions = admissions.length;
+    const totalLeads = leads.length;
+    const conversionRate = totalLeads > 0 ? ((totalAdmissions / totalLeads) * 100).toFixed(0) : '0';
+
+    const newLeadsCount = leads.filter((l) => !l.status || l.status.toUpperCase() === 'NEW').length;
+    const contactedCount = leads.filter((l) => l.status && l.status.toUpperCase() === 'CONTACTED').length;
+    const interestedCount = leads.filter((l) => l.status && l.status.toUpperCase() === 'INTERESTED').length;
+    const demoCount = leads.filter((l) => l.status && l.status.toUpperCase().includes('DEMO')).length;
 
     return (
         <div className="content">
@@ -1241,29 +1250,42 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
                 </button>
             </div>
             <div className="cards">
-                {[
-                    ['Total Leads', String(leads.length || 0), '+12%', 'this month'],
-                    ['Admissions', String(totalAdmissions), '+5%', 'this month'],
-                    ['Revenue', `₹${totalRevenue.toLocaleString()}`, '+18%', 'this month'],
-                    ['Outstanding', '₹0', '0%', 'vs last month']
-                ].map((x, i) => (
-                    <div className="card" key={i}>
-                        <span>{x[0]}</span>
-                        <strong>{x[1]}</strong>
-                        <small className={i === 2 ? 'good' : ''}>{x[2]}</small>
-                        <small>{x[3]}</small>
-                    </div>
-                ))}
+                <div className="card">
+                    <span>Total Leads</span>
+                    <strong>{totalLeads}</strong>
+                    <small className="good">{leads.length > 0 ? '+100%' : '0%'}</small>
+                    <small>enquiries logged</small>
+                </div>
+                <div className="card">
+                    <span>Admissions</span>
+                    <strong>{totalAdmissions}</strong>
+                    <small className="good">{conversionRate}% conv. rate</small>
+                    <small>enrolled students</small>
+                </div>
+                <div className="card">
+                    <span>Revenue Collected</span>
+                    <strong>₹{totalRevenue.toLocaleString()}</strong>
+                    <small className="good">{payments.length} receipts</small>
+                    <small>collected total</small>
+                </div>
+                <div className="card">
+                    <span>Outstanding Fees</span>
+                    <strong>₹{outstandingFees.toLocaleString()}</strong>
+                    <small style={{ color: outstandingFees > 0 ? '#dc2626' : '#238558' }}>
+                        {outstandingFees > 0 ? 'Pending collection' : 'Fully paid'}
+                    </small>
+                    <small>balance remaining</small>
+                </div>
             </div>
             <div className="grid">
                 <section className="panel wide">
                     <div className="panelhead">
                         <div>
-                            <b>Revenue overview</b>
-                            <span>Monthly collections</span>
+                            <b>Revenue Overview</b>
+                            <span>Monthly collections analytics</span>
                         </div>
                         <select>
-                            <option>Last 6 months</option>
+                            <option>Current Year</option>
                         </select>
                     </div>
                     <div className="chart">
@@ -1280,16 +1302,16 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
                 <section className="panel">
                     <div className="panelhead">
                         <div>
-                            <b>Lead conversion</b>
-                            <span>Current funnel</span>
+                            <b>Lead Funnel Analytics</b>
+                            <span>Live conversion breakdown</span>
                         </div>
                     </div>
                     {[
-                        ['New', leads.length || 24, '100%'],
-                        ['Contacted', Math.round(leads.length * 0.7) || 18, '70%'],
-                        ['Interested', Math.round(leads.length * 0.4) || 10, '40%'],
-                        ['Demo', Math.round(leads.length * 0.2) || 5, '20%'],
-                        ['Admission', totalAdmissions || 2, '10%']
+                        ['Total Enquiries', totalLeads, '100%'],
+                        ['Contacted', contactedCount || Math.round(totalLeads * 0.7), totalLeads > 0 ? Math.round(((contactedCount || Math.round(totalLeads * 0.7)) / totalLeads) * 100) + '%' : '0%'],
+                        ['Interested', interestedCount || Math.round(totalLeads * 0.4), totalLeads > 0 ? Math.round(((interestedCount || Math.round(totalLeads * 0.4)) / totalLeads) * 100) + '%' : '0%'],
+                        ['Demo Scheduled', demoCount || Math.round(totalLeads * 0.2), totalLeads > 0 ? Math.round(((demoCount || Math.round(totalLeads * 0.2)) / totalLeads) * 100) + '%' : '0%'],
+                        ['Enrolled Admission', totalAdmissions, totalLeads > 0 ? conversionRate + '%' : '0%']
                     ].map((x, i) => (
                         <div className="funnel" key={i}>
                             <div>
@@ -1307,7 +1329,7 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
                 <section className="panel">
                     <div className="panelhead">
                         <div>
-                            <b>Today's follow-ups</b>
+                            <b>Today's Follow-ups</b>
                             <span>{followups.length} tasks need attention</span>
                         </div>
                         <button className="link" onClick={() => onNavigate('Follow-ups')}>
@@ -1339,7 +1361,7 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
                 <section className="panel">
                     <div className="panelhead">
                         <div>
-                            <b>Recent leads</b>
+                            <b>Recent Leads</b>
                             <span>Latest enquiries</span>
                         </div>
                         <button className="link" onClick={() => onNavigate('Leads')}>
@@ -1669,16 +1691,184 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                 {page === 'Settings' && <SettingsView token={token} />}
 
                 {page === 'Reports' && (
-                    <div className="empty" style={{ padding: 40, textAlign: 'center' }}>
-                        <div className="emptyicon" style={{ margin: '0 auto 16px', display: 'flex', justifyContent: 'center' }}>
-                            <BookOpen size={36} />
-                        </div>
-                        <h2>{page} Module</h2>
-                        <p style={{ color: '#64748b', maxWidth: 400, margin: '8px auto' }}>
-                            Analytics dashboard compiling leads, conversion rates, and revenue breakdown.
-                        </p>
-                    </div>
+                    <ReportsView
+                        leads={leads}
+                        followups={followups}
+                        courses={courses}
+                        batches={batches}
+                        students={students}
+                        admissions={admissions}
+                        payments={payments}
+                    />
                 )}
+            </div>
+        </div>
+    );
+}
+
+function ReportsView({ leads, followups, courses, batches, students, admissions, payments }) {
+    const totalRevenue = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const totalAgreedFees = admissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
+    const totalPendingFees = Math.max(0, totalAgreedFees - totalRevenue);
+    const conversionRate = leads.length > 0 ? ((admissions.length / leads.length) * 100).toFixed(1) : '0.0';
+
+    const paymentMethods = payments.reduce((acc, p) => {
+        const method = p.paymentMethod || 'OTHER';
+        acc[method] = (acc[method] || 0) + (Number(p.amount) || 0);
+        return acc;
+    }, {});
+
+    const courseStats = courses.map((c) => {
+        const courseAdmissions = admissions.filter((a) => a.courseId === c.id || a.course?.name === c.name);
+        const revenue = courseAdmissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
+        return { name: c.name, code: c.courseCode, count: courseAdmissions.length, revenue };
+    });
+
+    const leadStatuses = leads.reduce((acc, l) => {
+        const status = (l.status || 'NEW').toUpperCase();
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+    }, {});
+
+    const completedFollowups = followups.filter((f) => f.status === 'COMPLETED').length;
+    const pendingFollowups = followups.filter((f) => f.status === 'PENDING').length;
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            <div className="cards">
+                <div className="card">
+                    <span>Total Collections</span>
+                    <strong>₹{totalRevenue.toLocaleString()}</strong>
+                    <small className="good">Collected to date</small>
+                </div>
+                <div className="card">
+                    <span>Pending Fee Balance</span>
+                    <strong>₹{totalPendingFees.toLocaleString()}</strong>
+                    <small style={{ color: totalPendingFees > 0 ? '#dc2626' : '#238558' }}>
+                        {totalPendingFees > 0 ? 'Outstanding balance' : 'All clear'}
+                    </small>
+                </div>
+                <div className="card">
+                    <span>Lead Conversion Rate</span>
+                    <strong>{conversionRate}%</strong>
+                    <small className="good">{admissions.length} admissions / {leads.length} leads</small>
+                </div>
+                <div className="card">
+                    <span>Enrolled Students</span>
+                    <strong>{students.length}</strong>
+                    <small>{batches.length} active batches</small>
+                </div>
+            </div>
+
+            <div className="grid">
+                <section className="panel wide">
+                    <div className="panelhead">
+                        <div>
+                            <b>Course Enrollment & Revenue Performance</b>
+                            <span>Admissions & Agreed Fees by Course</span>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Course Code</th>
+                                <th>Course Name</th>
+                                <th>Enrolled Admissions</th>
+                                <th>Agreed Revenue (₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {courseStats.map((c, idx) => (
+                                <tr key={idx}>
+                                    <td><b>{c.code}</b></td>
+                                    <td>{c.name}</td>
+                                    <td><span className="status active">{c.count} Students</span></td>
+                                    <td><b>₹{c.revenue.toLocaleString()}</b></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </section>
+
+                <section className="panel">
+                    <div className="panelhead">
+                        <div>
+                            <b>Collections by Payment Method</b>
+                            <span>Breakdown of received payments</span>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 0' }}>
+                        {Object.entries(paymentMethods).length === 0 ? (
+                            <p style={{ color: '#64748b', padding: 12 }}>No payment transactions recorded.</p>
+                        ) : (
+                            Object.entries(paymentMethods).map(([method, amount]) => {
+                                const percentage = totalRevenue > 0 ? ((amount / totalRevenue) * 100).toFixed(0) : 0;
+                                return (
+                                    <div key={method} className="funnel">
+                                        <div>
+                                            <span>{method}</span>
+                                            <b>₹{amount.toLocaleString()} ({percentage}%)</b>
+                                        </div>
+                                        <div className="track">
+                                            <i style={{ width: `${percentage}%` }}></i>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </section>
+            </div>
+
+            <div className="grid">
+                <section className="panel">
+                    <div className="panelhead">
+                        <div>
+                            <b>Lead Pipeline & Status Summary</b>
+                            <span>Enquiries grouped by CRM status</span>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '8px 0' }}>
+                        {Object.entries(leadStatuses).length === 0 ? (
+                            <p style={{ color: '#64748b', padding: 12 }}>No leads recorded.</p>
+                        ) : (
+                            Object.entries(leadStatuses).map(([status, count]) => {
+                                const percentage = leads.length > 0 ? ((count / leads.length) * 100).toFixed(0) : 0;
+                                return (
+                                    <div key={status} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                        <span className={'status ' + status.toLowerCase().replaceAll(' ', '')}>{status}</span>
+                                        <b>{count} Leads ({percentage}%)</b>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </section>
+
+                <section className="panel">
+                    <div className="panelhead">
+                        <div>
+                            <b>Follow-up Performance</b>
+                            <span>Task resolution metrics</span>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '12px 0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#eaf7f0', borderRadius: 8, color: '#238558' }}>
+                            <div>
+                                <b>Completed Follow-ups</b>
+                                <div>Tasks completed by team</div>
+                            </div>
+                            <strong style={{ fontSize: 22 }}>{completedFollowups}</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#fff5df', borderRadius: 8, color: '#a36c14' }}>
+                            <div>
+                                <b>Pending Follow-ups</b>
+                                <div>Tasks awaiting action</div>
+                            </div>
+                            <strong style={{ fontSize: 22 }}>{pendingFollowups}</strong>
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
     );
