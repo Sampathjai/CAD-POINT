@@ -63,4 +63,27 @@ router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR'), as
   }
 });
 
+// DELETE /api/students/:id
+router.delete('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  const { id } = req.params;
+  try {
+    await prisma.$transaction(async (tx) => {
+      const admissions = await tx.admission.findMany({ where: { studentId: id }, select: { id: true } });
+      const admissionIds = admissions.map((a) => a.id);
+
+      if (admissionIds.length > 0) {
+        await tx.payment.deleteMany({ where: { admissionId: { in: admissionIds } } });
+        await tx.admission.deleteMany({ where: { studentId: id } });
+      }
+
+      await tx.student.delete({ where: { id } });
+    });
+
+    res.json({ success: true, message: 'Student and related records deleted successfully' });
+  } catch (err) {
+    console.error('students.delete', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;

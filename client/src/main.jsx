@@ -458,6 +458,38 @@ function App() {
         }
     }
 
+    async function deleteStudent(id, name) {
+        if (!window.confirm(`Are you sure you want to delete student "${name}"?`)) return;
+        try {
+            const res = await fetch(import.meta.env.VITE_API_URL + '/students/' + id, {
+                method: 'DELETE',
+                headers: { Authorization: 'Bearer ' + token }
+            });
+            const j = await res.json();
+            if (!j.success) return alert(j.message || 'Delete student failed');
+            fetchStudents();
+        } catch (e) {
+            console.error(e);
+            alert('Delete student failed');
+        }
+    }
+
+    async function deleteAdmission(id, admissionNumber) {
+        if (!window.confirm(`Are you sure you want to delete admission "${admissionNumber}"?`)) return;
+        try {
+            const res = await fetch(import.meta.env.VITE_API_URL + '/admissions/' + id, {
+                method: 'DELETE',
+                headers: { Authorization: 'Bearer ' + token }
+            });
+            const j = await res.json();
+            if (!j.success) return alert(j.message || 'Delete admission failed');
+            fetchAdmissions();
+        } catch (e) {
+            console.error(e);
+            alert('Delete admission failed');
+        }
+    }
+
     function openEditCourse(courseToEdit) {
         setEditingCourse(courseToEdit);
         setEditCourseForm({
@@ -734,6 +766,8 @@ function App() {
                         onEditUser={openEditUser}
                         onDeleteUser={deleteUser}
                         onEditCourse={openEditCourse}
+                        onDeleteStudent={deleteStudent}
+                        onDeleteAdmission={deleteAdmission}
                         currentUserId={user?.id}
                         token={token}
                     />
@@ -1351,7 +1385,7 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
     );
 }
 
-function Module({ page, leads, followups, courses, batches, students, admissions, payments, usersList, onOpenAddModal, onCompleteFollowup, onEditUser, onDeleteUser, onEditCourse, currentUserId, token }) {
+function Module({ page, leads, followups, courses, batches, students, admissions, payments, usersList, onOpenAddModal, onCompleteFollowup, onEditUser, onDeleteUser, onEditCourse, onDeleteStudent, onDeleteAdmission, currentUserId, token }) {
     const itemSingular = page.slice(0, -1);
 
     return (
@@ -1514,6 +1548,7 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                                 <th>Phone</th>
                                 <th>Email</th>
                                 <th>Joined</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1524,6 +1559,11 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                                     <td>{s.phone}</td>
                                     <td>{s.email || '-'}</td>
                                     <td>{new Date(s.createdAt).toLocaleDateString()}</td>
+                                    <td>
+                                        <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => onDeleteStudent(s.id, `${s.firstName} ${s.lastName || ''}`.trim())}>
+                                            <Trash2 size={13} /> Delete
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -1539,6 +1579,7 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                                 <th>Course</th>
                                 <th>Final Fee</th>
                                 <th>Status</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1549,6 +1590,11 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                                     <td>{a.course?.name || '-'}</td>
                                     <td><b>₹{Number(a.finalFee).toLocaleString()}</b></td>
                                     <td><span className="status active">{a.status}</span></td>
+                                    <td>
+                                        <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => onDeleteAdmission(a.id, a.admissionNumber)}>
+                                            <Trash2 size={13} /> Delete
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
