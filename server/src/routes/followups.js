@@ -26,7 +26,7 @@ router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR'), as
 });
 
 router.get('/', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR'), async (req, res) => {
-  const upcoming = await prisma.followUp.findMany({ where: { status: 'PENDING' }, orderBy: { scheduledAt: 'asc' }, take: 100 });
+  const upcoming = await prisma.followUp.findMany({ include: { lead: true }, where: { status: 'PENDING' }, orderBy: { scheduledAt: 'asc' }, take: 100 });
   res.json({ success: true, data: upcoming });
 });
 

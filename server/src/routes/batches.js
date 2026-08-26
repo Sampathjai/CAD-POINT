@@ -5,6 +5,20 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { z } = require('zod');
 const prisma = new PrismaClient();
 
+// GET /api/batches
+router.get('/', authenticate, async (req, res) => {
+  try {
+    const batches = await prisma.batch.findMany({
+      include: { course: true, trainer: { select: { id: true, name: true } } },
+      orderBy: { startDate: 'desc' }
+    });
+    res.json({ success: true, data: batches });
+  } catch (err) {
+    console.error('batches.list', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // POST /api/batches
 router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN'), async (req, res) => {
   try {

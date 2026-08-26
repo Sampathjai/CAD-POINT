@@ -27,6 +27,7 @@ app.use('/api/batches', require('./routes/batches'));
 app.use('/api/students', require('./routes/students'));
 app.use('/api/admissions', require('./routes/admissions'));
 app.use('/api/payments', require('./routes/payments'));
+app.use('/api/settings', require('./routes/settings'));
 app.use((req,res)=>res.status(404).json({success:false,message:'API endpoint not found'}));
 app.use((err,_req,res,_next)=>res.status(err.status||500).json({success:false,message:process.env.NODE_ENV==='production'?'Internal server error':err.message}));
 module.exports={app,prisma,port};

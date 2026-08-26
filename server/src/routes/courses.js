@@ -5,6 +5,17 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { z } = require('zod');
 const prisma = new PrismaClient();
 
+// GET /api/courses
+router.get('/', authenticate, async (req, res) => {
+  try {
+    const courses = await prisma.course.findMany({ orderBy: { name: 'asc' } });
+    res.json({ success: true, data: courses });
+  } catch (err) {
+    console.error('courses.list', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // POST /api/courses
 router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN'), async (req, res) => {
   try {
@@ -16,6 +27,31 @@ router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN'), async (req, res
     res.json({ success: true, data: created });
   } catch (err) {
     console.error('courses.create', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// PATCH /api/courses/:id
+router.patch('/:id', authenticate, authorize('SUPER_ADMIN','ADMIN'), async (req, res) => {
+  const { id } = req.params;
+  try {
+    const schema = z.object({
+      courseCode: z.string().min(1).optional(),
+      name: z.string().min(1).optional(),
+      description: z.string().optional().nullable(),
+      standardFee: z.number().optional(),
+      isActive: z.boolean().optional()
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ success: false, message: parsed.error.message });
+    
+    const updated = await prisma.course.update({
+      where: { id },
+      data: parsed.data
+    });
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    console.error('courses.update', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });

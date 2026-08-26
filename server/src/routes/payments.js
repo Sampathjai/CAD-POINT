@@ -5,6 +5,20 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { z } = require('zod');
 const prisma = new PrismaClient();
 
+// GET /api/payments
+router.get('/', authenticate, async (req, res) => {
+  try {
+    const payments = await prisma.payment.findMany({
+      include: { admission: { include: { student: true, course: true } }, createdBy: { select: { id: true, name: true } } },
+      orderBy: { paymentDate: 'desc' }
+    });
+    res.json({ success: true, data: payments });
+  } catch (err) {
+    console.error('payments.list', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // POST /api/payments
 router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN','ACCOUNTS'), async (req, res) => {
   try {
