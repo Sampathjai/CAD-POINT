@@ -109,7 +109,23 @@ function App() {
         localStorage.removeItem('cadpoint_token');
     }
 
+    function formatErrorMessage(msg) {
+        if (!msg) return 'An error occurred. Please try again.';
+        if (typeof msg === 'string') return msg;
+        if (Array.isArray(msg)) {
+            return msg.map((item) => (typeof item === 'object' && item.message ? item.message : String(item))).join(', ');
+        }
+        if (typeof msg === 'object' && msg.message) return msg.message;
+        return String(msg);
+    }
+
     async function doLogin() {
+        if (!loginForm.email || !loginForm.email.trim()) {
+            return alert('Please enter your email address');
+        }
+        if (!loginForm.password || !loginForm.password.trim()) {
+            return alert('Please enter your password');
+        }
         try {
             const res = await fetch(import.meta.env.VITE_API_URL + '/auth/login', {
                 method: 'POST',
@@ -117,7 +133,7 @@ function App() {
                 body: JSON.stringify(loginForm)
             });
             const j = await res.json();
-            if (!j.success) return alert(j.message || 'Login failed');
+            if (!j.success) return alert(formatErrorMessage(j.message) || 'Login failed');
             localStorage.setItem('cadpoint_token', j.data.token);
             setToken(j.data.token);
             setUser(j.data.user);
@@ -572,18 +588,19 @@ function App() {
                     <div className="logo big">CP</div>
                     <h1>CAD POINT</h1>
                     <p>CRM Platform</p>
-                    <label>
-                        Email
-                        <input value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} placeholder="admin@cadpoint.com" />
-                    </label>
-                    <label>
-                        Password
-                        <input type="password" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} placeholder="••••••••" />
-                    </label>
-                    <button className="primary wide" onClick={doLogin}>
-                        Sign in
-                    </button>
-                    <small>Default Seed Login: admin@cadpoint.com / Admin@123</small>
+                    <form onSubmit={(e) => { e.preventDefault(); doLogin(); }}>
+                        <label>
+                            Email
+                            <input type="email" value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} placeholder="admin@cadpoint.com" required />
+                        </label>
+                        <label>
+                            Password
+                            <input type="password" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} placeholder="••••••••" required />
+                        </label>
+                        <button className="primary wide" type="submit">
+                            Sign in
+                        </button>
+                    </form>
                 </div>
             </div>
         );

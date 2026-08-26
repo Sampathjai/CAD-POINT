@@ -23,7 +23,10 @@ router.post('/login', async (req, res) => {
     const safeUser = { id: user.id, name: user.name, email: user.email, role: user.role, isActive: user.isActive };
     res.json({ success: true, data: { token, user: safeUser } });
   } catch (err) {
-    if (err.name === 'ZodError') return res.status(400).json({ success: false, message: err.errors });
+    if (err.name === 'ZodError') {
+      const msg = err.errors.map((e) => e.message || 'Invalid input').join(', ');
+      return res.status(400).json({ success: false, message: msg || 'Please enter valid email and password' });
+    }
     console.error('Login error', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
