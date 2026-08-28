@@ -23,6 +23,26 @@ aside {
     flex-direction: column;
     position: fixed;
     height: 100vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    z-index: 100;
+}
+
+aside::-webkit-scrollbar {
+    width: 4px;
+}
+
+aside::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+aside::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+aside::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }
 
 .brand {
@@ -813,6 +833,14 @@ td {
 [data-theme="dark"] aside {
     background: #0b1120 !important;
     border-right-color: #1e293b !important;
+}
+
+[data-theme="dark"] aside::-webkit-scrollbar-thumb {
+    background: #334155;
+}
+
+[data-theme="dark"] aside::-webkit-scrollbar-thumb:hover {
+    background: #475569;
 }
 
 [data-theme="dark"] .brand b {

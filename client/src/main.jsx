@@ -711,12 +711,12 @@ function App() {
                         {n === 'Follow-ups' && <em>{followups.length}</em>}
                     </button>
                 ))}
-                <div className="sidecard">
+                <div className="sidecard" style={{ marginTop: 'auto', marginBottom: 10, flexShrink: 0 }}>
                     <div className="pulse"></div>
                     <b>System healthy</b>
                     <span>All services operational</span>
                 </div>
-                <div className="profile" onClick={() => setShowProfileMenu(!showProfileMenu)} style={{ cursor: 'pointer', position: 'relative' }}>
+                <div className="profile" onClick={() => setShowProfileMenu(!showProfileMenu)} style={{ cursor: 'pointer', position: 'relative', flexShrink: 0 }}>
                     <div className="avatar">{(user?.name || 'SK').split(' ').map(s => s[0]).join('').slice(0, 2)}</div>
                     <div>
                         <b>{user?.name || 'Admin'}</b>
@@ -725,8 +725,8 @@ function App() {
                     <MoreHorizontal size={18} />
                 </div>
                 {showProfileMenu && (
-                    <div style={{ padding: '8px 16px', background: '#1e293b', borderRadius: 8, marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <button style={{ background: 'none', border: 'none', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 600 }} onClick={logout}>
+                    <div style={{ padding: '10px 16px', background: theme === 'dark' ? '#1e293b' : '#0f172a', color: '#ffffff', borderRadius: 8, marginTop: 6, marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                        <button type="button" style={{ background: 'none', border: 'none', color: '#f87171', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 600, width: '100%', padding: '4px 0', fontSize: 13 }} onClick={logout}>
                             <LogOut size={16} /> Sign out
                         </button>
                     </div>
