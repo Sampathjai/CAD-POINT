@@ -27,8 +27,7 @@ import {
     Moon,
     HardDrive,
     Laptop,
-    ShieldCheck,
-    RefreshCw
+    ShieldCheck
 } from 'lucide-react';
 import './styles.css';
 
@@ -2444,10 +2443,10 @@ function SettingsView({ token, theme, toggleTheme }) {
                                 </p>
                             </div>
                             <div style={{ display: 'flex', gap: 10 }}>
-                                <button className="secondary" onClick={() => alert('File synchronization triggered via Local Agent')}>
+                                <button type="button" className="secondary" onClick={() => alert('File synchronization triggered via Local Agent')}>
                                     <RefreshCw size={16} /> Sync Files Now
                                 </button>
-                                <button className="secondary" style={{ color: '#16a34a', borderColor: '#86efac' }} onClick={triggerDatabaseBackup}>
+                                <button type="button" className="secondary" style={{ color: '#16a34a', borderColor: '#86efac' }} onClick={triggerDatabaseBackup}>
                                     <Download size={16} /> Trigger Local Backup
                                 </button>
                             </div>
@@ -2481,22 +2480,23 @@ function SettingsView({ token, theme, toggleTheme }) {
                                         </td>
                                     </tr>
                                 ) : (
-                                    desktopDevices.map((d) => (
-                                        <tr key={d.id}>
-                                            <td style={{ fontWeight: 600 }}>{d.deviceName}</td>
-                                            <td>{d.platform}</td>
-                                            <td><code>v{d.appVersion}</code></td>
-                                            <td>{new Date(d.lastSeenAt).toLocaleString()}</td>
+                                    desktopDevices.map((d, index) => (
+                                        <tr key={d?.id || index}>
+                                            <td style={{ fontWeight: 600 }}>{d?.deviceName || 'Client Device'}</td>
+                                            <td>{d?.platform || 'Desktop'}</td>
+                                            <td><code>v{d?.appVersion || '1.0.0'}</code></td>
+                                            <td>{d?.lastSeenAt ? new Date(d.lastSeenAt).toLocaleString() : 'Recently'}</td>
                                             <td>
-                                                <span className={`status-badge ${d.status.toLowerCase()}`}>
-                                                    {d.status}
+                                                <span className={`status-badge ${(d?.status || 'active').toLowerCase()}`}>
+                                                    {d?.status || 'ACTIVE'}
                                                 </span>
                                             </td>
                                             <td>
-                                                {d.status === 'ACTIVE' ? (
+                                                {d?.status === 'ACTIVE' ? (
                                                     <button
+                                                        type="button"
                                                         className="action-btn danger"
-                                                        onClick={() => revokeDevice(d.id)}
+                                                        onClick={() => revokeDevice(d?.id)}
                                                         title="Revoke Device Access"
                                                     >
                                                         Revoke Access
