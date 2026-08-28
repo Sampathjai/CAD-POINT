@@ -115,6 +115,7 @@ model User {
   payments      Payment[]      @relation("PaymentCollector")
   batches       Batch[]        @relation("TrainerBatches")
   notifications Notification[]
+  files         FileMetadata[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -347,4 +348,24 @@ model Notification {
   createdAt     DateTime         @default(now())
 
   @@index([userId, isRead])
+}
+
+model FileMetadata {
+  id               String   @id @default(uuid())
+  organizationId   String   @default("org_default")
+  uploadedById     String?
+  uploadedBy       User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  originalFilename String
+  storageKey       String   @unique
+  storageProvider  String   @default("SUPABASE_STORAGE")
+  mimeType         String
+  fileSize         Int
+  category         String   @default("documents")
+  recordId         String?
+  publicUrl        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([organizationId, category])
+  @@index([uploadedById])
 }

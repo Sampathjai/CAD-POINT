@@ -2105,6 +2105,29 @@ function SettingsView({ token, theme, toggleTheme }) {
         }
     }
 
+    async function testConnections() {
+        setSaving(true);
+        try {
+            const res = await fetch(import.meta.env.VITE_API_URL + '/settings/storage/test-connection', {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + token }
+            });
+            const j = await res.json();
+            if (j.success) {
+                const db = j.data.database;
+                const st = j.data.storage;
+                alert(`✅ System Connection Diagnostic Results:\n\n🐘 Database (${db.engine}): ${db.status} (${db.details})\n☁️ Cloud Storage (${st.provider}): ${st.status} (${st.details || st.bucket})`);
+            } else {
+                alert(j.message || 'Connection test failed');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Connection test failed');
+        } finally {
+            setSaving(false);
+        }
+    }
+
     async function addEnquirySource(e) {
         e.preventDefault();
         if (!newSourceName.trim()) return;
@@ -2195,107 +2218,105 @@ function SettingsView({ token, theme, toggleTheme }) {
             {activeTab === 'Storage & Database' && (
                 <div className="settings-card">
                     <div className="settings-card-header">
-                        <h3>Database Storage & Client Location Settings</h3>
-                        <p>Configure database host parameters, client storage paths, allocation limits, and automated backups.</p>
+                        <h3>Cloud Storage & Hosted Database Architecture</h3>
+                        <p>Production infrastructure health, multi-tenant cloud object storage, and managed database backup configurations.</p>
+                    </div>
+
+                    {/* Infrastructure Summary Cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
+                        <div style={{ padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', background: theme === 'dark' ? '#0f172a' : '#f8fafc' }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em' }}>Hosted Database</span>
+                            <h4 style={{ margin: '6px 0 2px', fontSize: 16, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <Check size={18} /> Connected
+                            </h4>
+                            <span style={{ fontSize: 12, color: '#64748b' }}>PostgreSQL (Cloud Hosted)</span>
+                        </div>
+
+                        <div style={{ padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', background: theme === 'dark' ? '#0f172a' : '#f8fafc' }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em' }}>Cloud File Storage</span>
+                            <h4 style={{ margin: '6px 0 2px', fontSize: 16, color: settingsData?.storage?.status === 'Connected' ? '#16a34a' : '#0284c7', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <Check size={18} /> {settingsData?.storage?.provider || 'Supabase / S3 Storage'}
+                            </h4>
+                            <span style={{ fontSize: 12, color: '#64748b' }}>Bucket: <b>{settingsData?.storage?.bucket || 'cadpoint-crm-production'}</b></span>
+                        </div>
+
+                        <div style={{ padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', background: theme === 'dark' ? '#0f172a' : '#f8fafc' }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em' }}>Storage Usage</span>
+                            <h4 style={{ margin: '6px 0 2px', fontSize: 16, color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}>
+                                {settingsData?.storage?.sizeInMB || '0.00'} MB
+                            </h4>
+                            <span style={{ fontSize: 12, color: '#64748b' }}>{settingsData?.storage?.totalFiles || 0} production files uploaded</span>
+                        </div>
+
+                        <div style={{ padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', background: theme === 'dark' ? '#0f172a' : '#f8fafc' }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em' }}>Managed Backups</span>
+                            <h4 style={{ margin: '6px 0 2px', fontSize: 16, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <Check size={18} /> Cloud Vault Active
+                            </h4>
+                            <span style={{ fontSize: 12, color: '#64748b' }}>Multi-tenant cloud snapshot strategy</span>
+                        </div>
                     </div>
 
                     <form onSubmit={saveProfileSettings}>
-                        <h4 style={{ margin: '0 0 12px', fontSize: 14, color: theme === 'dark' ? '#cbd5e1' : '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            🗄️ Database Server Connection
-                        </h4>
-                        <div className="form-grid" style={{ marginBottom: 24 }}>
-                            <div className="form-field">
-                                <label>Database Host / IP</label>
-                                <input
-                                    value={profileForm.dbHost || 'localhost'}
-                                    onChange={(e) => setProfileForm({ ...profileForm, dbHost: e.target.value })}
-                                    placeholder="localhost or 192.168.1.100"
-                                />
-                                <small>Server host address of PostgreSQL engine</small>
+                        {/* Only show local drive picker if explicitly in dev mode and not production */}
+                        {(!settingsData?.isProduction && availableDrives.length > 0) && (
+                            <div className="form-field full-width" style={{ padding: '16px', background: theme === 'dark' ? '#1e293b' : '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', marginBottom: 20 }}>
+                                <label style={{ fontSize: 13, fontWeight: 700, color: theme === 'dark' ? '#38bdf8' : '#0284c7', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                    <HardDrive size={18} /> Local Development Drive Selector (Dev Only)
+                                </label>
+                                <p style={{ margin: '4px 0 12px', fontSize: 12, color: theme === 'dark' ? '#94a3b8' : '#64748b' }}>
+                                    Local development drive detection is active for offline dev testing. In production deployment, files are automatically stored in Cloud Object Storage.
+                                </p>
+                                <select
+                                    onChange={(e) => {
+                                        const selectedPath = e.target.value;
+                                        if (selectedPath) {
+                                            const cleanPath = selectedPath.endsWith('/') || selectedPath.endsWith('\\') ? selectedPath.slice(0, -1) : selectedPath;
+                                            setProfileForm({
+                                                ...profileForm,
+                                                storageLocation: cleanPath,
+                                                backupDir: cleanPath + '/backups'
+                                            });
+                                        }
+                                    }}
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, background: theme === 'dark' ? '#0f172a' : '#ffffff', color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
+                                >
+                                    <option value="">-- Select Development Local Drive --</option>
+                                    {availableDrives.map((drive) => (
+                                        <option key={drive.id} value={drive.path}>
+                                            {drive.label} ➔ ({drive.path})
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
-                            <div className="form-field">
-                                <label>Port Number</label>
-                                <input
-                                    value={profileForm.dbPort || '5432'}
-                                    onChange={(e) => setProfileForm({ ...profileForm, dbPort: e.target.value })}
-                                    placeholder="5432"
-                                />
-                                <small>PostgreSQL network port</small>
-                            </div>
-                            <div className="form-field">
-                                <label>Database Name</label>
-                                <input
-                                    value={profileForm.dbName || 'cadpoint_crm'}
-                                    onChange={(e) => setProfileForm({ ...profileForm, dbName: e.target.value })}
-                                    placeholder="cadpoint_crm"
-                                />
-                                <small>Target PostgreSQL database name</small>
-                            </div>
-                            <div className="form-field">
-                                <label>Database User</label>
-                                <input
-                                    value={profileForm.dbUser || 'postgres'}
-                                    onChange={(e) => setProfileForm({ ...profileForm, dbUser: e.target.value })}
-                                    placeholder="postgres"
-                                />
-                                <small>Database owner username</small>
-                            </div>
-                        </div>
-
-                        <div className="form-field full-width" style={{ padding: '16px', background: theme === 'dark' ? '#1e293b' : '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', marginBottom: 20 }}>
-                            <label style={{ fontSize: 13, fontWeight: 700, color: theme === 'dark' ? '#38bdf8' : '#0284c7', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                                <HardDrive size={18} /> Select Local Disk Drive / Volume
-                            </label>
-                            <p style={{ margin: '4px 0 12px', fontSize: 12, color: theme === 'dark' ? '#94a3b8' : '#64748b' }}>
-                                Choose an available local system disk drive or mounted volume to automatically assign storage & backup directory locations.
-                            </p>
-                            <select
-                                onChange={(e) => {
-                                    const selectedPath = e.target.value;
-                                    if (selectedPath) {
-                                        const cleanPath = selectedPath.endsWith('/') || selectedPath.endsWith('\\') ? selectedPath.slice(0, -1) : selectedPath;
-                                        setProfileForm({
-                                            ...profileForm,
-                                            storageLocation: cleanPath,
-                                            backupDir: cleanPath + '/backups'
-                                        });
-                                    }
-                                }}
-                                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, background: theme === 'dark' ? '#0f172a' : '#ffffff', color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
-                            >
-                                <option value="">-- Click to Select Detected Local Disk Drive --</option>
-                                {availableDrives.map((drive) => (
-                                    <option key={drive.id} value={drive.path}>
-                                        {drive.label} ➔ ({drive.path})
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                        )}
 
                         <h4 style={{ margin: '0 0 12px', fontSize: 14, color: theme === 'dark' ? '#cbd5e1' : '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            📁 Data & Backup Storage Directories
+                            ☁️ Production Cloud Infrastructure Credentials
                         </h4>
                         <div className="form-grid">
                             <div className="form-field full-width">
-                                <label>Primary Storage Location Directory</label>
+                                <label>Cloud Storage Provider Endpoint / Bucket</label>
                                 <input
-                                    value={profileForm.storageLocation || './storage'}
+                                    value={profileForm.storageLocation || 'Cloud Object Storage (Supabase / S3)'}
                                     onChange={(e) => setProfileForm({ ...profileForm, storageLocation: e.target.value })}
-                                    placeholder="./storage or D:\CADPoint_Data"
+                                    placeholder="Supabase Storage / AWS S3"
+                                    disabled={settingsData?.isProduction}
                                 />
-                                <small>Target directory where uploads, spreadsheets, and client datasets are stored</small>
+                                <small>All uploaded CRM documents, invoices, attachments, and backups are stored in cloud infrastructure.</small>
                             </div>
                             <div className="form-field full-width">
-                                <label>Automated Backup Directory Path</label>
+                                <label>Cloud Backup Target Destination</label>
                                 <input
-                                    value={profileForm.backupDir || './storage/backups'}
+                                    value={profileForm.backupDir || 'Cloud Vault (organizations/org_default/backups)'}
                                     onChange={(e) => setProfileForm({ ...profileForm, backupDir: e.target.value })}
-                                    placeholder="./storage/backups or D:\CADPoint_Backups"
+                                    placeholder="Cloud Vault Bucket"
+                                    disabled={settingsData?.isProduction}
                                 />
-                                <small>Directory path where database dumps and system backup snapshots are exported</small>
+                                <small>Automated cloud snapshot storage target</small>
                             </div>
                             <div className="form-field">
-                                <label>Backup Frequency</label>
+                                <label>Automated Backup Frequency</label>
                                 <select
                                     value={profileForm.backupFrequency || 'DAILY'}
                                     onChange={(e) => setProfileForm({ ...profileForm, backupFrequency: e.target.value })}
@@ -2307,21 +2328,21 @@ function SettingsView({ token, theme, toggleTheme }) {
                                 </select>
                             </div>
                             <div className="form-field">
-                                <label>Storage Capacity Limit (MB)</label>
+                                <label>Allocated Cloud Capacity (MB)</label>
                                 <input
                                     type="number"
                                     value={profileForm.maxStorageLimitMB || 10240}
                                     onChange={(e) => setProfileForm({ ...profileForm, maxStorageLimitMB: Number(e.target.value) })}
                                     placeholder="10240"
                                 />
-                                <small>Maximum allocated disk space in megabytes (e.g. 10240 MB = 10 GB)</small>
+                                <small>Allocated organization cloud quota (10240 MB = 10 GB)</small>
                             </div>
                         </div>
 
                         <div className="toggle-card" style={{ marginTop: 20 }}>
                             <div className="toggle-card-info">
-                                <h4>Automated Daily Database Backups</h4>
-                                <p>Automatically generate and save database JSON/SQL snapshot files into the backup directory</p>
+                                <h4>Automated Cloud Database Backups</h4>
+                                <p>Automatically generate and stream database JSON snapshot backups into persistent Cloud Storage</p>
                             </div>
                             <label className="checkbox-label" style={{ margin: 0 }}>
                                 <input
@@ -2329,22 +2350,33 @@ function SettingsView({ token, theme, toggleTheme }) {
                                     checked={profileForm.autoBackupEnabled}
                                     onChange={(e) => setProfileForm({ ...profileForm, autoBackupEnabled: e.target.checked })}
                                 />
-                                Enable Auto Backup
+                                Enable Cloud Auto Backup
                             </label>
                         </div>
 
-                        <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <button
-                                type="button"
-                                className="secondary"
-                                onClick={triggerDatabaseBackup}
-                                disabled={saving}
-                                style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#16a34a', borderColor: '#86efac' }}
-                            >
-                                📥 Trigger Database Backup Now
-                            </button>
+                        <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                            <div style={{ display: 'flex', gap: 10 }}>
+                                <button
+                                    type="button"
+                                    className="secondary"
+                                    onClick={testConnections}
+                                    disabled={saving}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                                >
+                                    ⚡ Test Cloud & DB Connections
+                                </button>
+                                <button
+                                    type="button"
+                                    className="secondary"
+                                    onClick={triggerDatabaseBackup}
+                                    disabled={saving}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#16a34a', borderColor: '#86efac' }}
+                                >
+                                    📥 Trigger Cloud Backup Now
+                                </button>
+                            </div>
                             <button className="primary" type="submit" disabled={saving}>
-                                {saving ? 'Saving Storage Config...' : 'Save Storage Settings'}
+                                {saving ? 'Saving Infrastructure Settings...' : 'Save Storage Settings'}
                             </button>
                         </div>
                     </form>
