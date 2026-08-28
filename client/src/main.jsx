@@ -2045,9 +2045,14 @@ function SettingsView({ token, theme, toggleTheme }) {
                 headers: { Authorization: 'Bearer ' + token }
             });
             const j = await res.json();
-            if (j.success) setAvailableDrives(j.data || []);
+            if (j.success && Array.isArray(j.data)) {
+                setAvailableDrives(j.data);
+            } else {
+                setAvailableDrives([]);
+            }
         } catch (e) {
             console.error('fetchDrives error', e);
+            setAvailableDrives([]);
         }
     }
 
@@ -2307,7 +2312,7 @@ function SettingsView({ token, theme, toggleTheme }) {
 
                     <form onSubmit={saveProfileSettings}>
                         {/* Only show local drive picker if explicitly in dev mode and not production */}
-                        {(!settingsData?.isProduction && availableDrives.length > 0) && (
+                        {(!settingsData?.isProduction && Array.isArray(availableDrives) && availableDrives.length > 0) && (
                             <div className="form-field full-width" style={{ padding: '16px', background: theme === 'dark' ? '#1e293b' : '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', marginBottom: 20 }}>
                                 <label style={{ fontSize: 13, fontWeight: 700, color: theme === 'dark' ? '#38bdf8' : '#0284c7', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                                     <HardDrive size={18} /> Local Development Drive Selector (Dev Only)
