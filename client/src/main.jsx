@@ -2495,7 +2495,7 @@ function SettingsView({ token, theme, toggleTheme }) {
                                             <td><code>v{d?.appVersion || '1.0.0'}</code></td>
                                             <td>{d?.lastSeenAt ? new Date(d.lastSeenAt).toLocaleString() : 'Recently'}</td>
                                             <td>
-                                                <span className={`status-badge ${(d?.status || 'active').toLowerCase()}`}>
+                                                <span className={d?.status === 'ACTIVE' ? 'status active' : 'status lost'}>
                                                     {d?.status || 'ACTIVE'}
                                                 </span>
                                             </td>
