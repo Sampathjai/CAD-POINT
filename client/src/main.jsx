@@ -2219,7 +2219,7 @@ function SettingsView({ token, theme, toggleTheme }) {
         <div className="settings-container">
             {/* Navigation sub-tabs */}
             <div className="settings-nav">
-                {['Profile', 'Appearance', 'Storage & Database', 'Local Agent & Devices', 'Enquiry Sources', 'WhatsApp & API', 'System Info'].map((tab) => (
+                {['Profile', 'Appearance', 'Storage & Database', 'Enquiry Sources', 'WhatsApp & API', 'System Info'].map((tab) => (
                     <button
                         key={tab}
                         className={`settings-nav-btn ${activeTab === tab ? 'active' : ''}`}
@@ -2402,6 +2402,88 @@ function SettingsView({ token, theme, toggleTheme }) {
                             </label>
                         </div>
 
+                        <div style={{ padding: 20, background: theme === 'dark' ? '#0f172a' : '#f8fafc', borderRadius: 12, border: '1px solid #cbd5e1', marginTop: 24, marginBottom: 24 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+                                <div>
+                                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#0284c7', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <ShieldCheck size={16} /> CADPOINT CRM Local Agent Integration
+                                    </span>
+                                    <h4 style={{ margin: '4px 0 2px', fontSize: 16, color: theme === 'dark' ? '#f8fafc' : '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <Laptop size={18} color="#16a34a" /> Local Agent Companion Active
+                                    </h4>
+                                    <p style={{ margin: 0, fontSize: 12, color: theme === 'dark' ? '#94a3b8' : '#64748b' }}>
+                                        Runs in background on client machine for persistent local storage & automated backups.
+                                    </p>
+                                </div>
+                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                                    <button type="button" className="secondary" style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => alert('Local agent file sync initiated.')}>
+                                        <RefreshCw size={14} /> Sync Files Now
+                                    </button>
+                                    <button type="button" className="secondary" style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#16a34a', borderColor: '#86efac' }} onClick={triggerDatabaseBackup}>
+                                        <Download size={14} /> Local Backup Snapshot
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div style={{ marginTop: 16 }}>
+                                <h5 style={{ fontSize: 12, fontWeight: 700, color: theme === 'dark' ? '#cbd5e1' : '#475569', textTransform: 'uppercase', marginBottom: 8 }}>
+                                    📱 Registered Client Desktop Devices ({(desktopDevices || []).length})
+                                </h5>
+                                <div className="table-responsive">
+                                    <table className="data-table" style={{ fontSize: 12 }}>
+                                        <thead>
+                                            <tr>
+                                                <th>Device Name</th>
+                                                <th>Platform</th>
+                                                <th>Version</th>
+                                                <th>Last Active</th>
+                                                <th>Status</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(!Array.isArray(desktopDevices) || desktopDevices.length === 0) ? (
+                                                <tr>
+                                                    <td colSpan={6} style={{ textAlign: 'center', padding: 14, color: '#94a3b8' }}>
+                                                        No desktop agent devices registered yet. Log in from CADPOINT CRM Local Agent app to register your computer.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                desktopDevices.map((d, index) => (
+                                                    <tr key={d?.id || index}>
+                                                        <td style={{ fontWeight: 600 }}>{d?.deviceName || 'Client Computer'}</td>
+                                                        <td>{d?.platform || 'Desktop'}</td>
+                                                        <td><code>v{d?.appVersion || '1.0.0'}</code></td>
+                                                        <td>{d?.lastSeenAt ? new Date(d.lastSeenAt).toLocaleString() : 'Recently'}</td>
+                                                        <td>
+                                                            <span className={d?.status === 'ACTIVE' ? 'status active' : 'status lost'}>
+                                                                {d?.status || 'ACTIVE'}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            {d?.status === 'ACTIVE' ? (
+                                                                <button
+                                                                    type="button"
+                                                                    className="action-btn danger"
+                                                                    style={{ padding: '2px 8px', fontSize: 11 }}
+                                                                    onClick={() => revokeDevice(d?.id)}
+                                                                    title="Revoke Device Access"
+                                                                >
+                                                                    Revoke
+                                                                </button>
+                                                            ) : (
+                                                                <span style={{ fontSize: 11, color: '#ef4444' }}>Revoked</span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
                         <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                             <div style={{ display: 'flex', gap: 10 }}>
                                 <button
@@ -2428,97 +2510,6 @@ function SettingsView({ token, theme, toggleTheme }) {
                             </button>
                         </div>
                     </form>
-                </div>
-            )}
-
-            {/* Local Agent & Connected Devices */}
-            {activeTab === 'Local Agent & Devices' && (
-                <div className="settings-card">
-                    <div className="settings-card-header">
-                        <h3>CADPOINT CRM Local Agent & Registered Client Devices</h3>
-                        <p>Manage background desktop companion agents, local drive storage synchronization, and offline database backup devices.</p>
-                    </div>
-
-                    <div style={{ padding: 20, background: theme === 'dark' ? '#0f172a' : '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', marginBottom: 24 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-                            <div>
-                                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em' }}>Desktop Agent Integration</span>
-                                <h4 style={{ margin: '4px 0 2px', fontSize: 18, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <Check size={20} /> CADPOINT CRM Local Agent Active
-                                </h4>
-                                <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>
-                                    Version: <b>1.0.0</b> • Storage Path: <b>~/CADPOINT CRM Data</b> • Status: <b>Background Service Active</b>
-                                </p>
-                            </div>
-                            <div style={{ display: 'flex', gap: 10 }}>
-                                <button type="button" className="secondary" onClick={() => alert('File synchronization triggered via Local Agent')}>
-                                    <RefreshCw size={16} /> Sync Files Now
-                                </button>
-                                <button type="button" className="secondary" style={{ color: '#16a34a', borderColor: '#86efac' }} onClick={triggerDatabaseBackup}>
-                                    <Download size={16} /> Trigger Local Backup
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <h4 style={{ margin: '0 0 12px', fontSize: 14, color: theme === 'dark' ? '#cbd5e1' : '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        📱 Registered Client Agent Devices ({(desktopDevices || []).length})
-                    </h4>
-                    <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
-                        Devices authorized to run CADPOINT CRM Local Agent and maintain persistent local storage.
-                    </p>
-
-                    <div className="table-responsive">
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Device Name</th>
-                                    <th>Platform</th>
-                                    <th>Agent Version</th>
-                                    <th>Last Seen</th>
-                                    <th>Status</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(!Array.isArray(desktopDevices) || desktopDevices.length === 0) ? (
-                                    <tr>
-                                        <td colSpan={6} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>
-                                            No desktop agent devices registered yet. Log in from CADPOINT CRM Local Agent app to register a device.
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    desktopDevices.map((d, index) => (
-                                        <tr key={d?.id || index}>
-                                            <td style={{ fontWeight: 600 }}>{d?.deviceName || 'Client Device'}</td>
-                                            <td>{d?.platform || 'Desktop'}</td>
-                                            <td><code>v{d?.appVersion || '1.0.0'}</code></td>
-                                            <td>{d?.lastSeenAt ? new Date(d.lastSeenAt).toLocaleString() : 'Recently'}</td>
-                                            <td>
-                                                <span className={d?.status === 'ACTIVE' ? 'status active' : 'status lost'}>
-                                                    {d?.status || 'ACTIVE'}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                {d?.status === 'ACTIVE' ? (
-                                                    <button
-                                                        type="button"
-                                                        className="action-btn danger"
-                                                        onClick={() => revokeDevice(d?.id)}
-                                                        title="Revoke Device Access"
-                                                    >
-                                                        Revoke Access
-                                                    </button>
-                                                ) : (
-                                                    <span style={{ fontSize: 12, color: '#ef4444' }}>Revoked</span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
                 </div>
             )}
 
