@@ -143,19 +143,22 @@ function App() {
             return alert('Please enter your password');
         }
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/auth/login', {
+            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+            const res = await fetch(apiUrl + '/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(loginForm)
             });
             const j = await res.json();
-            if (!j.success) return alert(formatErrorMessage(j.message) || 'Login failed');
+            if (!res.ok || !j.success) {
+                return alert(formatErrorMessage(j.message) || 'Invalid email or password. Please try again.');
+            }
             localStorage.setItem('cadpoint_token', j.data.token);
             setToken(j.data.token);
             setUser(j.data.user);
         } catch (err) {
-            console.error(err);
-            alert('Login error');
+            console.error('Login error', err);
+            alert('Unable to connect to login server. Please verify the API server is active.');
         }
     }
 

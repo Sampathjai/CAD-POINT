@@ -241,3 +241,4 @@ router.post('/devices/:id/revoke', authenticate, authorize('SUPER_ADMIN', 'ADMIN
 });
 
 module.exports = router;
+
