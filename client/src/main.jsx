@@ -2094,6 +2094,37 @@ function SettingsView({ token, theme, toggleTheme }) {
 
     const [desktopDevices, setDesktopDevices] = useState([]);
     const [agentConnected, setAgentConnected] = useState(true);
+    const [showAddDeviceModal, setShowAddDeviceModal] = useState(false);
+    const [newDeviceForm, setNewDeviceForm] = useState({ deviceName: '', platform: 'macOS' });
+
+    async function handleRegisterDevice(e) {
+        if (e) e.preventDefault();
+        if (!newDeviceForm.deviceName || !newDeviceForm.deviceName.trim()) {
+            return alert('Please enter a device name');
+        }
+        setSaving(true);
+        try {
+            const res = await fetch(import.meta.env.VITE_API_URL + '/desktop-agent/devices/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify(newDeviceForm)
+            });
+            const j = await res.json();
+            if (j.success) {
+                alert('✅ Device registered successfully!');
+                setShowAddDeviceModal(false);
+                setNewDeviceForm({ deviceName: '', platform: 'macOS' });
+                fetchDevices();
+            } else {
+                alert(j.message || 'Device registration failed');
+            }
+        } catch (err) {
+            console.error('handleRegisterDevice error', err);
+            alert('Failed to register device');
+        } finally {
+            setSaving(false);
+        }
+    }
 
     async function fetchSettings() {
         setLoading(true);
@@ -2467,9 +2498,19 @@ function SettingsView({ token, theme, toggleTheme }) {
                             </div>
 
                             <div style={{ marginTop: 16 }}>
-                                <h5 style={{ fontSize: 12, fontWeight: 700, color: theme === 'dark' ? '#cbd5e1' : '#475569', textTransform: 'uppercase', marginBottom: 8 }}>
-                                    📱 Registered Client Desktop Devices ({(desktopDevices || []).length})
-                                </h5>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                    <h5 style={{ fontSize: 12, fontWeight: 700, color: theme === 'dark' ? '#cbd5e1' : '#475569', textTransform: 'uppercase', margin: 0 }}>
+                                        📱 Registered Client Desktop Devices ({(desktopDevices || []).length})
+                                    </h5>
+                                    <button
+                                        type="button"
+                                        className="secondary"
+                                        style={{ padding: '4px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, color: '#0284c7', borderColor: '#7dd3fc', cursor: 'pointer' }}
+                                        onClick={() => setShowAddDeviceModal(true)}
+                                    >
+                                        <Plus size={14} /> Register New Device
+                                    </button>
+                                </div>
                                 <div className="table-responsive">
                                     <table className="data-table" style={{ fontSize: 12 }}>
                                         <thead>
@@ -2486,7 +2527,7 @@ function SettingsView({ token, theme, toggleTheme }) {
                                             {(!Array.isArray(desktopDevices) || desktopDevices.length === 0) ? (
                                                 <tr>
                                                     <td colSpan={6} style={{ textAlign: 'center', padding: 14, color: '#94a3b8' }}>
-                                                        No desktop agent devices registered yet. Log in from CADPOINT CRM Local Agent app to register your computer.
+                                                        No desktop agent devices registered yet. Click <b>"+ Register New Device"</b> above or log in from the CADPOINT Local Agent app to pair your computer.
                                                     </td>
                                                 </tr>
                                             ) : (
@@ -2524,6 +2565,63 @@ function SettingsView({ token, theme, toggleTheme }) {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Register New Device Modal */}
+                        {showAddDeviceModal && (
+                            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }}>
+                                <div style={{ background: theme === 'dark' ? '#1e293b' : '#ffffff', border: '1px solid #cbd5e1', borderRadius: 16, width: '100%', maxWidth: 480, padding: 24, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid #e2e8f0', paddingBottom: 12 }}>
+                                        <h3 style={{ margin: 0, fontSize: 18, color: theme === 'dark' ? '#f8fafc' : '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <Laptop size={20} color="#0284c7" /> Register Client Desktop Device
+                                        </h3>
+                                        <button type="button" onClick={() => setShowAddDeviceModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                                            <X size={20} />
+                                        </button>
+                                    </div>
+
+                                    <form onSubmit={handleRegisterDevice}>
+                                        <div style={{ marginBottom: 16 }}>
+                                            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#64748b', marginBottom: 6 }}>
+                                                Device / Computer Name *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                required
+                                                placeholder="e.g. Front Desk Windows 11 PC, Sampath MacBook Pro"
+                                                value={newDeviceForm.deviceName}
+                                                onChange={(e) => setNewDeviceForm({ ...newDeviceForm, deviceName: e.target.value })}
+                                                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14, background: theme === 'dark' ? '#0f172a' : '#ffffff', color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
+                                            />
+                                        </div>
+
+                                        <div style={{ marginBottom: 20 }}>
+                                            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#64748b', marginBottom: 6 }}>
+                                                Operating System Platform
+                                            </label>
+                                            <select
+                                                value={newDeviceForm.platform}
+                                                onChange={(e) => setNewDeviceForm({ ...newDeviceForm, platform: e.target.value })}
+                                                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14, background: theme === 'dark' ? '#0f172a' : '#ffffff', color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
+                                            >
+                                                <option value="macOS">macOS (Apple Silicon / Intel)</option>
+                                                <option value="Windows 11">Windows 11 (64-bit)</option>
+                                                <option value="Windows 10">Windows 10 (64-bit)</option>
+                                                <option value="Linux">Linux (Ubuntu / Debian / Fedora)</option>
+                                            </select>
+                                        </div>
+
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                                            <button type="button" className="secondary" onClick={() => setShowAddDeviceModal(false)} disabled={saving}>
+                                                Cancel
+                                            </button>
+                                            <button type="submit" className="primary" disabled={saving}>
+                                                {saving ? 'Registering...' : 'Confirm Device Registration'}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
 
                         <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                             <div style={{ display: 'flex', gap: 10 }}>

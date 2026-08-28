@@ -240,5 +240,37 @@ router.post('/devices/:id/revoke', authenticate, authorize('SUPER_ADMIN', 'ADMIN
   }
 });
 
+// POST /api/desktop-agent/devices/register - Register a new device directly from Web CRM Admin Settings
+router.post('/devices/register', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    const { deviceName, platform, appVersion } = req.body;
+    if (!deviceName || !deviceName.trim()) {
+      return res.status(400).json({ success: false, message: 'Device name is required' });
+    }
+
+    const organizationId = req.user?.organizationId || 'org_default';
+    const crypto = require('crypto');
+    const agentId = `agent_${crypto.randomBytes(6).toString('hex')}`;
+
+    const device = await prisma.desktopAgent.create({
+      data: {
+        agentId,
+        organizationId,
+        userId: req.user.id,
+        deviceName: deviceName.trim(),
+        platform: platform || 'macOS',
+        appVersion: appVersion || '1.0.0',
+        status: 'ACTIVE',
+        lastSeenAt: new Date()
+      }
+    });
+
+    res.json({ success: true, message: 'New desktop device registered successfully', data: device });
+  } catch (err) {
+    console.error('desktopAgent.devices.register', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;
 
