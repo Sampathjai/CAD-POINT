@@ -56,4 +56,27 @@ router.patch('/:id', authenticate, authorize('SUPER_ADMIN','ADMIN'), async (req,
   }
 });
 
+// DELETE /api/courses/:id
+router.delete('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  const { id } = req.params;
+  try {
+    const batchesCount = await prisma.batch.count({ where: { courseId: id } });
+    const admissionsCount = await prisma.admission.count({ where: { courseId: id } });
+
+    if (batchesCount > 0 || admissionsCount > 0) {
+      const updated = await prisma.course.update({
+        where: { id },
+        data: { isActive: false }
+      });
+      return res.json({ success: true, message: 'Course has associated batches or student admissions. Course deactivated.', data: updated });
+    }
+
+    await prisma.course.delete({ where: { id } });
+    res.json({ success: true, message: 'Course deleted successfully' });
+  } catch (err) {
+    console.error('courses.delete', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;

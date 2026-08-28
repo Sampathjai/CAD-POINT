@@ -561,6 +561,23 @@ function App() {
         }
     }
 
+    async function deleteCourse(id, courseName) {
+        if (!window.confirm(`Are you sure you want to remove course "${courseName}"?`)) return;
+        try {
+            const res = await fetch(import.meta.env.VITE_API_URL + '/courses/' + id, {
+                method: 'DELETE',
+                headers: { Authorization: 'Bearer ' + token }
+            });
+            const j = await res.json();
+            if (!j.success) return alert(j.message || 'Delete course failed');
+            alert(j.message || 'Course removed successfully');
+            fetchCourses();
+        } catch (e) {
+            console.error(e);
+            alert('Delete course failed');
+        }
+    }
+
     function openEditBatch(batchToEdit) {
         setEditingBatch(batchToEdit);
         setEditBatchForm({
@@ -859,6 +876,7 @@ function App() {
                         onEditUser={openEditUser}
                         onDeleteUser={deleteUser}
                         onEditCourse={openEditCourse}
+                        onDeleteCourse={deleteCourse}
                         onEditBatch={openEditBatch}
                         onDeleteBatch={deleteBatch}
                         onDeleteStudent={deleteStudent}
@@ -1565,7 +1583,7 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
     );
 }
 
-function Module({ page, leads, followups, courses, batches, students, admissions, payments, usersList, onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onEditUser, onDeleteUser, onEditCourse, onEditBatch, onDeleteBatch, onDeleteStudent, onDeleteAdmission, currentUserId, token, theme, toggleTheme }) {
+function Module({ page, leads, followups, courses, batches, students, admissions, payments, usersList, onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onDeleteStudent, onDeleteAdmission, currentUserId, token, theme, toggleTheme }) {
     const itemSingular = page.slice(0, -1);
 
     return (
@@ -1693,9 +1711,26 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                                     <td><b>₹{Number(c.standardFee).toLocaleString()}</b></td>
                                     <td><span className={c.isActive ? 'status confirmed' : 'status lost'}>{c.isActive ? 'Active' : 'Inactive'}</span></td>
                                     <td>
-                                        <button className="secondary" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => onEditCourse(c)}>
-                                            <Edit size={13} /> Edit
-                                        </button>
+                                        <div style={{ display: 'flex', gap: 6 }}>
+                                            <button
+                                                type="button"
+                                                className="secondary"
+                                                style={{ padding: '4px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                onClick={() => onEditCourse(c)}
+                                                title="Edit Course Details"
+                                            >
+                                                <Edit size={13} /> Edit
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="secondary"
+                                                style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                onClick={() => onDeleteCourse(c.id, c.name)}
+                                                title="Remove Course"
+                                            >
+                                                <Trash2 size={13} /> Remove
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
