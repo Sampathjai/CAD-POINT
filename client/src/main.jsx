@@ -27,7 +27,8 @@ import {
     Moon,
     HardDrive,
     Laptop,
-    ShieldCheck
+    ShieldCheck,
+    RefreshCw
 } from 'lucide-react';
 import './styles.css';
 
