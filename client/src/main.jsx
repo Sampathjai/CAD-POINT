@@ -73,6 +73,8 @@ function App() {
     const [editUserForm, setEditUserForm] = useState({ id: '', name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true });
     const [editingCourse, setEditingCourse] = useState(null);
     const [editCourseForm, setEditCourseForm] = useState({ id: '', courseCode: '', name: '', description: '', standardFee: '', isActive: true });
+    const [editingBatch, setEditingBatch] = useState(null);
+    const [editBatchForm, setEditBatchForm] = useState({ id: '', batchCode: '', name: '', courseId: '', startDate: '', capacity: 25 });
 
     const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -559,6 +561,57 @@ function App() {
         }
     }
 
+    function openEditBatch(batchToEdit) {
+        setEditingBatch(batchToEdit);
+        setEditBatchForm({
+            id: batchToEdit.id,
+            batchCode: batchToEdit.batchCode || '',
+            name: batchToEdit.name || '',
+            courseId: batchToEdit.courseId || (batchToEdit.course?.id || ''),
+            startDate: batchToEdit.startDate ? new Date(batchToEdit.startDate).toISOString().slice(0, 10) : '',
+            capacity: batchToEdit.capacity || 25
+        });
+    }
+
+    async function updateBatchSubmit() {
+        if (!editBatchForm.name || !editBatchForm.name.trim()) {
+            return alert('Please enter batch name');
+        }
+        try {
+            const res = await fetch(import.meta.env.VITE_API_URL + '/batches/' + editBatchForm.id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify({
+                    ...editBatchForm,
+                    capacity: Number(editBatchForm.capacity) || 25
+                })
+            });
+            const j = await res.json();
+            if (!j.success) return alert(j.message || 'Update batch failed');
+            fetchBatches();
+            setEditingBatch(null);
+        } catch (e) {
+            console.error(e);
+            alert('Update batch failed');
+        }
+    }
+
+    async function deleteBatch(id, batchName) {
+        if (!window.confirm(`Are you sure you want to delete batch "${batchName}"?`)) return;
+        try {
+            const res = await fetch(import.meta.env.VITE_API_URL + '/batches/' + id, {
+                method: 'DELETE',
+                headers: { Authorization: 'Bearer ' + token }
+            });
+            const j = await res.json();
+            if (!j.success) return alert(j.message || 'Delete batch failed');
+            fetchBatches();
+        } catch (e) {
+            console.error(e);
+            alert('Delete batch failed');
+        }
+    }
+
     function getNextCode(prefix, list, key) {
         let maxNum = 1000;
         if (list && list.length > 0) {
@@ -806,6 +859,8 @@ function App() {
                         onEditUser={openEditUser}
                         onDeleteUser={deleteUser}
                         onEditCourse={openEditCourse}
+                        onEditBatch={openEditBatch}
+                        onDeleteBatch={deleteBatch}
                         onDeleteStudent={deleteStudent}
                         onDeleteAdmission={deleteAdmission}
                         currentUserId={user?.id}
@@ -858,6 +913,48 @@ function App() {
                         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                             <button className="primary" type="submit">Save Changes</button>
                             <button type="button" onClick={() => setEditingCourse(null)}>Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            )}
+            {editingBatch && (
+                <div className="modal">
+                    <form
+                        className="panel"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            updateBatchSubmit();
+                        }}
+                    >
+                        <h3>Edit Batch</h3>
+                        <label>
+                            Batch Code
+                            <input value={editBatchForm.batchCode} onChange={(e) => setEditBatchForm({ ...editBatchForm, batchCode: e.target.value })} required />
+                        </label>
+                        <label>
+                            Batch Name
+                            <input value={editBatchForm.name} onChange={(e) => setEditBatchForm({ ...editBatchForm, name: e.target.value })} required />
+                        </label>
+                        <label>
+                            Course
+                            <select value={editBatchForm.courseId} onChange={(e) => setEditBatchForm({ ...editBatchForm, courseId: e.target.value })} required>
+                                <option value="">Select Course</option>
+                                {courses.map((c) => (
+                                    <option key={c.id} value={c.id}>{c.name} ({c.courseCode})</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label>
+                            Start Date
+                            <input type="date" value={editBatchForm.startDate} onChange={(e) => setEditBatchForm({ ...editBatchForm, startDate: e.target.value })} required />
+                        </label>
+                        <label>
+                            Capacity (Students)
+                            <input type="number" value={editBatchForm.capacity} onChange={(e) => setEditBatchForm({ ...editBatchForm, capacity: Number(e.target.value) })} />
+                        </label>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                            <button className="primary" type="submit">Save Batch</button>
+                            <button type="button" onClick={() => setEditingBatch(null)}>Cancel</button>
                         </div>
                     </form>
                 </div>
@@ -1468,7 +1565,7 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
     );
 }
 
-function Module({ page, leads, followups, courses, batches, students, admissions, payments, usersList, onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onEditUser, onDeleteUser, onEditCourse, onDeleteStudent, onDeleteAdmission, currentUserId, token, theme, toggleTheme }) {
+function Module({ page, leads, followups, courses, batches, students, admissions, payments, usersList, onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onEditUser, onDeleteUser, onEditCourse, onEditBatch, onDeleteBatch, onDeleteStudent, onDeleteAdmission, currentUserId, token, theme, toggleTheme }) {
     const itemSingular = page.slice(0, -1);
 
     return (
@@ -1616,6 +1713,7 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                                 <th>Start Date</th>
                                 <th>Capacity</th>
                                 <th>Status</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1627,6 +1725,28 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                                     <td>{new Date(b.startDate).toLocaleDateString()}</td>
                                     <td>{b.capacity} students</td>
                                     <td><span className="status active">{b.status}</span></td>
+                                    <td>
+                                        <div style={{ display: 'flex', gap: 6 }}>
+                                            <button
+                                                type="button"
+                                                className="secondary"
+                                                style={{ padding: '4px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                onClick={() => onEditBatch(b)}
+                                                title="Edit Batch Details"
+                                            >
+                                                <Edit size={13} /> Edit
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="secondary"
+                                                style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                onClick={() => onDeleteBatch(b.id, b.name)}
+                                                title="Delete Batch"
+                                            >
+                                                <Trash2 size={13} /> Delete
+                                            </button>
+                                        </div>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>

@@ -34,4 +34,48 @@ router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN'), async (req, res
   }
 });
 
+// PUT /api/batches/:id - Update batch details
+router.put('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { batchCode, name, courseId, startDate, endDate, capacity, status } = req.body;
+
+    const existing = await prisma.batch.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Batch not found' });
+    }
+
+    const updated = await prisma.batch.update({
+      where: { id },
+      data: {
+        batchCode: batchCode || existing.batchCode,
+        name: name || existing.name,
+        courseId: courseId || existing.courseId,
+        startDate: startDate ? new Date(startDate) : existing.startDate,
+        endDate: endDate ? new Date(endDate) : existing.endDate,
+        capacity: capacity ? Number(capacity) : existing.capacity,
+        status: status || existing.status
+      },
+      include: { course: true, trainer: { select: { id: true, name: true } } }
+    });
+
+    res.json({ success: true, data: updated, message: 'Batch updated successfully' });
+  } catch (err) {
+    console.error('batches.update', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// DELETE /api/batches/:id - Delete batch
+router.delete('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.batch.delete({ where: { id } });
+    res.json({ success: true, message: 'Batch deleted successfully' });
+  } catch (err) {
+    console.error('batches.delete', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;
