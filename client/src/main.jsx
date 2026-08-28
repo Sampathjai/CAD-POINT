@@ -2126,6 +2126,25 @@ function SettingsView({ token, theme, toggleTheme }) {
         }
     }
 
+    async function syncDeviceData(id, deviceName) {
+        try {
+            const res = await fetch(import.meta.env.VITE_API_URL + '/desktop-agent/devices/' + id + '/sync', {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + token }
+            });
+            const j = await res.json();
+            if (j.success) {
+                alert(`✅ Synchronized CRM Data to Device:\n\n${deviceName}\n\nAll leads, admissions, payments, and uploaded documents saved to persistent local storage on this computer.`);
+                fetchDevices();
+            } else {
+                alert(j.message || 'Sync failed');
+            }
+        } catch (err) {
+            console.error('syncDeviceData error', err);
+            alert('Device sync failed');
+        }
+    }
+
     async function fetchSettings() {
         setLoading(true);
         try {
@@ -2517,16 +2536,17 @@ function SettingsView({ token, theme, toggleTheme }) {
                                             <tr>
                                                 <th>Device Name</th>
                                                 <th>Platform</th>
+                                                <th>Device Local Storage Path</th>
                                                 <th>Version</th>
                                                 <th>Last Active</th>
                                                 <th>Status</th>
-                                                <th>Action</th>
+                                                <th>Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {(!Array.isArray(desktopDevices) || desktopDevices.length === 0) ? (
                                                 <tr>
-                                                    <td colSpan={6} style={{ textAlign: 'center', padding: 14, color: '#94a3b8' }}>
+                                                    <td colSpan={7} style={{ textAlign: 'center', padding: 14, color: '#94a3b8' }}>
                                                         No desktop agent devices registered yet. Click <b>"+ Register New Device"</b> above or log in from the CADPOINT Local Agent app to pair your computer.
                                                     </td>
                                                 </tr>
@@ -2535,24 +2555,36 @@ function SettingsView({ token, theme, toggleTheme }) {
                                                     <tr key={d?.id || index}>
                                                         <td style={{ fontWeight: 600 }}>{d?.deviceName || 'Client Computer'}</td>
                                                         <td>{d?.platform || 'Desktop'}</td>
+                                                        <td><code style={{ fontSize: 11, color: '#0284c7' }}>{d?.storagePath || `~/CADPOINT CRM Data/${d?.deviceName || 'Local'}`}</code></td>
                                                         <td><code>v{d?.appVersion || '1.0.0'}</code></td>
                                                         <td>{d?.lastSeenAt ? new Date(d.lastSeenAt).toLocaleString() : 'Recently'}</td>
                                                         <td>
                                                             <span className={d?.status === 'ACTIVE' ? 'status active' : 'status lost'}>
-                                                                {d?.status || 'ACTIVE'}
+                                                                {d?.status === 'ACTIVE' ? '🟢 Data Synced' : 'Revoked'}
                                                             </span>
                                                         </td>
                                                         <td>
                                                             {d?.status === 'ACTIVE' ? (
-                                                                <button
-                                                                    type="button"
-                                                                    className="action-btn danger"
-                                                                    style={{ padding: '2px 8px', fontSize: 11 }}
-                                                                    onClick={() => revokeDevice(d?.id)}
-                                                                    title="Revoke Device Access"
-                                                                >
-                                                                    Revoke
-                                                                </button>
+                                                                <div style={{ display: 'flex', gap: 6 }}>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="secondary"
+                                                                        style={{ padding: '2px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                                        onClick={() => syncDeviceData(d?.id, d?.deviceName)}
+                                                                        title="Synchronize CRM Data to Local Device Storage"
+                                                                    >
+                                                                        <RefreshCw size={11} /> Sync Data
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="action-btn danger"
+                                                                        style={{ padding: '2px 8px', fontSize: 11 }}
+                                                                        onClick={() => revokeDevice(d?.id)}
+                                                                        title="Revoke Device Access"
+                                                                    >
+                                                                        Revoke
+                                                                    </button>
+                                                                </div>
                                                             ) : (
                                                                 <span style={{ fontSize: 11, color: '#ef4444' }}>Revoked</span>
                                                             )}

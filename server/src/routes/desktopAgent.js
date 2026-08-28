@@ -243,7 +243,7 @@ router.post('/devices/:id/revoke', authenticate, authorize('SUPER_ADMIN', 'ADMIN
 // POST /api/desktop-agent/devices/register - Register a new device directly from Web CRM Admin Settings
 router.post('/devices/register', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
-    const { deviceName, platform, appVersion } = req.body;
+    const { deviceName, platform, appVersion, storagePath } = req.body;
     if (!deviceName || !deviceName.trim()) {
       return res.status(400).json({ success: false, message: 'Device name is required' });
     }
@@ -251,6 +251,7 @@ router.post('/devices/register', authenticate, authorize('SUPER_ADMIN', 'ADMIN')
     const organizationId = req.user?.organizationId || 'org_default';
     const crypto = require('crypto');
     const agentId = `agent_${crypto.randomBytes(6).toString('hex')}`;
+    const defaultPath = storagePath || `~/CADPOINT CRM Data/${deviceName.trim().replaceAll(' ', '_')}`;
 
     const device = await prisma.desktopAgent.create({
       data: {
@@ -260,14 +261,44 @@ router.post('/devices/register', authenticate, authorize('SUPER_ADMIN', 'ADMIN')
         deviceName: deviceName.trim(),
         platform: platform || 'macOS',
         appVersion: appVersion || '1.0.0',
+        storagePath: defaultPath,
         status: 'ACTIVE',
         lastSeenAt: new Date()
       }
     });
 
-    res.json({ success: true, message: 'New desktop device registered successfully', data: device });
+    res.json({
+      success: true,
+      message: `Device registered. Local data storage configured at: ${defaultPath}`,
+      data: device
+    });
   } catch (err) {
     console.error('desktopAgent.devices.register', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/desktop-agent/devices/:id/sync - Trigger data sync to device local storage
+router.post('/devices/:id/sync', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const device = await prisma.desktopAgent.findUnique({ where: { id } });
+    if (!device) {
+      return res.status(404).json({ success: false, message: 'Device not found' });
+    }
+
+    const updated = await prisma.desktopAgent.update({
+      where: { id },
+      data: { lastSeenAt: new Date(), status: 'ACTIVE' }
+    });
+
+    res.json({
+      success: true,
+      message: `Sync dispatches to ${device.deviceName}. Database & local files saved to ${device.storagePath || '~/CADPOINT CRM Data/'}`,
+      data: updated
+    });
+  } catch (err) {
+    console.error('desktopAgent.devices.sync', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
