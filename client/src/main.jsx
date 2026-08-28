@@ -1759,7 +1759,11 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                     </table>
                 )}
 
-                {page === 'Settings' && <SettingsView token={token} theme={theme} toggleTheme={toggleTheme} />}
+                {page === 'Settings' && (
+                    <ErrorBoundary>
+                        <SettingsView token={token} theme={theme} toggleTheme={toggleTheme} />
+                    </ErrorBoundary>
+                )}
 
                 {page === 'Reports' && (
                     <ReportsView
@@ -2000,6 +2004,42 @@ function ReportsView({ leads, followups, courses, batches, students, admissions,
     );
 }
 
+class ErrorBoundary extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+    }
+    static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+    }
+    componentDidCatch(error, errorInfo) {
+        console.error("ErrorBoundary caught error:", error, errorInfo);
+    }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div style={{ padding: 24, background: '#fef2f2', borderRadius: 12, border: '1px solid #fca5a5', color: '#991b1b', margin: 20 }}>
+                    <h3 style={{ margin: '0 0 8px' }}>⚠️ Component Display Error</h3>
+                    <p style={{ margin: '0 0 16px', fontSize: 13, color: '#7f1d1d' }}>
+                        {this.state.error?.message || 'An unexpected rendering error occurred in this view.'}
+                    </p>
+                    <button
+                        type="button"
+                        className="primary"
+                        onClick={() => {
+                            this.setState({ hasError: false, error: null });
+                            window.location.reload();
+                        }}
+                    >
+                        🔄 Refresh CRM Settings
+                    </button>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
+
 function SettingsView({ token, theme, toggleTheme }) {
     const [activeTab, setActiveTab] = useState('Profile');
     const [settingsData, setSettingsData] = useState(null);
@@ -2033,11 +2073,6 @@ function SettingsView({ token, theme, toggleTheme }) {
     });
 
     const [availableDrives, setAvailableDrives] = useState([]);
-
-    useEffect(() => {
-        fetchSettings();
-        fetchDrives();
-    }, []);
 
     async function fetchDrives() {
         try {
