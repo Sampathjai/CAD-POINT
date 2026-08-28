@@ -2026,9 +2026,24 @@ function SettingsView({ token, theme, toggleTheme }) {
         dbUser: 'postgres'
     });
 
+    const [availableDrives, setAvailableDrives] = useState([]);
+
     useEffect(() => {
         fetchSettings();
+        fetchDrives();
     }, []);
+
+    async function fetchDrives() {
+        try {
+            const res = await fetch(import.meta.env.VITE_API_URL + '/settings/storage/drives', {
+                headers: { Authorization: 'Bearer ' + token }
+            });
+            const j = await res.json();
+            if (j.success) setAvailableDrives(j.data || []);
+        } catch (e) {
+            console.error('fetchDrives error', e);
+        }
+    }
 
     async function fetchSettings() {
         setLoading(true);
@@ -2224,6 +2239,36 @@ function SettingsView({ token, theme, toggleTheme }) {
                                 />
                                 <small>Database owner username</small>
                             </div>
+                        </div>
+
+                        <div className="form-field full-width" style={{ padding: '16px', background: theme === 'dark' ? '#1e293b' : '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', marginBottom: 20 }}>
+                            <label style={{ fontSize: 13, fontWeight: 700, color: theme === 'dark' ? '#38bdf8' : '#0284c7', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                <HardDrive size={18} /> Select Local Disk Drive / Volume
+                            </label>
+                            <p style={{ margin: '4px 0 12px', fontSize: 12, color: theme === 'dark' ? '#94a3b8' : '#64748b' }}>
+                                Choose an available local system disk drive or mounted volume to automatically assign storage & backup directory locations.
+                            </p>
+                            <select
+                                onChange={(e) => {
+                                    const selectedPath = e.target.value;
+                                    if (selectedPath) {
+                                        const cleanPath = selectedPath.endsWith('/') || selectedPath.endsWith('\\') ? selectedPath.slice(0, -1) : selectedPath;
+                                        setProfileForm({
+                                            ...profileForm,
+                                            storageLocation: cleanPath,
+                                            backupDir: cleanPath + '/backups'
+                                        });
+                                    }
+                                }}
+                                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, background: theme === 'dark' ? '#0f172a' : '#ffffff', color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
+                            >
+                                <option value="">-- Click to Select Detected Local Disk Drive --</option>
+                                {availableDrives.map((drive) => (
+                                    <option key={drive.id} value={drive.path}>
+                                        {drive.label} ➔ ({drive.path})
+                                    </option>
+                                ))}
+                            </select>
                         </div>
 
                         <h4 style={{ margin: '0 0 12px', fontSize: 14, color: theme === 'dark' ? '#cbd5e1' : '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>

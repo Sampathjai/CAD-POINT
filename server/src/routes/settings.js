@@ -227,5 +227,78 @@ router.post('/backup/trigger', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), 
   }
 });
 
+// GET /api/settings/storage/drives - Detect available local disk drives/volumes on system
+router.get('/storage/drives', authenticate, async (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+    const drives = [];
+
+    // 1. Root System Drive
+    drives.push({
+      id: 'root',
+      label: '💾 Primary System Disk (/)',
+      path: '/var/cadpoint/storage',
+      description: 'System root drive volume'
+    });
+
+    // 2. User Home Directory Drive
+    const userHome = os.homedir();
+    drives.push({
+      id: 'user_home',
+      label: `📁 User Home Directory (${userHome})`,
+      path: path.join(userHome, 'cadpoint_storage'),
+      description: 'User home directory storage'
+    });
+
+    // 3. Application Local Directory
+    drives.push({
+      id: 'app_local',
+      label: '💽 Project Local Workspace (./storage)',
+      path: './storage',
+      description: 'Default project workspace storage folder'
+    });
+
+    // 4. macOS / Linux Mounted External Volumes (/Volumes or /mnt or /media)
+    if (process.platform === 'darwin' && fs.existsSync('/Volumes')) {
+      try {
+        const vols = fs.readdirSync('/Volumes');
+        for (const vol of vols) {
+          if (!vol.startsWith('.')) {
+            const volPath = path.join('/Volumes', vol);
+            drives.push({
+              id: 'vol_' + vol.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+              label: `🔌 External Volume (${vol})`,
+              path: path.join(volPath, 'cadpoint_data'),
+              description: `Mounted local drive volume at ${volPath}`
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('Error reading /Volumes:', e);
+      }
+    } else if (process.platform === 'win32') {
+      const winDrives = ['C', 'D', 'E', 'F', 'G', 'H'];
+      for (const letter of winDrives) {
+        const drivePath = `${letter}:\\`;
+        if (fs.existsSync(drivePath)) {
+          drives.push({
+            id: 'win_' + letter.toLowerCase(),
+            label: `💽 Local Disk (${letter}:)`,
+            path: `${letter}:\\CADPoint_Storage`,
+            description: `Windows Local Disk ${letter}:`
+          });
+        }
+      }
+    }
+
+    res.json({ success: true, data: drives });
+  } catch (err) {
+    console.error('settings.storage.drives', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;
 
