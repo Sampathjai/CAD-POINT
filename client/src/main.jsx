@@ -2075,9 +2075,14 @@ function SettingsView({ token, theme, toggleTheme }) {
                 headers: { Authorization: 'Bearer ' + token }
             });
             const j = await res.json();
-            if (j.success) setDesktopDevices(j.data);
+            if (j.success && Array.isArray(j.data)) {
+                setDesktopDevices(j.data);
+            } else {
+                setDesktopDevices([]);
+            }
         } catch (e) {
             console.error('fetchDevices error', e);
+            setDesktopDevices([]);
         }
     }
 
@@ -2473,7 +2478,7 @@ function SettingsView({ token, theme, toggleTheme }) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {(!desktopDevices || desktopDevices.length === 0) ? (
+                                {(!Array.isArray(desktopDevices) || desktopDevices.length === 0) ? (
                                     <tr>
                                         <td colSpan={6} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>
                                             No desktop agent devices registered yet. Log in from CADPOINT CRM Local Agent app to register a device.
