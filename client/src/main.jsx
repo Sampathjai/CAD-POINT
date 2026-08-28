@@ -27,7 +27,8 @@ import {
     Moon,
     HardDrive,
     Laptop,
-    ShieldCheck
+    ShieldCheck,
+    RefreshCw
 } from 'lucide-react';
 import './styles.css';
 
@@ -2454,7 +2455,7 @@ function SettingsView({ token, theme, toggleTheme }) {
                     </div>
 
                     <h4 style={{ margin: '0 0 12px', fontSize: 14, color: theme === 'dark' ? '#cbd5e1' : '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        📱 Registered Client Agent Devices ({desktopDevices.length})
+                        📱 Registered Client Agent Devices ({(desktopDevices || []).length})
                     </h4>
                     <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
                         Devices authorized to run CADPOINT CRM Local Agent and maintain persistent local storage.
@@ -2473,7 +2474,7 @@ function SettingsView({ token, theme, toggleTheme }) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {desktopDevices.length === 0 ? (
+                                {(!desktopDevices || desktopDevices.length === 0) ? (
                                     <tr>
                                         <td colSpan={6} style={{ textAlign: 'center', padding: 20, color: '#94a3b8' }}>
                                             No desktop agent devices registered yet. Log in from CADPOINT CRM Local Agent app to register a device.
