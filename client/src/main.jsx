@@ -24,7 +24,8 @@ import {
     Trash2,
     Download,
     Sun,
-    Moon
+    Moon,
+    HardDrive
 } from 'lucide-react';
 import './styles.css';
 
