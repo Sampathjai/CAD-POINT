@@ -74,3 +74,4 @@ router.get('/usage', authenticate, async (req, res) => {
 });
 
 module.exports = router;
+

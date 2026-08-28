@@ -68,3 +68,4 @@ This document contains step-by-step instructions for deploying CAD Point CRM to 
 - 🛡️ **Multi-Tenant Storage**: All client files and documents are stored under isolated object keys:
   `organizations/{organizationId}/{category}/{timestamp}_{filename}`
 - 🔑 **Serverless & Edge Compatible**: All storage calls happen server-side using secure API secrets without exposing private keys to the client browser.
+

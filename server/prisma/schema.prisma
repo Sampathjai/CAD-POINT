@@ -116,6 +116,7 @@ model User {
   batches       Batch[]        @relation("TrainerBatches")
   notifications Notification[]
   files         FileMetadata[]
+  desktopAgents DesktopAgent[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -368,4 +369,23 @@ model FileMetadata {
 
   @@index([organizationId, category])
   @@index([uploadedById])
+}
+
+model DesktopAgent {
+  id             String   @id @default(uuid())
+  agentId        String   @unique
+  organizationId String   @default("org_default")
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceName     String
+  platform       String   @default("windows")
+  appVersion     String   @default("1.0.0")
+  storagePath    String?
+  status         String   @default("ACTIVE")
+  lastSeenAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId, status])
+  @@index([userId])
 }
