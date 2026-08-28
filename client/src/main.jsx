@@ -2014,7 +2014,16 @@ function SettingsView({ token, theme, toggleTheme }) {
         whatsappApiUrl: '',
         whatsappPhoneNumberId: '',
         whatsappAccessToken: '',
-        autoAssignLeads: true
+        autoAssignLeads: true,
+        storageLocation: './storage',
+        backupDir: './storage/backups',
+        maxStorageLimitMB: 10240,
+        autoBackupEnabled: true,
+        backupFrequency: 'DAILY',
+        dbHost: 'localhost',
+        dbPort: '5432',
+        dbName: 'cadpoint_crm',
+        dbUser: 'postgres'
     });
 
     useEffect(() => {
@@ -2054,6 +2063,27 @@ function SettingsView({ token, theme, toggleTheme }) {
         } catch (e) {
             console.error(e);
             alert('Save failed');
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    async function triggerDatabaseBackup() {
+        setSaving(true);
+        try {
+            const res = await fetch(import.meta.env.VITE_API_URL + '/settings/backup/trigger', {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + token }
+            });
+            const j = await res.json();
+            if (j.success) {
+                alert(`✅ Database Backup Created Successfully!\n\nFile Name: ${j.data.fileName}\nSize: ${j.data.fileSizeFormatted}\nPath: ${j.data.filePath}`);
+            } else {
+                alert(j.message || 'Backup failed');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Backup failed');
         } finally {
             setSaving(false);
         }
@@ -2102,7 +2132,7 @@ function SettingsView({ token, theme, toggleTheme }) {
         <div className="settings-container">
             {/* Navigation sub-tabs */}
             <div className="settings-nav">
-                {['Profile', 'Appearance', 'Enquiry Sources', 'WhatsApp & API', 'System Info'].map((tab) => (
+                {['Profile', 'Appearance', 'Storage & Database', 'Enquiry Sources', 'WhatsApp & API', 'System Info'].map((tab) => (
                     <button
                         key={tab}
                         className={`settings-nav-btn ${activeTab === tab ? 'active' : ''}`}
@@ -2142,6 +2172,136 @@ function SettingsView({ token, theme, toggleTheme }) {
                             {theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
                         </button>
                     </div>
+                </div>
+            )}
+
+            {/* Storage & Database Location */}
+            {activeTab === 'Storage & Database' && (
+                <div className="settings-card">
+                    <div className="settings-card-header">
+                        <h3>Database Storage & Client Location Settings</h3>
+                        <p>Configure database host parameters, client storage paths, allocation limits, and automated backups.</p>
+                    </div>
+
+                    <form onSubmit={saveProfileSettings}>
+                        <h4 style={{ margin: '0 0 12px', fontSize: 14, color: theme === 'dark' ? '#cbd5e1' : '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            🗄️ Database Server Connection
+                        </h4>
+                        <div className="form-grid" style={{ marginBottom: 24 }}>
+                            <div className="form-field">
+                                <label>Database Host / IP</label>
+                                <input
+                                    value={profileForm.dbHost || 'localhost'}
+                                    onChange={(e) => setProfileForm({ ...profileForm, dbHost: e.target.value })}
+                                    placeholder="localhost or 192.168.1.100"
+                                />
+                                <small>Server host address of PostgreSQL engine</small>
+                            </div>
+                            <div className="form-field">
+                                <label>Port Number</label>
+                                <input
+                                    value={profileForm.dbPort || '5432'}
+                                    onChange={(e) => setProfileForm({ ...profileForm, dbPort: e.target.value })}
+                                    placeholder="5432"
+                                />
+                                <small>PostgreSQL network port</small>
+                            </div>
+                            <div className="form-field">
+                                <label>Database Name</label>
+                                <input
+                                    value={profileForm.dbName || 'cadpoint_crm'}
+                                    onChange={(e) => setProfileForm({ ...profileForm, dbName: e.target.value })}
+                                    placeholder="cadpoint_crm"
+                                />
+                                <small>Target PostgreSQL database name</small>
+                            </div>
+                            <div className="form-field">
+                                <label>Database User</label>
+                                <input
+                                    value={profileForm.dbUser || 'postgres'}
+                                    onChange={(e) => setProfileForm({ ...profileForm, dbUser: e.target.value })}
+                                    placeholder="postgres"
+                                />
+                                <small>Database owner username</small>
+                            </div>
+                        </div>
+
+                        <h4 style={{ margin: '0 0 12px', fontSize: 14, color: theme === 'dark' ? '#cbd5e1' : '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            📁 Data & Backup Storage Directories
+                        </h4>
+                        <div className="form-grid">
+                            <div className="form-field full-width">
+                                <label>Primary Storage Location Directory</label>
+                                <input
+                                    value={profileForm.storageLocation || './storage'}
+                                    onChange={(e) => setProfileForm({ ...profileForm, storageLocation: e.target.value })}
+                                    placeholder="./storage or D:\CADPoint_Data"
+                                />
+                                <small>Target directory where uploads, spreadsheets, and client datasets are stored</small>
+                            </div>
+                            <div className="form-field full-width">
+                                <label>Automated Backup Directory Path</label>
+                                <input
+                                    value={profileForm.backupDir || './storage/backups'}
+                                    onChange={(e) => setProfileForm({ ...profileForm, backupDir: e.target.value })}
+                                    placeholder="./storage/backups or D:\CADPoint_Backups"
+                                />
+                                <small>Directory path where database dumps and system backup snapshots are exported</small>
+                            </div>
+                            <div className="form-field">
+                                <label>Backup Frequency</label>
+                                <select
+                                    value={profileForm.backupFrequency || 'DAILY'}
+                                    onChange={(e) => setProfileForm({ ...profileForm, backupFrequency: e.target.value })}
+                                >
+                                    <option value="DAILY">Daily (Every Midnight)</option>
+                                    <option value="WEEKLY">Weekly (Sundays)</option>
+                                    <option value="MONTHLY">Monthly (1st of Month)</option>
+                                    <option value="MANUAL">Manual Only</option>
+                                </select>
+                            </div>
+                            <div className="form-field">
+                                <label>Storage Capacity Limit (MB)</label>
+                                <input
+                                    type="number"
+                                    value={profileForm.maxStorageLimitMB || 10240}
+                                    onChange={(e) => setProfileForm({ ...profileForm, maxStorageLimitMB: Number(e.target.value) })}
+                                    placeholder="10240"
+                                />
+                                <small>Maximum allocated disk space in megabytes (e.g. 10240 MB = 10 GB)</small>
+                            </div>
+                        </div>
+
+                        <div className="toggle-card" style={{ marginTop: 20 }}>
+                            <div className="toggle-card-info">
+                                <h4>Automated Daily Database Backups</h4>
+                                <p>Automatically generate and save database JSON/SQL snapshot files into the backup directory</p>
+                            </div>
+                            <label className="checkbox-label" style={{ margin: 0 }}>
+                                <input
+                                    type="checkbox"
+                                    checked={profileForm.autoBackupEnabled}
+                                    onChange={(e) => setProfileForm({ ...profileForm, autoBackupEnabled: e.target.checked })}
+                                />
+                                Enable Auto Backup
+                            </label>
+                        </div>
+
+                        <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <button
+                                type="button"
+                                className="secondary"
+                                onClick={triggerDatabaseBackup}
+                                disabled={saving}
+                                style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#16a34a', borderColor: '#86efac' }}
+                            >
+                                📥 Trigger Database Backup Now
+                            </button>
+                            <button className="primary" type="submit" disabled={saving}>
+                                {saving ? 'Saving Storage Config...' : 'Save Storage Settings'}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             )}
 
