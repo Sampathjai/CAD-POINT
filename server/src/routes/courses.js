@@ -56,23 +56,24 @@ router.patch('/:id', authenticate, authorize('SUPER_ADMIN','ADMIN'), async (req,
   }
 });
 
-// DELETE /api/courses/:id
+// DELETE /api/courses/:id - Complete permanent deletion
 router.delete('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   const { id } = req.params;
   try {
-    const batchesCount = await prisma.batch.count({ where: { courseId: id } });
-    const admissionsCount = await prisma.admission.count({ where: { courseId: id } });
-
-    if (batchesCount > 0 || admissionsCount > 0) {
-      const updated = await prisma.course.update({
-        where: { id },
-        data: { isActive: false }
-      });
-      return res.json({ success: true, message: 'Course has associated batches or student admissions. Course deactivated.', data: updated });
+    const existing = await prisma.course.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
     }
 
-    await prisma.course.delete({ where: { id } });
-    res.json({ success: true, message: 'Course deleted successfully' });
+    // Hard delete all dependent items and the course in a single transaction
+    await prisma.$transaction([
+      prisma.payment.deleteMany({ where: { admission: { courseId: id } } }),
+      prisma.admission.deleteMany({ where: { courseId: id } }),
+      prisma.batch.deleteMany({ where: { courseId: id } }),
+      prisma.course.delete({ where: { id } })
+    ]);
+
+    res.json({ success: true, message: `Course "${existing.name}" deleted completely from database` });
   } catch (err) {
     console.error('courses.delete', err);
     res.status(500).json({ success: false, message: err.message });

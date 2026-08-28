@@ -562,7 +562,7 @@ function App() {
     }
 
     async function deleteCourse(id, courseName) {
-        if (!window.confirm(`Are you sure you want to remove course "${courseName}"?`)) return;
+        if (!window.confirm(`Are you sure you want to PERMANENTLY delete course "${courseName}" from the database? This action cannot be undone.`)) return;
         try {
             const res = await fetch(import.meta.env.VITE_API_URL + '/courses/' + id, {
                 method: 'DELETE',
@@ -570,7 +570,7 @@ function App() {
             });
             const j = await res.json();
             if (!j.success) return alert(j.message || 'Delete course failed');
-            alert(j.message || 'Course removed successfully');
+            alert(j.message || 'Course permanently removed from database');
             fetchCourses();
         } catch (e) {
             console.error(e);
