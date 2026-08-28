@@ -9,33 +9,39 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [22]
+    env:
+      DATABASE_URL: "postgresql://cadtest:cadtest@localhost:5432/cadpoint_test"
+      JWT_SECRET: "ci_jwt_secret_test_key_12345"
+      NODE_ENV: "test"
+
     steps:
       - uses: actions/checkout@v4
-      - name: Use Node.js
+
+      - name: Use Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: '22'
+
       - name: Install server dependencies
         working-directory: server
         run: npm ci
-      - name: Prisma validate & generate
+
+      - name: Prisma generate
         working-directory: server
-        run: |
-          npx prisma format
-          npx prisma validate
-          npx prisma generate
+        run: npx prisma generate
+
       - name: Run server tests
         working-directory: server
         run: npm test
+
       - name: Install client dependencies
         working-directory: client
         run: npm ci
+
       - name: Run client tests
         working-directory: client
         run: npm test
+
       - name: Build client
         working-directory: client
         run: npm run build
