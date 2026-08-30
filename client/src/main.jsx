@@ -254,11 +254,17 @@ function App() {
     function handleStudentPhotoUpload(e) {
         const file = e.target.files && e.target.files[0];
         if (!file) return;
-        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-            return alert('Please select a valid image file (JPG, PNG, or WebP).');
+        const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        const ext = (file.name || '').split('.').pop().toLowerCase();
+        const validExts = ['jpg', 'jpeg', 'png', 'webp'];
+
+        if (!validTypes.includes((file.type || '').toLowerCase()) && !validExts.includes(ext)) {
+            e.target.value = '';
+            return alert('Only student photo image files (JPG, JPEG, PNG, or WebP) are allowed.');
         }
         if (file.size > 5 * 1024 * 1024) {
-            return alert('Image file size must be less than 5MB.');
+            e.target.value = '';
+            return alert('Student photo file size must be less than 5MB.');
         }
         const reader = new FileReader();
         reader.onload = (event) => {
@@ -1529,7 +1535,7 @@ function App() {
                             <input type="email" value={addStudentForm.email} onChange={(e) => setAddStudentForm({ ...addStudentForm, email: e.target.value })} />
                         </label>
                         <label>
-                            Student Photo
+                            Student Photo <span style={{ fontSize: 11, color: '#64748b', fontWeight: 400 }}>(Photo image only: JPG, PNG, WebP)</span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
                                 {addStudentForm.photoUrl ? (
                                     <img src={addStudentForm.photoUrl} alt="Student Preview" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: '2px solid #3b82f6' }} />
@@ -1540,13 +1546,13 @@ function App() {
                                 )}
                                 <input
                                     type="file"
-                                    accept="image/jpeg,image/png,image/webp"
+                                    accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
                                     onChange={handleStudentPhotoUpload}
                                     style={{ fontSize: 12, flex: 1 }}
                                 />
                                 {addStudentForm.photoUrl && (
                                     <button type="button" className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => setAddStudentForm(prev => ({ ...prev, photoUrl: '' }))}>
-                                        Remove
+                                        Remove Photo
                                     </button>
                                 )}
                             </div>
