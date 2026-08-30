@@ -1441,3 +1441,94 @@ button, select, input[type="text"], input[type="email"], input[type="tel"], inpu
         min-height: 44px;
     }
 }
+
+/* Comprehensive Dark Mode Blending for Students, Admissions, Payments, and Modals */
+[data-theme="dark"] .table-responsive {
+    background: #0f172a !important;
+    border-color: #1e293b !important;
+}
+
+[data-theme="dark"] .filter-bar {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+    color: #f8fafc !important;
+}
+
+[data-theme="dark"] .filter-bar span {
+    color: #cbd5e1 !important;
+}
+
+[data-theme="dark"] .filter-bar input[type="date"],
+[data-theme="dark"] .filter-bar select {
+    background: #0f172a !important;
+    border-color: #334155 !important;
+    color: #f8fafc !important;
+}
+
+[data-theme="dark"] table {
+    background: #0f172a !important;
+    color: #f8fafc !important;
+}
+
+[data-theme="dark"] th {
+    background: #1e293b !important;
+    color: #94a3b8 !important;
+    border-bottom: 1px solid #334155 !important;
+}
+
+[data-theme="dark"] td {
+    border-bottom: 1px solid #1e293b !important;
+    color: #f8fafc !important;
+}
+
+[data-theme="dark"] tr:hover td {
+    background: #1e293b !important;
+}
+
+[data-theme="dark"] [style*="background: #f1f5f9"],
+[data-theme="dark"] [style*="background:#f1f5f9"] {
+    background: #1e293b !important;
+    color: #cbd5e1 !important;
+}
+
+[data-theme="dark"] [style*="background: #f8fafc"],
+[data-theme="dark"] [style*="background:#f8fafc"] {
+    background: #1e293b !important;
+    color: #f8fafc !important;
+}
+
+[data-theme="dark"] [style*="background: #e0e7ff"],
+[data-theme="dark"] [style*="background:#e0e7ff"] {
+    background: #312e81 !important;
+    color: #c7d2fe !important;
+}
+
+[data-theme="dark"] [style*="color: #475569"] {
+    color: #cbd5e1 !important;
+}
+
+[data-theme="dark"] [style*="color: #64748b"] {
+    color: #94a3b8 !important;
+}
+
+[data-theme="dark"] [style*="color: #334155"] {
+    color: #cbd5e1 !important;
+}
+
+[data-theme="dark"] .modal .panel {
+    background: #0f172a !important;
+    border: 1px solid #1e293b !important;
+    color: #f8fafc !important;
+}
+
+[data-theme="dark"] .modal label {
+    color: #cbd5e1 !important;
+}
+
+[data-theme="dark"] .modal input,
+[data-theme="dark"] .modal select,
+[data-theme="dark"] .modal textarea {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+    color: #f8fafc !important;
+}
