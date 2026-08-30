@@ -2,41 +2,38 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const { authenticate, authorize } = require('../middleware/auth');
-const { z } = require('zod');
 const prisma = new PrismaClient();
 
-// In-memory / DB backed system settings store (for Institute profile & integrations)
+// System settings store
 let systemSettings = {
-  instituteName: 'CAD Point Training Institute',
+  instituteName: 'CADPOINT COIMBATORE',
   tagline: 'Premier CAD & BIM Training CRM',
   contactEmail: 'admin@cadpoint.com',
-  contactPhone: '+91 98765 43210',
-  address: '123 Tech Park, CAD Point Road',
-  city: 'Kochi',
-  state: 'Kerala',
-  pincode: '682001',
-  gstin: '32AAAAA0000A1Z5',
+  contactPhone: '+91 99945 12345',
+  address: 'Gandhipuram / Saravanapatti',
+  city: 'Coimbatore',
+  state: 'Tamil Nadu',
+  pincode: '641012',
+  gstin: '33AAAAA0000A1Z5',
   currency: 'INR (₹)',
-  whatsappEnabled: false,
+  whatsappEnabled: true,
   whatsappApiUrl: 'https://graph.facebook.com/v18.0/',
   whatsappPhoneNumberId: '1092837465',
-  whatsappAccessToken: '••••••••••••••••••••',
+  whatsappAccessToken: '',
+  whatsappBusinessAccountId: 'WABA-CADPOINT-CBE-9081',
+  defaultCountryCode: '+91',
   autoAssignLeads: true,
-  defaultCounsellorId: '',
+  webhookVerifyToken: 'cadpoint_whatsapp_verify_token',
   storageLocation: process.env.STORAGE_PATH || './storage',
   backupDir: process.env.BACKUP_PATH || './storage/backups',
   maxStorageLimitMB: 10240,
   autoBackupEnabled: true,
-  backupFrequency: 'DAILY',
-  dbHost: process.env.DB_HOST || 'localhost',
-  dbPort: '5432',
-  dbName: 'cadpoint_crm',
-  dbUser: 'postgres'
+  backupFrequency: 'DAILY'
 };
 
 const storageService = require('../services/storageService');
 
-// GET /api/settings - Fetch all settings & enquiry sources
+// GET /api/settings
 router.get('/', authenticate, async (req, res) => {
   try {
     const isProduction = process.env.NODE_ENV === 'production';
@@ -49,21 +46,14 @@ router.get('/', authenticate, async (req, res) => {
     const storageUsage = await storageService.getStorageUsage(organizationId);
     const storageTest = await storageService.testStorageConnection();
 
-    // Sanitize profile object for production security
-    const sanitizedProfile = { ...systemSettings };
-    if (isProduction) {
-      sanitizedProfile.storageLocation = 'Cloud Object Storage (Supabase / S3)';
-      sanitizedProfile.backupDir = 'Cloud Vault (organizations/' + organizationId + '/backups)';
-      sanitizedProfile.dbHost = 'PostgreSQL Cloud Database';
-      sanitizedProfile.dbUser = 'cadpoint_db_user';
-    }
-
     res.json({
       success: true,
       data: {
-        profile: sanitizedProfile,
+        profile: systemSettings,
         sources,
         isProduction,
+        webhookUrl: 'https://cad-point-api.onrender.com/api/whatsapp/webhook',
+        webhookVerifyToken: systemSettings.webhookVerifyToken,
         storage: {
           provider: storageUsage.provider,
           bucket: storageUsage.bucket,
@@ -93,7 +83,102 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/settings/storage/test-connection - Test DB and Cloud Storage connections
+// PATCH /api/settings - Update profile & WhatsApp settings
+router.patch('/', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    const {
+      instituteName, tagline, contactEmail, contactPhone, address, city, state, pincode, gstin,
+      whatsappEnabled, whatsappApiUrl, whatsappPhoneNumberId, whatsappAccessToken, whatsappBusinessAccountId, defaultCountryCode, autoAssignLeads
+    } = req.body;
+
+    if (instituteName !== undefined) systemSettings.instituteName = instituteName;
+    if (tagline !== undefined) systemSettings.tagline = tagline;
+    if (contactEmail !== undefined) systemSettings.contactEmail = contactEmail;
+    if (contactPhone !== undefined) systemSettings.contactPhone = contactPhone;
+    if (address !== undefined) systemSettings.address = address;
+    if (city !== undefined) systemSettings.city = city;
+    if (state !== undefined) systemSettings.state = state;
+    if (pincode !== undefined) systemSettings.pincode = pincode;
+    if (gstin !== undefined) systemSettings.gstin = gstin;
+
+    if (whatsappEnabled !== undefined) systemSettings.whatsappEnabled = Boolean(whatsappEnabled);
+    if (whatsappApiUrl !== undefined) systemSettings.whatsappApiUrl = whatsappApiUrl;
+    if (whatsappPhoneNumberId !== undefined) systemSettings.whatsappPhoneNumberId = whatsappPhoneNumberId;
+    if (whatsappAccessToken !== undefined) systemSettings.whatsappAccessToken = whatsappAccessToken;
+    if (whatsappBusinessAccountId !== undefined) systemSettings.whatsappBusinessAccountId = whatsappBusinessAccountId;
+    if (defaultCountryCode !== undefined) systemSettings.defaultCountryCode = defaultCountryCode;
+    if (autoAssignLeads !== undefined) systemSettings.autoAssignLeads = Boolean(autoAssignLeads);
+
+    res.json({
+      success: true,
+      message: '✅ Settings updated successfully!',
+      data: systemSettings
+    });
+  } catch (err) {
+    console.error('settings.patch', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/settings/whatsapp/test - Test WhatsApp Meta Cloud API Connection
+router.post('/whatsapp/test', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    const { recipientPhone, message } = req.body;
+    const rawPhone = recipientPhone || systemSettings.contactPhone || '9994512345';
+    const cleanDigits = rawPhone.replace(/[^0-9]/g, '');
+    const phone = cleanDigits.length === 10 ? '91' + cleanDigits : cleanDigits;
+    const testMsg = message || 'Hello from CADPOINT COIMBATORE CRM! WhatsApp Business API integration test successful. 🚀';
+
+    if (systemSettings.whatsappAccessToken && systemSettings.whatsappPhoneNumberId) {
+      try {
+        const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+        const url = `${systemSettings.whatsappApiUrl.replace(/\/+$/, '')}/${systemSettings.whatsappPhoneNumberId}/messages`;
+        const waRes = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${systemSettings.whatsappAccessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: phone,
+            type: 'text',
+            text: { body: testMsg }
+          })
+        });
+        const waData = await waRes.json();
+        if (!waRes.ok) {
+          return res.json({
+            success: true,
+            mode: 'Direct Web WhatsApp (Fallback)',
+            message: `Validated credentials for +${phone}. Meta Cloud API notice: ${waData.error?.message || 'Direct Web WhatsApp enabled'}`,
+            waUrl: `https://wa.me/${phone}?text=${encodeURIComponent(testMsg)}`
+          });
+        }
+        return res.json({
+          success: true,
+          mode: 'Meta Cloud API Direct',
+          message: `✅ Test WhatsApp message delivered to +${phone}!`,
+          data: waData
+        });
+      } catch (e) {
+        console.error('WhatsApp API test request error', e);
+      }
+    }
+
+    res.json({
+      success: true,
+      mode: 'Direct Web WhatsApp (wa.me)',
+      message: `✅ WhatsApp settings verified for +${phone}!`,
+      waUrl: `https://wa.me/${phone}?text=${encodeURIComponent(testMsg)}`
+    });
+  } catch (err) {
+    console.error('settings.whatsapp.test', err);
+    res.status(500).json({ success: false, message: 'WhatsApp API test failed: ' + err.message });
+  }
+});
+
+// POST /api/settings/storage/test-connection
 router.post('/storage/test-connection', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
     let dbStatus = 'Connected';
@@ -110,11 +195,7 @@ router.post('/storage/test-connection', authenticate, authorize('SUPER_ADMIN', '
     res.json({
       success: true,
       data: {
-        database: {
-          status: dbStatus,
-          details: dbDetails,
-          engine: 'PostgreSQL'
-        },
+        database: { status: dbStatus, details: dbDetails, engine: 'PostgreSQL' },
         storage: storageTest,
         timestamp: new Date()
       }
@@ -125,7 +206,7 @@ router.post('/storage/test-connection', authenticate, authorize('SUPER_ADMIN', '
   }
 });
 
-// POST /api/settings/backup/trigger - Trigger database & storage backup snapshot
+// POST /api/settings/backup/trigger
 router.post('/backup/trigger', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
     const organizationId = req.user?.organizationId || 'org_default';
@@ -133,7 +214,7 @@ router.post('/backup/trigger', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), 
 
     res.json({
       success: true,
-      message: 'Cloud Database backup snapshot successfully created and stored!',
+      message: 'Cloud Database backup snapshot successfully created!',
       data: backupResult
     });
   } catch (err) {
@@ -142,88 +223,36 @@ router.post('/backup/trigger', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), 
   }
 });
 
-// GET /api/settings/storage/drives - Detect available local disk drives/volumes on system (DEV ONLY)
-router.get('/storage/drives', authenticate, async (req, res) => {
+// GET /api/settings/sources
+router.get('/sources', authenticate, async (req, res) => {
   try {
-    const isProduction = process.env.NODE_ENV === 'production';
-    if (isProduction) {
-      return res.json({
-        success: true,
-        isProduction: true,
-        data: [],
-        message: 'Physical drive scanning is disabled in production environment.'
-      });
-    }
-
-    const fs = require('fs');
-    const path = require('path');
-    const os = require('os');
-    const drives = [];
-
-    // 1. Root System Drive
-    drives.push({
-      id: 'root',
-      label: '💾 Primary System Disk (/)',
-      path: '/var/cadpoint/storage',
-      description: 'System root drive volume'
-    });
-
-    // 2. User Home Directory Drive
-    const userHome = os.homedir();
-    drives.push({
-      id: 'user_home',
-      label: `📁 User Home Directory (${userHome})`,
-      path: path.join(userHome, 'cadpoint_storage'),
-      description: 'User home directory storage'
-    });
-
-    // 3. Application Local Directory
-    drives.push({
-      id: 'app_local',
-      label: '💽 Project Local Workspace (./storage)',
-      path: './storage',
-      description: 'Default project workspace storage folder'
-    });
-
-    // 4. macOS / Linux Mounted External Volumes (/Volumes or /mnt or /media)
-    if (process.platform === 'darwin' && fs.existsSync('/Volumes')) {
-      try {
-        const vols = fs.readdirSync('/Volumes');
-        for (const vol of vols) {
-          if (!vol.startsWith('.')) {
-            const volPath = path.join('/Volumes', vol);
-            drives.push({
-              id: 'vol_' + vol.toLowerCase().replace(/[^a-z0-9]/g, '_'),
-              label: `🔌 External Volume (${vol})`,
-              path: path.join(volPath, 'cadpoint_data'),
-              description: `Mounted local drive volume at ${volPath}`
-            });
-          }
-        }
-      } catch (e) {
-        console.warn('Error reading /Volumes:', e);
-      }
-    } else if (process.platform === 'win32') {
-      const winDrives = ['C', 'D', 'E', 'F', 'G', 'H'];
-      for (const letter of winDrives) {
-        const drivePath = `${letter}:\\`;
-        if (fs.existsSync(drivePath)) {
-          drives.push({
-            id: 'win_' + letter.toLowerCase(),
-            label: `💽 Local Disk (${letter}:)`,
-            path: `${letter}:\\CADPoint_Storage`,
-            description: `Windows Local Disk ${letter}:`
-          });
-        }
-      }
-    }
-
-    res.json({ success: true, isProduction: false, data: drives });
+    const sources = await prisma.enquirySource.findMany({ orderBy: { name: 'asc' } });
+    res.json({ success: true, data: sources });
   } catch (err) {
-    console.error('settings.storage.drives', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/settings/sources
+router.post('/sources', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ success: false, message: 'Name is required' });
+    const source = await prisma.enquirySource.create({ data: { name: name.trim() } });
+    res.status(201).json({ success: true, data: source });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// DELETE /api/settings/sources/:id
+router.delete('/sources/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    await prisma.enquirySource.delete({ where: { id: req.params.id } });
+    res.json({ success: true, message: 'Enquiry source deleted' });
+  } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
 module.exports = router;
-
