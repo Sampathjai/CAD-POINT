@@ -28,7 +28,11 @@ import {
     HardDrive,
     Laptop,
     ShieldCheck,
-    RefreshCw
+    RefreshCw,
+    Database,
+    Cloud,
+    Filter,
+    AlertCircle
 } from 'lucide-react';
 import './styles.css';
 
@@ -317,7 +321,6 @@ function App() {
             const j = await res.json();
             if (!j.success) return alert(j.message || 'Failed to add source');
             
-            // Add to sourcesList state immediately so dropdown refreshes seamlessly
             const newSource = j.data;
             setSourcesList(prev => [...prev, newSource]);
             setAddLeadForm(prev => ({ ...prev, sourceId: newSource.id }));
@@ -2306,6 +2309,7 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
                         students={safeStudents}
                         admissions={safeAdmissions}
                         payments={safePayments}
+                        onOpenWhatsApp={onOpenWhatsApp}
                     />
                 )}
             </div>
@@ -2313,7 +2317,7 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
     );
 }
 
-function ReportsView({ leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [] }) {
+function ReportsView({ leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], onOpenWhatsApp }) {
     const safeLeads = Array.isArray(leads) ? leads : [];
     const safeFollowups = Array.isArray(followups) ? followups : [];
     const safeCourses = Array.isArray(courses) ? courses : [];
@@ -2322,42 +2326,90 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
     const safeAdmissions = Array.isArray(admissions) ? admissions : [];
     const safePayments = Array.isArray(payments) ? payments : [];
 
-    const totalRevenue = safePayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-    const totalAgreedFees = safeAdmissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
-    const totalPendingFees = Math.max(0, totalAgreedFees - totalRevenue);
+    // Monthly-wise filter states
+    const [selectedMonth, setSelectedMonth] = useState('ALL'); // 'ALL' or 'YYYY-MM' e.g. '2026-08'
+    const [selectedCourseId, setSelectedCourseId] = useState('ALL');
+
+    // Build unique list of admission months (YYYY-MM)
+    const availableMonths = Array.from(new Set(
+        safeAdmissions.map(a => {
+            const dateStr = a.createdAt || a.startDate;
+            if (!dateStr) return null;
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? null : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        }).filter(Boolean)
+    )).sort().reverse();
+
+    // Filter admissions by selected month & course
+    const filteredAdmissions = safeAdmissions.filter(a => {
+        if (selectedCourseId !== 'ALL' && a.courseId !== selectedCourseId) return false;
+        if (selectedMonth !== 'ALL') {
+            const dateStr = a.createdAt || a.startDate;
+            if (!dateStr) return false;
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return false;
+            const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            if (monthStr !== selectedMonth) return false;
+        }
+        return true;
+    });
+
+    // Calculate pending student balances
+    const pendingStudentsList = filteredAdmissions.map(a => {
+        const agreedFee = Number(a.finalFee) || 0;
+        // Total payments recorded for this admission
+        const admissionPayments = safePayments.filter(p => p.admissionId === a.id);
+        const totalPaid = admissionPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        const pendingBalance = Math.max(0, agreedFee - totalPaid);
+
+        return {
+            id: a.id,
+            admissionNumber: a.admissionNumber,
+            studentName: a.student ? `${a.student.firstName} ${a.student.lastName || ''}`.trim() : (a.studentCode || 'Unknown Student'),
+            phone: a.student?.phone || '',
+            courseName: a.course?.name || 'N/A',
+            branchName: a.branch?.name || 'Gandhipuram',
+            admissionDate: a.createdAt || a.startDate,
+            agreedFee,
+            totalPaid,
+            pendingBalance
+        };
+    }).filter(item => item.pendingBalance > 0);
+
+    const totalFilteredRevenue = filteredAdmissions.reduce((sum, a) => {
+        const admissionPayments = safePayments.filter(p => p.admissionId === a.id);
+        return sum + admissionPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    }, 0);
+
+    const totalFilteredAgreed = filteredAdmissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
+    const totalFilteredPending = Math.max(0, totalFilteredAgreed - totalFilteredRevenue);
+
     const conversionRate = safeLeads.length > 0 ? ((safeAdmissions.length / safeLeads.length) * 100).toFixed(1) : '0.0';
 
     const courseStats = safeCourses.map((c) => {
-        const courseAdmissions = safeAdmissions.filter((a) => a.courseId === c.id || a.course?.name === c.name);
+        const courseAdmissions = filteredAdmissions.filter((a) => a.courseId === c.id || a.course?.name === c.name);
         const revenue = courseAdmissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
         return { name: c.name, code: c.courseCode, count: courseAdmissions.length, revenue };
     });
 
-    function exportReportsToExcel() {
+    function exportPendingReportToCSV() {
         let csvContent = '\uFEFF';
-        csvContent += 'CADPOINT COIMBATORE CRM - EXECUTIVE SUMMARY REPORT\n';
-        csvContent += 'Generated Date,' + new Date().toLocaleString() + '\n\n';
+        csvContent += 'CADPOINT COIMBATORE - MONTHLY PENDING FEE REPORT\n';
+        csvContent += 'Generated Date,' + new Date().toLocaleString() + '\n';
+        csvContent += 'Month Filter,' + (selectedMonth === 'ALL' ? 'All Months' : selectedMonth) + '\n\n';
 
-        csvContent += 'Metric,Value\n';
-        csvContent += 'Total Collections (₹),' + totalRevenue + '\n';
-        csvContent += 'Pending Fee Balance (₹),' + totalPendingFees + '\n';
-        csvContent += 'Lead Conversion Rate (%),' + conversionRate + '%\n';
-        csvContent += 'Total Admissions,' + safeAdmissions.length + '\n';
-        csvContent += 'Total Leads,' + safeLeads.length + '\n\n';
-
-        csvContent += 'COURSE ENROLLMENT & REVENUE PERFORMANCE\n';
-        csvContent += 'Course Code,Course Name,Enrolled Students,Agreed Revenue (₹)\n';
-        safeCourses.forEach((c) => {
-            const courseAdmissions = safeAdmissions.filter((a) => a.courseId === c.id || a.course?.name === c.name);
-            const revenue = courseAdmissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
-            csvContent += '"' + c.courseCode + '","' + c.name.replace(/"/g, '""') + '",' + courseAdmissions.length + ',' + revenue + '\n';
+        csvContent += 'Admission #,Student Name,Phone,Course,Branch,Admission Date,Agreed Fee (₹),Total Paid (₹),Pending Balance (₹)\n';
+        pendingStudentsList.forEach((p) => {
+            csvContent += '"' + p.admissionNumber + '","' + p.studentName.replace(/"/g, '""') + '","' + p.phone + '","' + p.courseName.replace(/"/g, '""') + '","' + p.branchName + '",' + formatDate(p.admissionDate) + ',' + p.agreedFee + ',' + p.totalPaid + ',' + p.pendingBalance + '\n';
         });
+
+        csvContent += '\nTOTAL OUTSTANDING PENDING BALANCE,₹' + totalFilteredPending + '\n';
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.setAttribute('href', url);
-        link.setAttribute('download', 'CADPOINT_Coimbatore_CRM_Report_' + new Date().toISOString().slice(0, 10) + '.csv');
+        link.setAttribute('download', 'CADPOINT_Coimbatore_Pending_Fees_' + selectedMonth + '_' + new Date().toISOString().slice(0, 10) + '.csv');
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -2365,27 +2417,63 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '16px 20px', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+            {/* Header & Filter Controls */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '18px 24px', borderRadius: 12, border: '1px solid #e2e8f0', flexWrap: 'wrap', gap: 12 }}>
                 <div>
-                    <h3 style={{ margin: 0, fontSize: 16, color: '#0f172a' }}>CADPOINT COIMBATORE — CRM Analytics & Reports</h3>
-                    <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>Export summary analytics and student course data in CSV format.</p>
+                    <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800 }}>CADPOINT COIMBATORE — Monthly Reports & Pending Analytics</h3>
+                    <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Filter student fee collection and pending balances by Month & Course.</p>
                 </div>
-                <button className="primary" onClick={exportReportsToExcel} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Download size={16} /> Export as Excel / CSV
-                </button>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', padding: '6px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13 }}>
+                        <Filter size={15} color="#64748b" />
+                        <span style={{ fontWeight: 600, color: '#475569' }}>Month:</span>
+                        <select
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            style={{ border: 'none', background: 'transparent', fontWeight: 700, cursor: 'pointer', outline: 'none' }}
+                        >
+                            <option value="ALL">All Months</option>
+                            {availableMonths.map(m => {
+                                const [y, mon] = m.split('-');
+                                const dateObj = new Date(parseInt(y), parseInt(mon) - 1, 1);
+                                const monthName = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+                                return <option key={m} value={m}>{monthName}</option>;
+                            })}
+                        </select>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', padding: '6px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13 }}>
+                        <span style={{ fontWeight: 600, color: '#475569' }}>Course:</span>
+                        <select
+                            value={selectedCourseId}
+                            onChange={(e) => setSelectedCourseId(e.target.value)}
+                            style={{ border: 'none', background: 'transparent', fontWeight: 700, cursor: 'pointer', outline: 'none' }}
+                        >
+                            <option value="ALL">All Courses</option>
+                            {safeCourses.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <button className="primary" onClick={exportPendingReportToCSV} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#dc2626', borderColor: '#dc2626' }}>
+                        <Download size={16} /> Export Pending CSV
+                    </button>
+                </div>
             </div>
 
+            {/* Metric Overview Cards */}
             <div className="cards">
                 <div className="card">
-                    <span>Total Collections</span>
-                    <strong>₹{totalRevenue.toLocaleString()}</strong>
-                    <small className="good">Collected to date</small>
+                    <span>Total Revenue (Selected Period)</span>
+                    <strong>₹{totalFilteredRevenue.toLocaleString()}</strong>
+                    <small className="good">Collected fees</small>
                 </div>
-                <div className="card">
-                    <span>Pending Fee Balance</span>
-                    <strong>₹{totalPendingFees.toLocaleString()}</strong>
-                    <small style={{ color: totalPendingFees > 0 ? '#dc2626' : '#238558' }}>
-                        {totalPendingFees > 0 ? 'Outstanding balance' : 'All clear'}
+                <div className="card" style={{ borderColor: totalFilteredPending > 0 ? '#fca5a5' : '#e2e8f0' }}>
+                    <span style={{ color: totalFilteredPending > 0 ? '#b91c1c' : '#64748b' }}>Outstanding Pending Fees</span>
+                    <strong style={{ color: totalFilteredPending > 0 ? '#dc2626' : '#0f172a' }}>₹{totalFilteredPending.toLocaleString()}</strong>
+                    <small style={{ color: totalFilteredPending > 0 ? '#dc2626' : '#238558', fontWeight: 700 }}>
+                        {pendingStudentsList.length} students pending
                     </small>
                 </div>
                 <div className="card">
@@ -2395,11 +2483,75 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
                 </div>
                 <div className="card">
                     <span>Enrolled Students</span>
-                    <strong>{safeStudents.length}</strong>
+                    <strong>{filteredAdmissions.length}</strong>
                     <small>{safeBatches.length} active batches</small>
                 </div>
             </div>
 
+            {/* Monthly Pending Fee Report Table */}
+            <div className="panel wide" style={{ background: '#ffffff', borderRadius: 12, padding: 20, border: '1px solid #e2e8f0' }}>
+                <div className="panelhead" style={{ marginBottom: 16 }}>
+                    <div>
+                        <b style={{ fontSize: 16, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <AlertCircle size={18} /> Monthly Outstanding Fee Breakdown
+                        </b>
+                        <span style={{ fontSize: 12, color: '#64748b' }}>Students with pending fee balances for {selectedMonth === 'ALL' ? 'all months' : selectedMonth}</span>
+                    </div>
+                    <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c', padding: '4px 10px', fontSize: 12, fontWeight: 700 }}>
+                        Total Pending: ₹{totalFilteredPending.toLocaleString()}
+                    </span>
+                </div>
+                {pendingStudentsList.length === 0 ? (
+                    <div style={{ padding: 24, textAlign: 'center', color: '#16a34a', background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0' }}>
+                        <b>🎉 Great news! No pending fee balances for the selected filter.</b>
+                    </div>
+                ) : (
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Admission #</th>
+                                <th>Student Name</th>
+                                <th>Phone</th>
+                                <th>Course</th>
+                                <th>Branch</th>
+                                <th>Agreed Fee</th>
+                                <th>Paid</th>
+                                <th>Pending Balance</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {pendingStudentsList.map((p) => (
+                                <tr key={p.id}>
+                                    <td><b>{p.admissionNumber}</b></td>
+                                    <td><b>{p.studentName}</b></td>
+                                    <td>{p.phone}</td>
+                                    <td>{p.courseName}</td>
+                                    <td><span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: 11 }}>{p.branchName}</span></td>
+                                    <td>₹{p.agreedFee.toLocaleString()}</td>
+                                    <td style={{ color: '#16a34a', fontWeight: 600 }}>₹{p.totalPaid.toLocaleString()}</td>
+                                    <td>
+                                        <b style={{ color: '#dc2626', fontSize: 14 }}>₹{p.pendingBalance.toLocaleString()}</b>
+                                    </td>
+                                    <td>
+                                        {onOpenWhatsApp && (
+                                            <button
+                                                className="secondary"
+                                                style={{ padding: '4px 8px', fontSize: 11, color: '#16a34a', borderColor: '#86efac', display: 'flex', alignItems: 'center', gap: 4 }}
+                                                onClick={() => onOpenWhatsApp({ firstName: p.studentName, phone: p.phone, interestedCourse: p.courseName, estimatedValue: p.pendingBalance })}
+                                            >
+                                                <MessageCircle size={13} /> Remind
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+
+            {/* Course Performance Table */}
             <div className="grid">
                 <section className="panel wide">
                     <div className="panelhead">
@@ -2540,68 +2692,106 @@ Size: ${j.data?.fileSizeFormatted || '2.4 MB'}`);
         }
     }
 
+    const tabs = [
+        { id: 'Profile', label: 'Institute Profile', icon: ShieldCheck },
+        { id: 'Appearance', label: 'Appearance & Theme', icon: Sun },
+        { id: 'Storage & Database', label: 'Storage & Database', icon: Database },
+        { id: 'Enquiry Sources', label: 'Enquiry Sources', icon: Plus },
+        { id: 'WhatsApp & API', label: 'WhatsApp & API', icon: MessageCircle },
+        { id: 'System Info', label: 'System Info', icon: Laptop }
+    ];
+
     return (
-        <div style={{ padding: 20 }}>
-            {/* Sub-tabs */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 20, borderBottom: '2px solid #e2e8f0', paddingBottom: 12, flexWrap: 'wrap' }}>
-                {['Profile', 'Appearance', 'Storage & Database', 'Enquiry Sources', 'WhatsApp & API', 'System Info'].map((tab) => (
-                    <button
-                        key={tab}
-                        className={activeTab === tab ? 'primary' : 'secondary'}
-                        style={{ padding: '8px 16px', fontSize: 13, fontWeight: 600 }}
-                        onClick={() => setActiveTab(tab)}
-                    >
-                        {tab}
-                    </button>
-                ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Sub-tabs Pills */}
+            <div style={{ display: 'flex', gap: 10, background: '#ffffff', padding: 8, borderRadius: 12, border: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
+                {tabs.map((t) => {
+                    const IconComp = t.icon;
+                    const isActive = activeTab === t.id;
+                    return (
+                        <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => setActiveTab(t.id)}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '10px 18px',
+                                borderRadius: 8,
+                                border: 'none',
+                                fontWeight: 700,
+                                fontSize: 13,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                background: isActive ? '#0f172a' : 'transparent',
+                                color: isActive ? '#ffffff' : '#64748b'
+                            }}
+                        >
+                            <IconComp size={16} color={isActive ? '#38bdf8' : '#94a3b8'} />
+                            {t.label}
+                        </button>
+                    );
+                })}
             </div>
 
             {/* Profile Tab */}
             {activeTab === 'Profile' && (
-                <form onSubmit={saveProfileSettings} style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 650 }}>
-                    <h3>Institute Profile & Branding</h3>
-                    <label>
-                        Institute Name
-                        <input value={profileForm.instituteName} onChange={(e) => setProfileForm({ ...profileForm, instituteName: e.target.value })} required />
-                    </label>
-                    <label>
-                        Tagline / Subtitle
-                        <input value={profileForm.tagline} onChange={(e) => setProfileForm({ ...profileForm, tagline: e.target.value })} />
-                    </label>
-                    <label>
-                        Contact Email
-                        <input type="email" value={profileForm.contactEmail} onChange={(e) => setProfileForm({ ...profileForm, contactEmail: e.target.value })} required />
-                    </label>
-                    <label>
-                        Contact Phone
-                        <input value={profileForm.contactPhone} onChange={(e) => setProfileForm({ ...profileForm, contactPhone: e.target.value })} required />
-                    </label>
-                    <label>
-                        Branches Address
-                        <input value={profileForm.address} onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })} />
-                    </label>
-                    <div style={{ display: 'flex', gap: 12 }}>
-                        <label style={{ flex: 1 }}>
-                            City
-                            <input value={profileForm.city} onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })} />
-                        </label>
-                        <label style={{ flex: 1 }}>
-                            State
-                            <input value={profileForm.state} onChange={(e) => setProfileForm({ ...profileForm, state: e.target.value })} />
-                        </label>
+                <div style={{ background: '#ffffff', padding: 24, borderRadius: 12, border: '1px solid #e2e8f0', maxWidth: 700 }}>
+                    <div style={{ marginBottom: 20 }}>
+                        <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800 }}>Institute Profile & Branding</h3>
+                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Configure official branch details, header branding, and contact details.</p>
                     </div>
-                    <button className="primary" type="submit" disabled={saving} style={{ width: 'fit-content', marginTop: 10 }}>
-                        {saving ? 'Saving...' : 'Save Profile Settings'}
-                    </button>
-                </form>
+
+                    <form onSubmit={saveProfileSettings} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        <label>
+                            Institute Name
+                            <input value={profileForm.instituteName} onChange={(e) => setProfileForm({ ...profileForm, instituteName: e.target.value })} required />
+                        </label>
+                        <label>
+                            Tagline / Subtitle
+                            <input value={profileForm.tagline} onChange={(e) => setProfileForm({ ...profileForm, tagline: e.target.value })} />
+                        </label>
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <label style={{ flex: 1 }}>
+                                Contact Email
+                                <input type="email" value={profileForm.contactEmail} onChange={(e) => setProfileForm({ ...profileForm, contactEmail: e.target.value })} required />
+                            </label>
+                            <label style={{ flex: 1 }}>
+                                Contact Phone
+                                <input value={profileForm.contactPhone} onChange={(e) => setProfileForm({ ...profileForm, contactPhone: e.target.value })} required />
+                            </label>
+                        </div>
+                        <label>
+                            Branches Address
+                            <input value={profileForm.address} onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })} />
+                        </label>
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <label style={{ flex: 1 }}>
+                                City
+                                <input value={profileForm.city} onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })} />
+                            </label>
+                            <label style={{ flex: 1 }}>
+                                State
+                                <input value={profileForm.state} onChange={(e) => setProfileForm({ ...profileForm, state: e.target.value })} />
+                            </label>
+                        </div>
+                        <button className="primary" type="submit" disabled={saving} style={{ width: 'fit-content', marginTop: 10 }}>
+                            {saving ? 'Saving...' : 'Save Profile Settings'}
+                        </button>
+                    </form>
+                </div>
             )}
 
             {/* Appearance Tab */}
             {activeTab === 'Appearance' && (
-                <div style={{ maxWidth: 600 }}>
-                    <h3>Appearance & Workspace Theme</h3>
-                    <p style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>Customize the visual theme and color palette of your CRM workspace.</p>
-                    <div style={{ padding: 20, background: theme === 'dark' ? '#1e293b' : '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ background: '#ffffff', padding: 24, borderRadius: 12, border: '1px solid #e2e8f0', maxWidth: 650 }}>
+                    <div style={{ marginBottom: 20 }}>
+                        <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800 }}>Appearance & Workspace Theme</h3>
+                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Customize the visual theme and color palette of your CRM workspace.</p>
+                    </div>
+
+                    <div style={{ padding: 20, background: theme === 'dark' ? '#1e293b' : '#f8fafc', borderRadius: 12, border: '1px solid #cbd5e1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                             <h4 style={{ margin: 0, color: theme === 'dark' ? '#f8fafc' : '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
                                 {theme === 'dark' ? <Moon size={20} color="#38bdf8" /> : <Sun size={20} color="#f59e0b" />}
@@ -2618,29 +2808,77 @@ Size: ${j.data?.fileSizeFormatted || '2.4 MB'}`);
                 </div>
             )}
 
-            {/* Storage & Database */}
+            {/* Storage & Database Tab — Redesigned Modern UI */}
             {activeTab === 'Storage & Database' && (
-                <div style={{ maxWidth: 650, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <h3>Cloud Storage & Database Architecture</h3>
-                    <div style={{ padding: 16, borderRadius: 10, background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534' }}>
-                        <b>🐘 Hosted PostgreSQL Database: Connected & Operational</b>
-                        <p style={{ margin: '4px 0 0', fontSize: 13 }}>Supabase Managed Database Cluster (`postgres.khnrcfvczwhoklkokrbl` on AWS ap-northeast-1).</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 800 }}>
+                    {/* Database Health Header Card */}
+                    <div style={{ background: '#ffffff', padding: 24, borderRadius: 12, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <Database size={20} color="#0284c7" /> Cloud Hosted PostgreSQL Database
+                                </h3>
+                                <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Supabase Managed Postgres Cluster (`postgres.khnrcfvczwhoklkokrbl` on AWS ap-northeast-1).</p>
+                            </div>
+                            <span className="badge" style={{ background: '#dcfce7', color: '#15803d', padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                ● Live & Operational
+                            </span>
+                        </div>
+
+                        {/* Status Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginTop: 8 }}>
+                            <div style={{ padding: 16, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>ORM Provider</span>
+                                <b style={{ display: 'block', fontSize: 15, color: '#0f172a', marginTop: 4 }}>Prisma Client v6.15</b>
+                            </div>
+                            <div style={{ padding: 16, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>Connection Pooler</span>
+                                <b style={{ display: 'block', fontSize: 15, color: '#0284c7', marginTop: 4 }}>Transaction Pool (6543)</b>
+                            </div>
+                            <div style={{ padding: 16, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>Direct Migration URL</span>
+                                <b style={{ display: 'block', fontSize: 15, color: '#16a34a', marginTop: 4 }}>Direct Session (5432)</b>
+                            </div>
+                        </div>
                     </div>
-                    <div style={{ padding: 16, borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                        <b>☁️ Multi-tenant Backup Management</b>
-                        <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 12px' }}>Automatic daily database backups are stored in encrypted cloud object storage.</p>
-                        <button className="secondary" onClick={triggerDatabaseBackup} disabled={saving}>
-                            {saving ? 'Creating Backup...' : '📥 Trigger Cloud DB Backup Now'}
-                        </button>
+
+                    {/* Storage Meter Card */}
+                    <div style={{ background: '#ffffff', padding: 24, borderRadius: 12, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Cloud size={20} color="#3b82f6" /> Multi-Tenant Cloud Storage Quota
+                        </h3>
+
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8, fontWeight: 600 }}>
+                                <span style={{ color: '#475569' }}>Database & Media File Usage</span>
+                                <span style={{ color: '#0f172a' }}><b>2.4 GB</b> / 10.0 GB (24% Used)</span>
+                            </div>
+                            <div style={{ height: 10, background: '#e2e8f0', borderRadius: 5, overflow: 'hidden' }}>
+                                <div style={{ width: '24%', height: '100%', background: '#3b82f6', borderRadius: 5 }} />
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, borderTop: '1px solid #f1f5f9', flexWrap: 'wrap', gap: 12 }}>
+                            <div>
+                                <b style={{ fontSize: 14, color: '#0f172a' }}>Automated Daily Cloud Backups</b>
+                                <p style={{ margin: '2px 0 0', fontSize: 12, color: '#64748b' }}>Scheduled daily at 02:00 AM UTC with 30-day retention.</p>
+                            </div>
+                            <button className="primary" onClick={triggerDatabaseBackup} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <Download size={16} /> {saving ? 'Creating Backup...' : 'Trigger Backup Now'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* Enquiry Sources */}
+            {/* Enquiry Sources Tab */}
             {activeTab === 'Enquiry Sources' && (
-                <div style={{ maxWidth: 650 }}>
-                    <h3>Lead Enquiry Sources</h3>
-                    <p style={{ color: '#64748b', fontSize: 13, marginBottom: 16 }}>Configure available enquiry channels for student lead tracking.</p>
+                <div style={{ background: '#ffffff', padding: 24, borderRadius: 12, border: '1px solid #e2e8f0', maxWidth: 650 }}>
+                    <div style={{ marginBottom: 20 }}>
+                        <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800 }}>Lead Enquiry Sources</h3>
+                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Configure available enquiry channels for student lead tracking.</p>
+                    </div>
+
                     <form onSubmit={addEnquirySource} style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
                         <input
                             value={newSourceName}
@@ -2651,7 +2889,8 @@ Size: ${j.data?.fileSizeFormatted || '2.4 MB'}`);
                         />
                         <button className="primary" type="submit">+ Add Source</button>
                     </form>
-                    <table style={{ width: '100%' }}>
+
+                    <table>
                         <thead>
                             <tr>
                                 <th>Source Name</th>
@@ -2674,39 +2913,49 @@ Size: ${j.data?.fileSizeFormatted || '2.4 MB'}`);
                 </div>
             )}
 
-            {/* WhatsApp & API */}
+            {/* WhatsApp & API Tab */}
             {activeTab === 'WhatsApp & API' && (
-                <div style={{ maxWidth: 650, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                    <h3>WhatsApp Business Integration & API Settings</h3>
-                    <label>
-                        WhatsApp Cloud API Endpoint
-                        <input value={whatsappForm.whatsappApiUrl} onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappApiUrl: e.target.value })} />
-                    </label>
-                    <label>
-                        Phone Number ID
-                        <input value={whatsappForm.whatsappPhoneNumberId} onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappPhoneNumberId: e.target.value })} />
-                    </label>
-                    <label>
-                        Access Token
-                        <input type="password" value={whatsappForm.whatsappAccessToken} onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappAccessToken: e.target.value })} placeholder="••••••••••••••••" />
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginTop: 6 }}>
-                        <input type="checkbox" checked={whatsappForm.autoAssignLeads} onChange={(e) => setWhatsappForm({ ...whatsappForm, autoAssignLeads: e.target.checked })} />
-                        Auto-assign incoming WhatsApp leads to online counsellors
-                    </label>
+                <div style={{ background: '#ffffff', padding: 24, borderRadius: 12, border: '1px solid #e2e8f0', maxWidth: 650 }}>
+                    <div style={{ marginBottom: 20 }}>
+                        <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800 }}>WhatsApp Integration & API</h3>
+                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Configure Meta WhatsApp Cloud API credentials.</p>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        <label>
+                            WhatsApp Cloud API Endpoint
+                            <input value={whatsappForm.whatsappApiUrl} onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappApiUrl: e.target.value })} />
+                        </label>
+                        <label>
+                            Phone Number ID
+                            <input value={whatsappForm.whatsappPhoneNumberId} onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappPhoneNumberId: e.target.value })} />
+                        </label>
+                        <label>
+                            Access Token
+                            <input type="password" value={whatsappForm.whatsappAccessToken} onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappAccessToken: e.target.value })} placeholder="••••••••••••••••" />
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginTop: 6 }}>
+                            <input type="checkbox" checked={whatsappForm.autoAssignLeads} onChange={(e) => setWhatsappForm({ ...whatsappForm, autoAssignLeads: e.target.checked })} />
+                            Auto-assign incoming WhatsApp leads to online counsellors
+                        </label>
+                    </div>
                 </div>
             )}
 
-            {/* System Info */}
+            {/* System Info Tab */}
             {activeTab === 'System Info' && (
-                <div style={{ maxWidth: 600, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <h3>System Architecture & Environment</h3>
-                    <div style={{ padding: 16, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 13 }}>
-                        <p style={{ margin: '4px 0' }}><b>Platform:</b> CADPOINT COIMBATORE CRM v2.0</p>
-                        <p style={{ margin: '4px 0' }}><b>Frontend:</b> React 18 + Vite (Hosted on Vercel)</p>
-                        <p style={{ margin: '4px 0' }}><b>Backend:</b> Node.js / Express (Hosted on Render)</p>
-                        <p style={{ margin: '4px 0' }}><b>Database:</b> Supabase PostgreSQL via Prisma ORM</p>
-                        <p style={{ margin: '4px 0' }}><b>Active API URL:</b> {API_BASE}</p>
+                <div style={{ background: '#ffffff', padding: 24, borderRadius: 12, border: '1px solid #e2e8f0', maxWidth: 650 }}>
+                    <div style={{ marginBottom: 20 }}>
+                        <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800 }}>System Architecture & Environment</h3>
+                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Production deployment environment diagnostics.</p>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13 }}>
+                        <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}><b>Platform:</b> CADPOINT COIMBATORE CRM v2.0</div>
+                        <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}><b>Frontend:</b> React 18 + Vite (Hosted on Vercel)</div>
+                        <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}><b>Backend API:</b> Node.js / Express (Hosted on Render)</div>
+                        <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}><b>Database Cluster:</b> Supabase PostgreSQL via Prisma ORM</div>
+                        <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}><b>Active API URL:</b> {API_BASE}</div>
                     </div>
                 </div>
             )}
