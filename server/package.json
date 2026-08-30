@@ -12,7 +12,7 @@
     "prisma:generate": "prisma generate",
     "test:integration": "cross-env NODE_ENV=test vitest run --config vitest.integration.config.js",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:deploy": "prisma db push",
+    "prisma:deploy": "prisma migrate deploy",
     "prisma:status": "prisma migrate status"
   },
   "dependencies": {

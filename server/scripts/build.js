@@ -11,8 +11,8 @@ try {
   console.log('Generating Prisma Client...');
   execSync('npx prisma generate', { stdio: 'inherit', env: process.env });
 
-  console.log('Synchronizing database schema...');
-  execSync('npx prisma db push --schema=./prisma/schema.prisma', {
+  console.log('Running Prisma production migration deployment...');
+  execSync('npx prisma migrate deploy', {
     stdio: 'inherit',
     env: { ...process.env, DATABASE_URL: directUrl, DIRECT_URL: directUrl }
   });
