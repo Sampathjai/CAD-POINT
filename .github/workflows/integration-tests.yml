@@ -22,6 +22,7 @@ jobs:
           --health-cmd "pg_isready -U cadtest" --health-interval=5s --health-timeout=5s --health-retries=10
     env:
       DATABASE_URL: postgresql://cadtest:cadtest@localhost:5432/cadpoint_test
+      DIRECT_URL: postgresql://cadtest:cadtest@localhost:5432/cadpoint_test
       JWT_SECRET: test_jwt_secret
       PORT: 5001
     steps:
