@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../config/prisma');
 const { authenticate, authorize } = require('../middleware/auth');
-const prisma = new PrismaClient();
+
 
 // GET /api/devices - List primary device and all authorized devices
 router.get('/', authenticate, async (req, res) => {

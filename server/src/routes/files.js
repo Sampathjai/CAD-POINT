@@ -40,8 +40,8 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
 router.get('/download/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
+    const prisma = require('../config/prisma');
+    
 
     const file = await prisma.fileMetadata.findUnique({ where: { id } });
     if (!file) {

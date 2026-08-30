@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { z } = require('zod');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma');
 const { authenticate, authorize } = require('../middleware/auth');
 
 const createLeadSchema = z.object({

@@ -1,10 +1,9 @@
 require('dotenv').config();
 const express=require('express');
 const cors=require('cors');
-const {PrismaClient}=require('@prisma/client');
+const prisma=require('./config/prisma');
 const {helmetMiddleware,apiLimiter}=require('./middleware/security');
 const {port,clientUrl}=require('./config/env');
-const prisma=new PrismaClient();
 const app=express();
 app.set('trust proxy',1);
 app.use(helmetMiddleware);

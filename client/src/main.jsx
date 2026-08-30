@@ -251,7 +251,7 @@ function App() {
     const [addUserForm, setAddUserForm] = useState({ name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true });
 
     useEffect(() => {
-        if (!token) return;
+        if (!token || user) return;
         fetch(API_BASE + '/auth/me', { headers: { Authorization: 'Bearer ' + token } })
             .then((r) => r.json())
             .then((j) => {
@@ -259,7 +259,7 @@ function App() {
                 else logout();
             })
             .catch(() => logout());
-    }, [token]);
+    }, [token, user]);
 
     // High Performance Parallel Data Fetching
     const fetchAllData = useCallback(async () => {
@@ -336,19 +336,27 @@ function App() {
         if (!loginForm.password || !loginForm.password.trim()) {
             return alert('Please enter your password');
         }
+        const tStart = performance.now();
+        console.log('[PERF FRONTEND] 🚀 Login request sent to API...');
         try {
             const res = await fetch(API_BASE + '/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(loginForm)
             });
+            const tHttp = performance.now();
+            console.log(`[PERF FRONTEND] HTTP response received in ${(tHttp - tStart).toFixed(1)}ms`);
+
             const j = await res.json();
             if (!res.ok || !j.success) {
                 return alert(formatErrorMessage(j.message) || 'Invalid email or password. Please try again.');
             }
             localStorage.setItem('cadpoint_token', j.data.token);
-            setToken(j.data.token);
+            // Set user FIRST so useEffect does not trigger redundant /auth/me call
             setUser(j.data.user);
+            setToken(j.data.token);
+
+            console.log(`[PERF FRONTEND] ✅ Dashboard redirected in ${(performance.now() - tStart).toFixed(1)}ms (Server handling: ${j._perf?.totalMs || 'N/A'}ms)`);
         } catch (err) {
             console.error('Login error', err);
             alert('Unable to connect to login server. Please verify the API server is active.');
