@@ -23,7 +23,8 @@ app.use(
         callback(null, true);
       }
     },
-    credentials: true
+    credentials: true,
+    maxAge: 86400
   })
 );
 app.use(express.json({limit:'2mb'}));
