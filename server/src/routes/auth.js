@@ -19,7 +19,8 @@ router.post('/login', async (req, res) => {
     if (!user.isActive) return res.status(403).json({ success: false, message: 'User is inactive' });
     const ok = await bcrypt.compare(data.password, user.passwordHash);
     if (!ok) return res.status(401).json({ success: false, message: 'Invalid credentials' });
-    const token = jwt.sign({ id: user.id, role: user.role, email: user.email, name: user.name }, process.env.JWT_SECRET, { expiresIn: '8h' });
+    const secret = process.env.JWT_SECRET || 'cadpoint-secret-key-production-fallback';
+    const token = jwt.sign({ id: user.id, role: user.role, email: user.email, name: user.name }, secret, { expiresIn: '8h' });
     const safeUser = { id: user.id, name: user.name, email: user.email, role: user.role, isActive: user.isActive };
     res.json({ success: true, data: { token, user: safeUser } });
   } catch (err) {
