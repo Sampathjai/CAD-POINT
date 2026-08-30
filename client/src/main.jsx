@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, Component } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
     LayoutDashboard,
@@ -36,6 +36,61 @@ const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env && impor
     ? String(import.meta.env.VITE_API_URL).trim().replace(/\/+$/, '')
     : '/api';
 
+class ErrorBoundary extends Component {
+    constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+    }
+    static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+    }
+    componentDidCatch(error, errorInfo) {
+        console.error("ErrorBoundary caught error:", error, errorInfo);
+    }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div style={{ padding: 24, background: '#fef2f2', borderRadius: 12, border: '1px solid #fca5a5', color: '#991b1b', margin: 20 }}>
+                    <h3 style={{ margin: '0 0 8px' }}>⚠️ Display Error</h3>
+                    <p style={{ margin: '0 0 16px', fontSize: 13, color: '#7f1d1d' }}>
+                        {this.state.error?.message || 'An unexpected rendering error occurred.'}
+                    </p>
+                    <button
+                        type="button"
+                        className="primary"
+                        onClick={() => {
+                            this.setState({ hasError: false, error: null });
+                            window.location.reload();
+                        }}
+                    >
+                        🔄 Refresh Page
+                    </button>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
+
+function formatDate(val) {
+    if (!val) return 'N/A';
+    try {
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString();
+    } catch {
+        return 'N/A';
+    }
+}
+
+function formatDateTime(val) {
+    if (!val) return 'N/A';
+    try {
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? 'N/A' : d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch {
+        return 'N/A';
+    }
+}
 
 function ProgressBar({ percentage }) {
   const pct = Math.min(100, Math.max(0, Number(percentage) || 0));
@@ -73,14 +128,13 @@ function CertificateBadge({ status, issueDate }) {
 
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, ...style }}>
-      ● {label}
+      ● {label} {issueDate && `(${formatDate(issueDate)})`}
     </span>
   );
 }
 
 function App() {
     const [page, setPage] = useState('Dashboard');
-
     const [activeBranch, setActiveBranch] = useState(() => localStorage.getItem('cadpoint_branch') || 'gandhipuram');
     const [branchesList, setBranchesList] = useState([]);
     const [sourcesList, setSourcesList] = useState([]);
@@ -141,69 +195,17 @@ function App() {
     const [showSearchModal, setShowSearchModal] = useState(false);
 
     // Forms
-    const [addLeadForm, setAddLeadForm] = useState({ firstName: '', lastName: '', phone: '', email: '', interestedCourse: '', estimatedValue: '' });
+    const [addLeadForm, setAddLeadForm] = useState({ firstName: '', lastName: '', phone: '', email: '', interestedCourse: '', estimatedValue: '', sourceId: '', leadType: 'STANDARD', assignedCounsellorId: '' });
     const [scheduleForm, setScheduleForm] = useState({ leadId: '', scheduledAt: '', type: 'CALL', notes: '' });
     const [addCourseForm, setAddCourseForm] = useState({ courseCode: '', name: '', description: '', standardFee: '' });
     const [addBatchForm, setAddBatchForm] = useState({ batchCode: '', name: '', courseId: '', startDate: '', capacity: 25 });
     const [addStudentForm, setAddStudentForm] = useState({ studentCode: '', firstName: '', lastName: '', phone: '', email: '' });
     const [addAdmissionForm, setAddAdmissionForm] = useState({ admissionNumber: '', studentId: '', courseId: '', batchId: '', agreedFee: '', finalFee: '' });
-    const [addPaymentForm, setAddPaymentForm] = useState({ admissionId: '', receiptNumber: '', amount: '', paymentMethod: 'UPI', transactionReference: '' });
+    const [addPaymentForm, setAddPaymentForm] = useState({ admissionId: '', receiptNumber: '', amount: '', paymentMethod: 'UPI', transactionReference: '', remarks: '' });
     const [addUserForm, setAddUserForm] = useState({ name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true });
 
     useEffect(() => {
-        
-    async function handleCreateSourceInline(e) {
-        e.preventDefault();
-        if (!newSourceName.trim()) return alert('Please enter source name');
-        try {
-            const res = await fetch(API_BASE + '/settings/sources', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify({ name: newSourceName.trim() })
-            });
-            const j = await res.json();
-            if (!j.success) return alert(j.message || 'Failed to add source');
-            fetchSources();
-            setAddLeadForm(prev => ({ ...prev, sourceId: j.data.id }));
-            setNewSourceName('');
-            setShowAddSourceModal(false);
-        } catch (err) {
-            console.error(err);
-            alert('Failed to add lead source');
-        }
-    }
-
-    function openEditProgress(admission) {
-        setEditingAdmissionProgress(admission);
-        setProgressForm({
-            id: admission.id,
-            startDate: admission.startDate ? admission.startDate.slice(0, 10) : '',
-            endDate: admission.endDate ? admission.endDate.slice(0, 10) : '',
-            completionPct: admission.completionPct || 0,
-            certificateStatus: admission.certificate?.status || 'NOT_STARTED',
-            issueDate: admission.certificate?.issueDate ? admission.certificate.issueDate.slice(0, 10) : ''
-        });
-    }
-
-    async function updateAdmissionProgress() {
-        try {
-            const res = await fetch(API_BASE + '/admissions/' + progressForm.id + '/progress', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify(progressForm)
-            });
-            const j = await res.json();
-            if (!j.success) return alert(j.message || 'Failed to update progress');
-            fetchAdmissions();
-            fetchStudents();
-            setEditingAdmissionProgress(null);
-        } catch (err) {
-            console.error(err);
-            alert('Failed to update progress');
-        }
-    }
-
-    if (!token) return;
+        if (!token) return;
         fetch(API_BASE + '/auth/me', { headers: { Authorization: 'Bearer ' + token } })
             .then((r) => r.json())
             .then((j) => {
@@ -213,59 +215,53 @@ function App() {
             .catch(() => logout());
     }, [token]);
 
+    // High Performance Parallel Data Fetching
+    const fetchAllData = useCallback(async () => {
+        if (!token) return;
+        const headers = { Authorization: 'Bearer ' + token };
+        const branchQuery = activeBranch ? `?branchId=${activeBranch}` : '';
+
+        try {
+            const [leadsR, followupsR, coursesR, batchesR, studentsR, admissionsR, paymentsR, notifsR, branchesR, sourcesR] = await Promise.allSettled([
+                fetch(`${API_BASE}/leads${branchQuery}`, { headers }).then(r => r.json()),
+                fetch(`${API_BASE}/followups`, { headers }).then(r => r.json()),
+                fetch(`${API_BASE}/courses`, { headers }).then(r => r.json()),
+                fetch(`${API_BASE}/batches${branchQuery}`, { headers }).then(r => r.json()),
+                fetch(`${API_BASE}/students${branchQuery}`, { headers }).then(r => r.json()),
+                fetch(`${API_BASE}/admissions${branchQuery}`, { headers }).then(r => r.json()),
+                fetch(`${API_BASE}/payments${branchQuery}`, { headers }).then(r => r.json()),
+                fetch(`${API_BASE}/notifications`, { headers }).then(r => r.json()),
+                fetch(`${API_BASE}/branches`).then(r => r.json()),
+                fetch(`${API_BASE}/settings/sources`, { headers }).then(r => r.json())
+            ]);
+
+            if (leadsR.status === 'fulfilled' && leadsR.value.success) setLeads(leadsR.value.data || []);
+            if (followupsR.status === 'fulfilled' && followupsR.value.success) setFollowups(followupsR.value.data || []);
+            if (coursesR.status === 'fulfilled' && coursesR.value.success) setCourses(coursesR.value.data || []);
+            if (batchesR.status === 'fulfilled' && batchesR.value.success) setBatches(batchesR.value.data || []);
+            if (studentsR.status === 'fulfilled' && studentsR.value.success) setStudents(studentsR.value.data || []);
+            if (admissionsR.status === 'fulfilled' && admissionsR.value.success) setAdmissions(admissionsR.value.data || []);
+            if (paymentsR.status === 'fulfilled' && paymentsR.value.success) setPayments(paymentsR.value.data || []);
+            if (notifsR.status === 'fulfilled' && notifsR.value.success) setNotifications(notifsR.value.data || []);
+            if (branchesR.status === 'fulfilled' && branchesR.value.success) setBranchesList(branchesR.value.data || []);
+            if (sourcesR.status === 'fulfilled' && sourcesR.value.success) setSourcesList(sourcesR.value.data || []);
+        } catch (e) {
+            console.error('fetchAllData error', e);
+        }
+    }, [token, activeBranch]);
+
     useEffect(() => {
-        if (token) {
-            fetchLeads();
-            fetchFollowups();
-            fetchCourses();
-            fetchBatches();
-            fetchStudents();
-            fetchAdmissions();
-            fetchPayments();
-            fetchNotifications();
-            if (user?.role === 'SUPER_ADMIN') {
-                fetchUsers();
-            }
+        fetchAllData();
+    }, [fetchAllData]);
+
+    useEffect(() => {
+        if (token && user?.role === 'SUPER_ADMIN') {
+            fetch(API_BASE + '/users', { headers: { Authorization: 'Bearer ' + token } })
+                .then(r => r.json())
+                .then(j => { if (j.success) setUsersList(j.data || []); })
+                .catch(e => console.error(e));
         }
     }, [token, user?.role]);
-
-    
-    async function fetchBranches() {
-        try {
-            const res = await fetch(API_BASE + '/branches');
-            const j = await res.json();
-            if (j.success) setBranchesList(j.data || []);
-        } catch (e) {
-            console.error('fetchBranches', e);
-        }
-    }
-
-    async function fetchSources() {
-        try {
-            const res = await fetch(API_BASE + '/settings/sources', { headers: { Authorization: 'Bearer ' + token } });
-            const j = await res.json();
-            if (j.success) setSourcesList(j.data || []);
-        } catch (e) {
-            console.error('fetchSources', e);
-        }
-    }
-
-    useEffect(() => {
-        fetchBranches();
-    }, []);
-
-    useEffect(() => {
-        if (token) fetchSources();
-    }, [token]);
-
-    useEffect(() => {
-        if (token) {
-            fetchLeads();
-            fetchStudents();
-            fetchAdmissions();
-            fetchPayments();
-        }
-    }, [activeBranch]);
 
     function logout() {
         setToken('');
@@ -309,93 +305,53 @@ function App() {
         }
     }
 
-    async function fetchLeads() {
+    async function handleCreateSourceInline(e) {
+        e.preventDefault();
+        if (!newSourceName.trim()) return alert('Please enter source name');
         try {
-            const res = await fetch(API_BASE + `/leads?branchId=${activeBranch}`, { headers: { Authorization: 'Bearer ' + token } });
+            const res = await fetch(API_BASE + '/settings/sources', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify({ name: newSourceName.trim() })
+            });
             const j = await res.json();
-            if (j.success) setLeads(j.data || []);
-        } catch (e) {
-            console.error('fetchLeads', e);
+            if (!j.success) return alert(j.message || 'Failed to add source');
+            fetchAllData();
+            setAddLeadForm(prev => ({ ...prev, sourceId: j.data.id }));
+            setNewSourceName('');
+            setShowAddSourceModal(false);
+        } catch (err) {
+            console.error(err);
+            alert('Failed to add lead source');
         }
     }
 
-    async function fetchFollowups() {
-        try {
-            const res = await fetch(API_BASE + '/followups', { headers: { Authorization: 'Bearer ' + token } });
-            const j = await res.json();
-            if (j.success) setFollowups(j.data || []);
-        } catch (e) {
-            console.error('fetchFollowups', e);
-        }
+    function openEditProgress(admission) {
+        setEditingAdmissionProgress(admission);
+        setProgressForm({
+            id: admission.id,
+            startDate: admission.startDate ? admission.startDate.slice(0, 10) : '',
+            endDate: admission.endDate ? admission.endDate.slice(0, 10) : '',
+            completionPct: admission.completionPct || 0,
+            certificateStatus: admission.certificate?.status || 'NOT_STARTED',
+            issueDate: admission.certificate?.issueDate ? admission.certificate.issueDate.slice(0, 10) : ''
+        });
     }
 
-    async function fetchCourses() {
+    async function updateAdmissionProgress() {
         try {
-            const res = await fetch(API_BASE + '/courses', { headers: { Authorization: 'Bearer ' + token } });
+            const res = await fetch(API_BASE + '/admissions/' + progressForm.id + '/progress', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify(progressForm)
+            });
             const j = await res.json();
-            if (j.success) setCourses(j.data || []);
-        } catch (e) {
-            console.error('fetchCourses', e);
-        }
-    }
-
-    async function fetchBatches() {
-        try {
-            const res = await fetch(API_BASE + '/batches', { headers: { Authorization: 'Bearer ' + token } });
-            const j = await res.json();
-            if (j.success) setBatches(j.data || []);
-        } catch (e) {
-            console.error('fetchBatches', e);
-        }
-    }
-
-    async function fetchStudents() {
-        try {
-            const res = await fetch(API_BASE + `/students?branchId=${activeBranch}`, { headers: { Authorization: 'Bearer ' + token } });
-            const j = await res.json();
-            if (j.success) setStudents(j.data || []);
-        } catch (e) {
-            console.error('fetchStudents', e);
-        }
-    }
-
-    async function fetchAdmissions() {
-        try {
-            const res = await fetch(API_BASE + `/admissions?branchId=${activeBranch}`, { headers: { Authorization: 'Bearer ' + token } });
-            const j = await res.json();
-            if (j.success) setAdmissions(j.data || []);
-        } catch (e) {
-            console.error('fetchAdmissions', e);
-        }
-    }
-
-    async function fetchPayments() {
-        try {
-            const res = await fetch(API_BASE + `/payments?branchId=${activeBranch}`, { headers: { Authorization: 'Bearer ' + token } });
-            const j = await res.json();
-            if (j.success) setPayments(j.data || []);
-        } catch (e) {
-            console.error('fetchPayments', e);
-        }
-    }
-
-    async function fetchUsers() {
-        try {
-            const res = await fetch(API_BASE + '/users', { headers: { Authorization: 'Bearer ' + token } });
-            const j = await res.json();
-            if (j.success) setUsersList(j.data || []);
-        } catch (e) {
-            console.error('fetchUsers', e);
-        }
-    }
-
-    async function fetchNotifications() {
-        try {
-            const res = await fetch(API_BASE + '/notifications', { headers: { Authorization: 'Bearer ' + token } });
-            const j = await res.json();
-            if (j.success) setNotifications(j.data || []);
-        } catch (e) {
-            console.error('fetchNotifications', e);
+            if (!j.success) return alert(j.message || 'Failed to update progress');
+            fetchAllData();
+            setEditingAdmissionProgress(null);
+        } catch (err) {
+            console.error(err);
+            alert('Failed to update progress');
         }
     }
 
@@ -428,10 +384,10 @@ function App() {
                 body: JSON.stringify({ ...addLeadForm, branchId: activeBranch })
             });
             const j = await res.json();
-            if (!j.success) return alert(j.message || 'Create lead failed');
-            setLeads((s) => [j.data, ...s]);
+            if (!j.success) return alert(formatErrorMessage(j.message) || 'Create lead failed');
+            fetchAllData();
             setShowAddLead(false);
-            setAddLeadForm({ firstName: '', lastName: '', phone: '', email: '', interestedCourse: '', estimatedValue: '' });
+            setAddLeadForm({ firstName: '', lastName: '', phone: '', email: '', interestedCourse: '', estimatedValue: '', sourceId: '', leadType: 'STANDARD', assignedCounsellorId: '' });
         } catch (e) {
             console.error(e);
             alert('Create lead failed');
@@ -447,7 +403,7 @@ function App() {
             });
             const j = await res.json();
             if (!j.success) return alert(j.message || 'Create follow-up failed');
-            fetchFollowups();
+            fetchAllData();
             setShowSchedule(false);
             setScheduleForm({ leadId: '', scheduledAt: '', type: 'CALL', notes: '' });
         } catch (e) {
@@ -464,7 +420,7 @@ function App() {
             });
             const j = await res.json();
             if (!j.success) return alert('Complete failed');
-            fetchFollowups();
+            fetchAllData();
         } catch (e) {
             console.error(e);
             alert('Complete failed');
@@ -480,7 +436,7 @@ function App() {
             });
             const j = await res.json();
             if (!j.success) return alert(j.message || 'Create course failed');
-            setCourses((s) => [...s, j.data]);
+            fetchAllData();
             setShowAddCourse(false);
             setAddCourseForm({ courseCode: '', name: '', description: '', standardFee: '' });
         } catch (e) {
@@ -489,215 +445,16 @@ function App() {
         }
     }
 
-    async function createBatch() {
-        try {
-            const res = await fetch(API_BASE + '/batches', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify({ ...addBatchForm, capacity: Number(addBatchForm.capacity) || 25 })
-            });
-            const j = await res.json();
-            if (!j.success) return alert(j.message || 'Create batch failed');
-            fetchBatches();
-            setShowAddBatch(false);
-            setAddBatchForm({ batchCode: '', name: '', courseId: '', startDate: '', capacity: 25 });
-        } catch (e) {
-            console.error(e);
-            alert('Create batch failed');
-        }
-    }
-
-    async function createStudent() {
-        try {
-            const payload = {
-                ...addStudentForm,
-                studentCode: addStudentForm.studentCode.trim() || undefined,
-                email: addStudentForm.email.trim() || undefined,
-                lastName: addStudentForm.lastName.trim() || undefined
-            };
-            const res = await fetch(API_BASE + '/students', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify(payload)
-            });
-            const j = await res.json();
-            if (!j.success) return alert(j.message || 'Create student failed');
-            fetchStudents();
-            setShowAddStudent(false);
-            setAddStudentForm({ studentCode: '', firstName: '', lastName: '', phone: '', email: '' });
-        } catch (e) {
-            console.error(e);
-            alert('Create student failed');
-        }
-    }
-
-    async function createAdmission() {
-        try {
-            const payload = {
-                ...addAdmissionForm,
-                admissionNumber: addAdmissionForm.admissionNumber.trim() || undefined,
-                batchId: addAdmissionForm.batchId || undefined,
-                agreedFee: Number(addAdmissionForm.agreedFee) || Number(addAdmissionForm.finalFee),
-                finalFee: Number(addAdmissionForm.finalFee)
-            };
-            const res = await fetch(API_BASE + '/admissions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify(payload)
-            });
-            const j = await res.json();
-            if (!j.success) return alert(j.message || 'Create admission failed');
-            fetchAdmissions();
-            setShowAddAdmission(false);
-            setAddAdmissionForm({ admissionNumber: '', studentId: '', courseId: '', batchId: '', agreedFee: '', finalFee: '' });
-        } catch (e) {
-            console.error(e);
-            alert('Create admission failed');
-        }
-    }
-
-    async function createPayment() {
-        try {
-            const res = await fetch(API_BASE + '/payments', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify({
-                    ...addPaymentForm,
-                    amount: Number(addPaymentForm.amount)
-                })
-            });
-            const j = await res.json();
-            if (!j.success) return alert(j.message || 'Create payment failed');
-            fetchPayments();
-            setShowAddPayment(false);
-            setAddPaymentForm({ admissionId: '', receiptNumber: '', amount: '', paymentMethod: 'UPI', transactionReference: '' });
-        } catch (e) {
-            console.error(e);
-            alert('Create payment failed');
-        }
-    }
-
-    async function createUserSubmit() {
-        try {
-            const res = await fetch(API_BASE + '/users', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify(addUserForm)
-            });
-            const j = await res.json();
-            if (!j.success) return alert(j.message || 'Create user failed');
-            fetchUsers();
-            setShowAddUser(false);
-            setAddUserForm({ name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true });
-        } catch (e) {
-            console.error(e);
-            alert('Create user failed');
-        }
-    }
-
-    function openEditUser(userToEdit) {
-        setEditingUser(userToEdit);
-        setEditUserForm({
-            id: userToEdit.id,
-            name: userToEdit.name || '',
-            email: userToEdit.email || '',
-            phone: userToEdit.phone || '',
-            password: '',
-            role: userToEdit.role || 'COUNSELLOR',
-            isActive: userToEdit.isActive ?? true
-        });
-    }
-
-    async function updateUserSubmit() {
-        try {
-            const res = await fetch(API_BASE + '/users/' + editUserForm.id, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify(editUserForm)
-            });
-            const j = await res.json();
-            if (!j.success) return alert(j.message || 'Update user failed');
-            fetchUsers();
-            setEditingUser(null);
-        } catch (e) {
-            console.error(e);
-            alert('Update user failed');
-        }
-    }
-
-    async function deleteUser(id, name) {
-        if (!window.confirm(`Are you sure you want to delete user account "${name}"?`)) return;
-        try {
-            const res = await fetch(API_BASE + '/users/' + id, {
-                method: 'DELETE',
-                headers: { Authorization: 'Bearer ' + token }
-            });
-            const j = await res.json();
-            if (!j.success) return alert(j.message || 'Delete user failed');
-            fetchUsers();
-        } catch (e) {
-            console.error(e);
-            alert('Delete user failed');
-        }
-    }
-
-    async function deleteStudent(id, name) {
-        if (!window.confirm(`Are you sure you want to delete student "${name}"?`)) return;
-        try {
-            const res = await fetch(API_BASE + '/students/' + id, {
-                method: 'DELETE',
-                headers: { Authorization: 'Bearer ' + token }
-            });
-            const j = await res.json();
-            if (!j.success) return alert(j.message || 'Delete student failed');
-            fetchStudents();
-        } catch (e) {
-            console.error(e);
-            alert('Delete student failed');
-        }
-    }
-
-    async function deleteAdmission(id, admissionNumber) {
-        if (!window.confirm(`Are you sure you want to delete admission "${admissionNumber}"?`)) return;
-        try {
-            const res = await fetch(API_BASE + '/admissions/' + id, {
-                method: 'DELETE',
-                headers: { Authorization: 'Bearer ' + token }
-            });
-            const j = await res.json();
-            if (!j.success) return alert(j.message || 'Delete admission failed');
-            fetchAdmissions();
-        } catch (e) {
-            console.error(e);
-            alert('Delete admission failed');
-        }
-    }
-
-    function openEditCourse(courseToEdit) {
-        setEditingCourse(courseToEdit);
-        setEditCourseForm({
-            id: courseToEdit.id,
-            courseCode: courseToEdit.courseCode || '',
-            name: courseToEdit.name || '',
-            description: courseToEdit.description || '',
-            standardFee: courseToEdit.standardFee || '',
-            isActive: courseToEdit.isActive ?? true
-        });
-    }
-
     async function updateCourseSubmit() {
         try {
-            const res = await fetch(API_BASE + '/courses/' + editCourseForm.id, {
-                method: 'PATCH',
+            const res = await fetch(API_BASE + '/courses/' + editingCourse.id, {
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify({
-                    ...editCourseForm,
-                    standardFee: Number(editCourseForm.standardFee) || 0
-                })
+                body: JSON.stringify({ ...editCourseForm, standardFee: Number(editCourseForm.standardFee) || 0 })
             });
             const j = await res.json();
             if (!j.success) return alert(j.message || 'Update course failed');
-            fetchCourses();
+            fetchAllData();
             setEditingCourse(null);
         } catch (e) {
             console.error(e);
@@ -706,7 +463,7 @@ function App() {
     }
 
     async function deleteCourse(id, courseName) {
-        if (!window.confirm(`Are you sure you want to PERMANENTLY delete course "${courseName}" from the database? This action cannot be undone.`)) return;
+        if (!window.confirm(`Are you sure you want to delete course "${courseName}"?`)) return;
         try {
             const res = await fetch(API_BASE + '/courses/' + id, {
                 method: 'DELETE',
@@ -714,42 +471,41 @@ function App() {
             });
             const j = await res.json();
             if (!j.success) return alert(j.message || 'Delete course failed');
-            alert(j.message || 'Course permanently removed from database');
-            fetchCourses();
+            fetchAllData();
         } catch (e) {
             console.error(e);
             alert('Delete course failed');
         }
     }
 
-    function openEditBatch(batchToEdit) {
-        setEditingBatch(batchToEdit);
-        setEditBatchForm({
-            id: batchToEdit.id,
-            batchCode: batchToEdit.batchCode || '',
-            name: batchToEdit.name || '',
-            courseId: batchToEdit.courseId || (batchToEdit.course?.id || ''),
-            startDate: batchToEdit.startDate ? new Date(batchToEdit.startDate).toISOString().slice(0, 10) : '',
-            capacity: batchToEdit.capacity || 25
-        });
+    async function createBatch() {
+        try {
+            const res = await fetch(API_BASE + '/batches', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify({ ...addBatchForm, capacity: Number(addBatchForm.capacity) || 25, branchId: activeBranch })
+            });
+            const j = await res.json();
+            if (!j.success) return alert(j.message || 'Create batch failed');
+            fetchAllData();
+            setShowAddBatch(false);
+            setAddBatchForm({ batchCode: '', name: '', courseId: '', startDate: '', capacity: 25 });
+        } catch (e) {
+            console.error(e);
+            alert('Create batch failed');
+        }
     }
 
     async function updateBatchSubmit() {
-        if (!editBatchForm.name || !editBatchForm.name.trim()) {
-            return alert('Please enter batch name');
-        }
         try {
             const res = await fetch(API_BASE + '/batches/' + editBatchForm.id, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify({
-                    ...editBatchForm,
-                    capacity: Number(editBatchForm.capacity) || 25
-                })
+                body: JSON.stringify({ ...editBatchForm, capacity: Number(editBatchForm.capacity) || 25 })
             });
             const j = await res.json();
             if (!j.success) return alert(j.message || 'Update batch failed');
-            fetchBatches();
+            fetchAllData();
             setEditingBatch(null);
         } catch (e) {
             console.error(e);
@@ -766,16 +522,168 @@ function App() {
             });
             const j = await res.json();
             if (!j.success) return alert(j.message || 'Delete batch failed');
-            fetchBatches();
+            fetchAllData();
         } catch (e) {
             console.error(e);
             alert('Delete batch failed');
         }
     }
 
+    async function createStudent() {
+        try {
+            const res = await fetch(API_BASE + '/students', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify({ ...addStudentForm, branchId: activeBranch })
+            });
+            const j = await res.json();
+            if (!j.success) return alert(formatErrorMessage(j.message) || 'Create student failed');
+            fetchAllData();
+            setShowAddStudent(false);
+            setAddStudentForm({ studentCode: '', firstName: '', lastName: '', phone: '', email: '' });
+        } catch (e) {
+            console.error(e);
+            alert('Create student failed');
+        }
+    }
+
+    async function deleteStudent(id, studentName) {
+        if (!window.confirm(`Are you sure you want to delete student "${studentName}"?`)) return;
+        try {
+            const res = await fetch(API_BASE + '/students/' + id, {
+                method: 'DELETE',
+                headers: { Authorization: 'Bearer ' + token }
+            });
+            const j = await res.json();
+            if (!j.success) return alert(j.message || 'Delete student failed');
+            fetchAllData();
+        } catch (e) {
+            console.error(e);
+            alert('Delete student failed');
+        }
+    }
+
+    async function createAdmission() {
+        try {
+            const res = await fetch(API_BASE + '/admissions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify({ ...addAdmissionForm, finalFee: Number(addAdmissionForm.finalFee) || 0, branchId: activeBranch })
+            });
+            const j = await res.json();
+            if (!j.success) return alert(formatErrorMessage(j.message) || 'Create admission failed');
+            fetchAllData();
+            setShowAddAdmission(false);
+            setAddAdmissionForm({ admissionNumber: '', studentId: '', courseId: '', batchId: '', agreedFee: '', finalFee: '' });
+        } catch (e) {
+            console.error(e);
+            alert('Create admission failed');
+        }
+    }
+
+    async function deleteAdmission(id, admissionNumber) {
+        if (!window.confirm(`Are you sure you want to delete admission "${admissionNumber}"?`)) return;
+        try {
+            const res = await fetch(API_BASE + '/admissions/' + id, {
+                method: 'DELETE',
+                headers: { Authorization: 'Bearer ' + token }
+            });
+            const j = await res.json();
+            if (!j.success) return alert(j.message || 'Delete admission failed');
+            fetchAllData();
+        } catch (e) {
+            console.error(e);
+            alert('Delete admission failed');
+        }
+    }
+
+    async function createPayment() {
+        try {
+            const res = await fetch(API_BASE + '/payments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify({ ...addPaymentForm, amount: Number(addPaymentForm.amount) || 0, branchId: activeBranch })
+            });
+            const j = await res.json();
+            if (!j.success) return alert(formatErrorMessage(j.message) || 'Create payment failed');
+            fetchAllData();
+            setShowAddPayment(false);
+            setAddPaymentForm({ admissionId: '', receiptNumber: '', amount: '', paymentMethod: 'UPI', transactionReference: '', remarks: '' });
+        } catch (e) {
+            console.error(e);
+            alert('Create payment failed');
+        }
+    }
+
+    async function createUserSubmit() {
+        try {
+            const res = await fetch(API_BASE + '/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify(addUserForm)
+            });
+            const j = await res.json();
+            if (!j.success) return alert(j.message || 'Create user failed');
+            fetchAllData();
+            setShowAddUser(false);
+            setAddUserForm({ name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true });
+        } catch (e) {
+            console.error(e);
+            alert('Create user failed');
+        }
+    }
+
+    async function updateUserSubmit() {
+        try {
+            const res = await fetch(API_BASE + '/users/' + editUserForm.id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify(editUserForm)
+            });
+            const j = await res.json();
+            if (!j.success) return alert(j.message || 'Update user failed');
+            fetchAllData();
+            setEditingUser(null);
+        } catch (e) {
+            console.error(e);
+            alert('Update user failed');
+        }
+    }
+
+    async function deleteUser(id, userName) {
+        if (!window.confirm(`Are you sure you want to delete user "${userName}"?`)) return;
+        try {
+            const res = await fetch(API_BASE + '/users/' + id, {
+                method: 'DELETE',
+                headers: { Authorization: 'Bearer ' + token }
+            });
+            const j = await res.json();
+            if (!j.success) return alert(j.message || 'Delete user failed');
+            fetchAllData();
+        } catch (e) {
+            console.error(e);
+            alert('Delete user failed');
+        }
+    }
+
+    function openEditUser(u) {
+        setEditingUser(u);
+        setEditUserForm({ id: u.id, name: u.name, email: u.email, phone: u.phone || '', password: '', role: u.role, isActive: u.isActive });
+    }
+
+    function openEditCourse(c) {
+        setEditingCourse(c);
+        setEditCourseForm({ id: c.id, courseCode: c.courseCode, name: c.name, description: c.description || '', standardFee: c.standardFee, isActive: c.isActive });
+    }
+
+    function openEditBatch(b) {
+        setEditingBatch(b);
+        setEditBatchForm({ id: b.id, batchCode: b.batchCode, name: b.name, courseId: b.courseId, startDate: b.startDate ? b.startDate.slice(0, 10) : '', capacity: b.capacity });
+    }
+
     function getNextCode(prefix, list, key) {
         let maxNum = 1000;
-        if (list && list.length > 0) {
+        if (Array.isArray(list) && list.length > 0) {
             list.forEach((item) => {
                 const val = (item && item[key]) ? String(item[key]) : '';
                 const match = val.match(/\d+/);
@@ -899,7 +807,7 @@ function App() {
                     <div>
                         <span className="crumb">Workspace / </span>
                         <b>{page}</b>
-                        <h1>{page === 'Dashboard' ? `Good day, ${user?.name || 'Admin'} 👋` : page}</h1>
+                        <h1>{page === 'Dashboard' ? `CADPOINT COIMBATORE 👋` : page}</h1>
                     </div>
                     <div className="headright">
                         <div className="search" style={{ position: 'relative' }}>
@@ -985,7 +893,6 @@ function App() {
                             )}
                         </div>
 
-                        
                         <div className="branch-selector" style={{ display: 'flex', alignItems: 'center', gap: 6, background: theme === 'dark' ? '#1e293b' : '#f1f5f9', padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
                             <span style={{ color: '#64748b' }}>Branch:</span>
                             <select
@@ -1001,54 +908,57 @@ function App() {
                                 <option value="all">All Branches</option>
                             </select>
                         </div>
-                        <button className="user"
- onClick={logout} title="Click to Logout">
+
+                        <button className="user" onClick={logout} title="Click to Logout">
                             {(user && user.name && user.name.split(' ').map((s) => s[0]).slice(0, 2).join('')) || 'SK'}
                         </button>
                     </div>
                 </header>
 
-                {page === 'Dashboard' ? (
-                    <Dashboard
-                        leads={leads}
-                        followups={followups}
-                        admissions={admissions}
-                        payments={payments}
-                        onAddLead={() => setShowAddLead(true)}
-                        onSchedule={() => setShowSchedule(true)}
-                        onCompleteFollowup={completeFollowup}
-                        onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
-                        onNavigate={(targetPage) => setPage(targetPage)}
-                    />
-                ) : (
-                    <Module
-                        page={page}
-                        leads={leads}
-                        followups={followups}
-                        courses={courses}
-                        batches={batches}
-                        students={students}
-                        admissions={admissions}
-                        payments={payments}
-                        usersList={usersList}
-                        onOpenAddModal={() => openAddModalForPage(page)}
-                        onCompleteFollowup={completeFollowup}
-                        onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
-                        onEditUser={openEditUser}
-                        onDeleteUser={deleteUser}
-                        onEditCourse={openEditCourse}
-                        onDeleteCourse={deleteCourse}
-                        onEditBatch={openEditBatch}
-                        onDeleteBatch={deleteBatch}
-                        onDeleteStudent={deleteStudent}
-                        onDeleteAdmission={deleteAdmission}
-                        onOpenEditProgress={openEditProgress}
-                        currentUserId={user?.id}
-                        token={token}
-                        theme={theme}
-                        toggleTheme={toggleTheme}
-                    />
-                )}
+                <ErrorBoundary key={page}>
+                    {page === 'Dashboard' ? (
+                        <Dashboard
+                            leads={leads}
+                            followups={followups}
+                            admissions={admissions}
+                            payments={payments}
+                            onAddLead={() => setShowAddLead(true)}
+                            onSchedule={() => setShowSchedule(true)}
+                            onCompleteFollowup={completeFollowup}
+                            onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
+                            onNavigate={(targetPage) => setPage(targetPage)}
+                        />
+                    ) : (
+                        <Module
+                            page={page}
+                            leads={leads}
+                            followups={followups}
+                            courses={courses}
+                            batches={batches}
+                            students={students}
+                            admissions={admissions}
+                            payments={payments}
+                            usersList={usersList}
+                            sourcesList={sourcesList}
+                            onOpenAddModal={() => openAddModalForPage(page)}
+                            onCompleteFollowup={completeFollowup}
+                            onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
+                            onEditUser={openEditUser}
+                            onDeleteUser={deleteUser}
+                            onEditCourse={openEditCourse}
+                            onDeleteCourse={deleteCourse}
+                            onEditBatch={openEditBatch}
+                            onDeleteBatch={deleteBatch}
+                            onDeleteStudent={deleteStudent}
+                            onDeleteAdmission={deleteAdmission}
+                            onOpenEditProgress={openEditProgress}
+                            currentUserId={user?.id}
+                            token={token}
+                            theme={theme}
+                            toggleTheme={toggleTheme}
+                        />
+                    )}
+                </ErrorBoundary>
             </main>
 
             {/* WhatsApp Messaging Modal */}
@@ -1172,6 +1082,7 @@ function App() {
                     </form>
                 </div>
             )}
+
             {editingBatch && (
                 <div className="modal">
                     <form
@@ -1193,9 +1104,9 @@ function App() {
                         <label>
                             Course
                             <select value={editBatchForm.courseId} onChange={(e) => setEditBatchForm({ ...editBatchForm, courseId: e.target.value })} required>
-                                <option value="">Select Course</option>
+                                <option value="">Select course</option>
                                 {courses.map((c) => (
-                                    <option key={c.id} value={c.id}>{c.name} ({c.courseCode})</option>
+                                    <option key={c.id} value={c.id}>{c.name}</option>
                                 ))}
                             </select>
                         </label>
@@ -1204,16 +1115,17 @@ function App() {
                             <input type="date" value={editBatchForm.startDate} onChange={(e) => setEditBatchForm({ ...editBatchForm, startDate: e.target.value })} required />
                         </label>
                         <label>
-                            Capacity (Students)
-                            <input type="number" value={editBatchForm.capacity} onChange={(e) => setEditBatchForm({ ...editBatchForm, capacity: Number(e.target.value) })} />
+                            Capacity
+                            <input type="number" value={editBatchForm.capacity} onChange={(e) => setEditBatchForm({ ...editBatchForm, capacity: e.target.value })} required />
                         </label>
                         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                            <button className="primary" type="submit">Save Batch</button>
+                            <button className="primary" type="submit">Save Changes</button>
                             <button type="button" onClick={() => setEditingBatch(null)}>Cancel</button>
                         </div>
                     </form>
                 </div>
             )}
+
             {editingUser && (
                 <div className="modal">
                     <form
@@ -1223,7 +1135,7 @@ function App() {
                             updateUserSubmit();
                         }}
                     >
-                        <h3>Edit User Account</h3>
+                        <h3>Edit User</h3>
                         <label>
                             Name
                             <input value={editUserForm.name} onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })} required />
@@ -1234,25 +1146,25 @@ function App() {
                         </label>
                         <label>
                             Phone
-                            <input value={editUserForm.phone || ''} onChange={(e) => setEditUserForm({ ...editUserForm, phone: e.target.value })} />
-                        </label>
-                        <label>
-                            New Password (leave blank to keep current)
-                            <input type="password" value={editUserForm.password} onChange={(e) => setEditUserForm({ ...editUserForm, password: e.target.value })} placeholder="••••••••" minLength={8} />
+                            <input value={editUserForm.phone} onChange={(e) => setEditUserForm({ ...editUserForm, phone: e.target.value })} />
                         </label>
                         <label>
                             Role
                             <select value={editUserForm.role} onChange={(e) => setEditUserForm({ ...editUserForm, role: e.target.value })}>
-                                <option>SUPER_ADMIN</option>
-                                <option>ADMIN</option>
-                                <option>COUNSELLOR</option>
-                                <option>TRAINER</option>
-                                <option>ACCOUNTS</option>
-                                <option>RECEPTIONIST</option>
+                                <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                                <option value="ADMIN">ADMIN</option>
+                                <option value="COUNSELLOR">COUNSELLOR</option>
+                                <option value="TRAINER">TRAINER</option>
+                                <option value="ACCOUNTS">ACCOUNTS</option>
+                                <option value="RECEPTIONIST">RECEPTIONIST</option>
                             </select>
                         </label>
+                        <label>
+                            New Password (leave blank to keep current)
+                            <input type="password" value={editUserForm.password} onChange={(e) => setEditUserForm({ ...editUserForm, password: e.target.value })} placeholder="••••••••" />
+                        </label>
                         <label className="checkbox-label">
-                            <input type="checkbox" checked={editUserForm.isActive} onChange={(e) => setEditUserForm({ ...editUserForm, isActive: e.target.checked })} /> Active User
+                            <input type="checkbox" checked={editUserForm.isActive} onChange={(e) => setEditUserForm({ ...editUserForm, isActive: e.target.checked })} /> Active User Account
                         </label>
                         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                             <button className="primary" type="submit">Save Changes</button>
@@ -1261,6 +1173,7 @@ function App() {
                     </form>
                 </div>
             )}
+
             {showAddLead && (
                 <div className="modal">
                     <form
@@ -1435,8 +1348,12 @@ function App() {
                             <textarea value={addCourseForm.description} onChange={(e) => setAddCourseForm({ ...addCourseForm, description: e.target.value })} />
                         </label>
                         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                            <button className="primary" type="submit">Create Course</button>
-                            <button type="button" onClick={() => setShowAddCourse(false)}>Cancel</button>
+                            <button className="primary" type="submit">
+                                Create Course
+                            </button>
+                            <button type="button" onClick={() => setShowAddCourse(false)}>
+                                Cancel
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -1454,18 +1371,18 @@ function App() {
                         <h3>Add Batch</h3>
                         <label>
                             Batch Code
-                            <input value={addBatchForm.batchCode} onChange={(e) => setAddBatchForm({ ...addBatchForm, batchCode: e.target.value })} placeholder="BATCH-2026-A" required />
+                            <input value={addBatchForm.batchCode} onChange={(e) => setAddBatchForm({ ...addBatchForm, batchCode: e.target.value })} placeholder="BAT-101" required />
                         </label>
                         <label>
                             Batch Name
-                            <input value={addBatchForm.name} onChange={(e) => setAddBatchForm({ ...addBatchForm, name: e.target.value })} placeholder="Morning AutoCAD Batch" required />
+                            <input value={addBatchForm.name} onChange={(e) => setAddBatchForm({ ...addBatchForm, name: e.target.value })} placeholder="Morning Batch A" required />
                         </label>
                         <label>
                             Course
                             <select value={addBatchForm.courseId} onChange={(e) => setAddBatchForm({ ...addBatchForm, courseId: e.target.value })} required>
                                 <option value="">Select course</option>
                                 {courses.map((c) => (
-                                    <option key={c.id} value={c.id}>{c.name} ({c.courseCode})</option>
+                                    <option key={c.id} value={c.id}>{c.name}</option>
                                 ))}
                             </select>
                         </label>
@@ -1475,11 +1392,15 @@ function App() {
                         </label>
                         <label>
                             Capacity
-                            <input type="number" value={addBatchForm.capacity} onChange={(e) => setAddBatchForm({ ...addBatchForm, capacity: e.target.value })} />
+                            <input type="number" value={addBatchForm.capacity} onChange={(e) => setAddBatchForm({ ...addBatchForm, capacity: e.target.value })} required />
                         </label>
                         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                            <button className="primary" type="submit">Create Batch</button>
-                            <button type="button" onClick={() => setShowAddBatch(false)}>Cancel</button>
+                            <button className="primary" type="submit">
+                                Create Batch
+                            </button>
+                            <button type="button" onClick={() => setShowAddBatch(false)}>
+                                Cancel
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -1497,7 +1418,7 @@ function App() {
                         <h3>Add Student</h3>
                         <label>
                             Student Code
-                            <input value={addStudentForm.studentCode} onChange={(e) => setAddStudentForm({ ...addStudentForm, studentCode: e.target.value })} placeholder="STU-101" required />
+                            <input value={addStudentForm.studentCode} onChange={(e) => setAddStudentForm({ ...addStudentForm, studentCode: e.target.value })} placeholder="STU-1001" required />
                         </label>
                         <label>
                             First Name
@@ -1658,21 +1579,18 @@ function App() {
                         </label>
                         <label>
                             Password
-                            <input type="password" value={addUserForm.password} onChange={(e) => setAddUserForm({ ...addUserForm, password: e.target.value })} required minLength={8} />
+                            <input type="password" value={addUserForm.password} onChange={(e) => setAddUserForm({ ...addUserForm, password: e.target.value })} placeholder="••••••••" required />
                         </label>
                         <label>
                             Role
                             <select value={addUserForm.role} onChange={(e) => setAddUserForm({ ...addUserForm, role: e.target.value })}>
-                                <option>SUPER_ADMIN</option>
-                                <option>ADMIN</option>
-                                <option>COUNSELLOR</option>
-                                <option>TRAINER</option>
-                                <option>ACCOUNTS</option>
-                                <option>RECEPTIONIST</option>
+                                <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                                <option value="ADMIN">ADMIN</option>
+                                <option value="COUNSELLOR">COUNSELLOR</option>
+                                <option value="TRAINER">TRAINER</option>
+                                <option value="ACCOUNTS">ACCOUNTS</option>
+                                <option value="RECEPTIONIST">RECEPTIONIST</option>
                             </select>
-                        </label>
-                        <label className="checkbox-label">
-                            <input type="checkbox" checked={addUserForm.isActive} onChange={(e) => setAddUserForm({ ...addUserForm, isActive: e.target.checked })} /> Active User
                         </label>
                         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                             <button className="primary" type="submit">Create User</button>
@@ -1685,18 +1603,79 @@ function App() {
     );
 }
 
-function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedule, onCompleteFollowup, onOpenWhatsApp, onNavigate }) {
-    const totalRevenue = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-    const totalAgreedFees = admissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
+function WhatsAppModal({ data, onClose, token }) {
+    const lead = data.lead || {};
+    const followup = data.followup;
+    const phone = lead.phone || '';
+    const name = (lead.firstName || '') + (lead.lastName ? ' ' + lead.lastName : '');
+    const course = lead.interestedCourse || 'our courses';
+
+    const defaultMsg = followup
+        ? `Hello ${name || 'Student'}, this is a reminder from CADPOINT COIMBATORE regarding your scheduled follow-up for ${course}.`
+        : `Hello ${name || 'Student'}, thank you for inquiring about ${course} at CADPOINT COIMBATORE! How can we assist you today?`;
+
+    const [message, setMessage] = useState(defaultMsg);
+
+    function sendWhatsApp() {
+        if (!phone) return alert('No phone number available for this lead');
+        const cleanPhone = phone.replace(/\D/g, '');
+        const formattedPhone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
+        const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
+        window.open(url, '_blank');
+        onClose();
+    }
+
+    return (
+        <div className="modal">
+            <div className="panel" style={{ maxWidth: 450 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <h3 style={{ margin: 0, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <MessageCircle size={20} /> Send WhatsApp Message
+                    </h3>
+                    <X size={18} style={{ cursor: 'pointer' }} onClick={onClose} />
+                </div>
+                <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 12px' }}>
+                    Recipient: <b>{name || 'Lead'}</b> ({phone})
+                </p>
+                <label>
+                    Message
+                    <textarea
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        rows={4}
+                        style={{ width: '100%', marginTop: 4 }}
+                    />
+                </label>
+                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                    <button className="primary" style={{ background: '#16a34a', borderColor: '#16a34a' }} onClick={sendWhatsApp}>
+                        Open WhatsApp Web / App
+                    </button>
+                    <button type="button" onClick={onClose}>
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function Dashboard({ leads = [], followups = [], admissions = [], payments = [], onAddLead, onSchedule, onCompleteFollowup, onOpenWhatsApp, onNavigate }) {
+    const safeLeads = Array.isArray(leads) ? leads : [];
+    const safeFollowups = Array.isArray(followups) ? followups : [];
+    const safeAdmissions = Array.isArray(admissions) ? admissions : [];
+    const safePayments = Array.isArray(payments) ? payments : [];
+
+    const totalRevenue = safePayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const totalAgreedFees = safeAdmissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
     const outstandingFees = Math.max(0, totalAgreedFees - totalRevenue);
-    const totalAdmissions = admissions.length;
-    const totalLeads = leads.length;
+    const totalAdmissions = safeAdmissions.length;
+    const totalLeads = safeLeads.length;
     const conversionRate = totalLeads > 0 ? ((totalAdmissions / totalLeads) * 100).toFixed(0) : '0';
 
-    const newLeadsCount = leads.filter((l) => !l.status || l.status.toUpperCase() === 'NEW').length;
-    const contactedCount = leads.filter((l) => l.status && l.status.toUpperCase() === 'CONTACTED').length;
-    const interestedCount = leads.filter((l) => l.status && l.status.toUpperCase() === 'INTERESTED').length;
-    const demoCount = leads.filter((l) => l.status && l.status.toUpperCase().includes('DEMO')).length;
+    const newLeadsCount = safeLeads.filter((l) => !l.status || (l.status + '').toUpperCase() === 'NEW').length;
+    const contactedCount = safeLeads.filter((l) => l.status && (l.status + '').toUpperCase() === 'CONTACTED').length;
+    const interestedCount = safeLeads.filter((l) => l.status && (l.status + '').toUpperCase() === 'INTERESTED').length;
+    const demoCount = safeLeads.filter((l) => l.status && (l.status + '').toUpperCase().includes('DEMO')).length;
 
     return (
         <div className="content">
@@ -1712,7 +1691,7 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
                 <div className="card">
                     <span>Total Leads</span>
                     <strong>{totalLeads}</strong>
-                    <small className="good">{leads.length > 0 ? '+100%' : '0%'}</small>
+                    <small className="good">{totalLeads > 0 ? '+100%' : '0%'}</small>
                     <small>enquiries logged</small>
                 </div>
                 <div className="card">
@@ -1724,7 +1703,7 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
                 <div className="card">
                     <span>Revenue Collected</span>
                     <strong>₹{totalRevenue.toLocaleString()}</strong>
-                    <small className="good">{payments.length} receipts</small>
+                    <small className="good">{safePayments.length} receipts</small>
                     <small>collected total</small>
                 </div>
                 <div className="card">
@@ -1789,17 +1768,17 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
                     <div className="panelhead">
                         <div>
                             <b>Today's Follow-ups</b>
-                            <span>{followups.length} tasks need attention</span>
+                            <span>{safeFollowups.length} tasks need attention</span>
                         </div>
                         <button className="link" onClick={() => onNavigate('Follow-ups')}>
                             View calendar
                         </button>
                     </div>
-                    {followups.length === 0 ? (
+                    {safeFollowups.length === 0 ? (
                         <p style={{ padding: 16, color: '#64748b' }}>No pending follow-ups scheduled for today.</p>
                     ) : (
-                        followups.slice(0, 8).map((f) => {
-                            const time = new Date(f.scheduledAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                        safeFollowups.slice(0, 8).map((f) => {
+                            const time = formatDateTime(f.scheduledAt);
                             const leadName = f.lead ? `${f.lead.firstName} ${f.lead.lastName || ''}`.trim() : (f.leadId || 'Unknown Lead');
                             return (
                                 <div className="task" key={f.id}>
@@ -1832,7 +1811,7 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
                             View all
                         </button>
                     </div>
-                    {leads.length === 0 ? (
+                    {safeLeads.length === 0 ? (
                         <p style={{ padding: 16, color: '#64748b' }}>No leads recorded yet.</p>
                     ) : (
                         <table>
@@ -1844,9 +1823,10 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
                                 </tr>
                             </thead>
                             <tbody>
-                                {leads.slice(0, 6).map((l) => {
+                                {safeLeads.slice(0, 6).map((l) => {
                                     const name = (l.firstName || '') + (l.lastName ? ' ' + l.lastName : '');
                                     const initials = (name.match(/\b\w/g) || []).slice(0, 2).join('');
+                                    const statusStr = (l.status || 'NEW') + '';
                                     return (
                                         <tr key={l.id || l.leadNumber}>
                                             <td>
@@ -1858,7 +1838,7 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
                                             <td>{l.phone}</td>
                                             <td>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                    <span className={'status ' + (l.status || 'new').toString().replaceAll(' ', '').toLowerCase()}>{l.status || 'NEW'}</span>
+                                                    <span className={'status ' + statusStr.replaceAll(' ', '').toLowerCase()}>{statusStr}</span>
                                                     <button className="secondary" style={{ padding: '2px 6px', fontSize: 10, color: '#16a34a', borderColor: '#86efac' }} onClick={() => onOpenWhatsApp(l)} title="WhatsApp Lead">
                                                         <MessageCircle size={12} />
                                                     </button>
@@ -1876,8 +1856,20 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
     );
 }
 
-function Module({ page, leads, followups, courses, batches, students, admissions, payments, usersList, onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onDeleteStudent, onDeleteAdmission, onOpenEditProgress, currentUserId, token, theme, toggleTheme }) {
-    const itemSingular = page.slice(0, -1);
+function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onDeleteStudent, onDeleteAdmission, onOpenEditProgress, currentUserId, token, theme, toggleTheme }) {
+    const itemSingular = page.endsWith('s') ? page.slice(0, -1) : page;
+    const [filterText, setFilterText] = useState('');
+
+    const safeLeads = Array.isArray(leads) ? leads : [];
+    const safeFollowups = Array.isArray(followups) ? followups : [];
+    const safeCourses = Array.isArray(courses) ? courses : [];
+    const safeBatches = Array.isArray(batches) ? batches : [];
+    const safeStudents = Array.isArray(students) ? students : [];
+    const safeAdmissions = Array.isArray(admissions) ? admissions : [];
+    const safePayments = Array.isArray(payments) ? payments : [];
+    const safeUsers = Array.isArray(usersList) ? usersList : [];
+
+    const lowerFilter = filterText.trim().toLowerCase();
 
     return (
         <div className="content">
@@ -1897,11 +1889,15 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                     <div className="toolbar">
                         <div className="search inline">
                             <Search size={16} />
-                            <input placeholder={'Filter ' + page.toLowerCase() + '...'} />
+                            <input
+                                value={filterText}
+                                onChange={(e) => setFilterText(e.target.value)}
+                                placeholder={'Filter ' + page.toLowerCase() + '...'}
+                            />
+                            {filterText && (
+                                <X size={14} style={{ cursor: 'pointer', marginRight: 6 }} onClick={() => setFilterText('')} />
+                            )}
                         </div>
-                        <select>
-                            <option>All items</option>
-                        </select>
                     </div>
                 )}
 
@@ -1911,6 +1907,7 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                             <tr>
                                 <th>Lead</th>
                                 <th>Course</th>
+                                <th>Source</th>
                                 <th>Phone</th>
                                 <th>Status</th>
                                 <th>Value</th>
@@ -1918,28 +1915,31 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                             </tr>
                         </thead>
                         <tbody>
-                            {leads.map((l) => (
-                                <tr key={l.id || l.leadNumber}>
-                                    <td>
-                                        <div className="lead">
-                                            <div className="mini">{((l.firstName || '').match(/\b\w/g) || []).slice(0, 2).join('') || 'LD'}</div>
-                                            <b>{(l.firstName || '') + (l.lastName ? ' ' + l.lastName : '') || l.leadNumber}</b>
-                                        </div>
-                                    </td>
-                                    <td>{l.interestedCourse || '-'}</td>
-                                    <td>{l.phone}</td>
-                                    <td>
-                                        <span className={'status ' + ((l.status || 'new') + '').replaceAll(' ', '').toLowerCase()}>{l.status}</span>
-                                    </td>
-                                    <td>
-                                        <b>{l.estimatedValue ? `₹${Number(l.estimatedValue).toLocaleString()}` : '-'}</b>
-                                    </td>
-                                    <td>
-                                        <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#16a34a', borderColor: '#86efac' }} onClick={() => onOpenWhatsApp(l)}>
-                                            <MessageCircle size={13} /> WhatsApp
-                                        </button>
-                                    </td>
-                                </tr>
+                            {safeLeads
+                                .filter((l) => !lowerFilter || (l.firstName + ' ' + (l.lastName || '') + ' ' + l.phone + ' ' + (l.interestedCourse || '')).toLowerCase().includes(lowerFilter))
+                                .map((l) => (
+                                    <tr key={l.id || l.leadNumber}>
+                                        <td>
+                                            <div className="lead">
+                                                <div className="mini">{((l.firstName || '').match(/\b\w/g) || []).slice(0, 2).join('') || 'LD'}</div>
+                                                <b>{(l.firstName || '') + (l.lastName ? ' ' + l.lastName : '') || l.leadNumber}</b>
+                                            </div>
+                                        </td>
+                                        <td>{l.interestedCourse || '-'}</td>
+                                        <td><span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', fontSize: 11 }}>{l.source?.name || 'Walk-in'}</span></td>
+                                        <td>{l.phone}</td>
+                                        <td>
+                                            <span className={'status ' + ((l.status || 'NEW') + '').replaceAll(' ', '').toLowerCase()}>{l.status || 'NEW'}</span>
+                                        </td>
+                                        <td>
+                                            <b>{l.estimatedValue ? `₹${Number(l.estimatedValue).toLocaleString()}` : '-'}</b>
+                                        </td>
+                                        <td>
+                                            <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#16a34a', borderColor: '#86efac' }} onClick={() => onOpenWhatsApp(l)}>
+                                                <MessageCircle size={13} /> WhatsApp
+                                            </button>
+                                        </td>
+                                    </tr>
                             ))}
                         </tbody>
                     </table>
@@ -1958,26 +1958,28 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                             </tr>
                         </thead>
                         <tbody>
-                            {followups.map((f) => (
-                                <tr key={f.id}>
-                                    <td>{new Date(f.scheduledAt).toLocaleString()}</td>
-                                    <td><b>{f.lead ? `${f.lead.firstName} ${f.lead.lastName || ''}`.trim() : f.leadId}</b></td>
-                                    <td>{f.type}</td>
-                                    <td>{f.notes || '-'}</td>
-                                    <td><span className={'status ' + f.status.toLowerCase()}>{f.status}</span></td>
-                                    <td>
-                                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                            {f.status === 'PENDING' && (
-                                                <button className="primary" style={{ padding: '4px 8px', fontSize: 12 }} onClick={() => onCompleteFollowup(f.id)}>
-                                                    Complete
+                            {safeFollowups
+                                .filter((f) => !lowerFilter || (f.notes || '' + f.type).toLowerCase().includes(lowerFilter))
+                                .map((f) => (
+                                    <tr key={f.id}>
+                                        <td>{formatDateTime(f.scheduledAt)}</td>
+                                        <td><b>{f.lead ? `${f.lead.firstName} ${f.lead.lastName || ''}`.trim() : f.leadId}</b></td>
+                                        <td>{f.type}</td>
+                                        <td>{f.notes || '-'}</td>
+                                        <td><span className={'status ' + (f.status || 'PENDING').toLowerCase()}>{f.status || 'PENDING'}</span></td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                                {f.status === 'PENDING' && (
+                                                    <button className="primary" style={{ padding: '4px 8px', fontSize: 12 }} onClick={() => onCompleteFollowup(f.id)}>
+                                                        Complete
+                                                    </button>
+                                                )}
+                                                <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#16a34a', borderColor: '#86efac' }} onClick={() => onOpenWhatsApp(f.lead, f)}>
+                                                    <MessageCircle size={13} /> WhatsApp
                                                 </button>
-                                            )}
-                                            <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#16a34a', borderColor: '#86efac' }} onClick={() => onOpenWhatsApp(f.lead, f)}>
-                                                <MessageCircle size={13} /> WhatsApp
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
+                                            </div>
+                                        </td>
+                                    </tr>
                             ))}
                         </tbody>
                     </table>
@@ -1996,36 +1998,38 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                             </tr>
                         </thead>
                         <tbody>
-                            {courses.map((c) => (
-                                <tr key={c.id}>
-                                    <td><b>{c.courseCode}</b></td>
-                                    <td>{c.name}</td>
-                                    <td>{c.description || '-'}</td>
-                                    <td><b>₹{Number(c.standardFee).toLocaleString()}</b></td>
-                                    <td><span className={c.isActive ? 'status confirmed' : 'status lost'}>{c.isActive ? 'Active' : 'Inactive'}</span></td>
-                                    <td>
-                                        <div style={{ display: 'flex', gap: 6 }}>
-                                            <button
-                                                type="button"
-                                                className="secondary"
-                                                style={{ padding: '4px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                onClick={() => onEditCourse(c)}
-                                                title="Edit Course Details"
-                                            >
-                                                <Edit size={13} /> Edit
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="secondary"
-                                                style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                onClick={() => onDeleteCourse(c.id, c.name)}
-                                                title="Remove Course"
-                                            >
-                                                <Trash2 size={13} /> Remove
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
+                            {safeCourses
+                                .filter((c) => !lowerFilter || (c.name + ' ' + c.courseCode).toLowerCase().includes(lowerFilter))
+                                .map((c) => (
+                                    <tr key={c.id}>
+                                        <td><b>{c.courseCode}</b></td>
+                                        <td>{c.name}</td>
+                                        <td>{c.description || '-'}</td>
+                                        <td><b>₹{Number(c.standardFee).toLocaleString()}</b></td>
+                                        <td><span className={c.isActive ? 'status confirmed' : 'status lost'}>{c.isActive ? 'Active' : 'Inactive'}</span></td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: 6 }}>
+                                                <button
+                                                    type="button"
+                                                    className="secondary"
+                                                    style={{ padding: '4px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                    onClick={() => onEditCourse(c)}
+                                                    title="Edit Course Details"
+                                                >
+                                                    <Edit size={13} /> Edit
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="secondary"
+                                                    style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                    onClick={() => onDeleteCourse(c.id, c.name)}
+                                                    title="Remove Course"
+                                                >
+                                                    <Trash2 size={13} /> Remove
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
                             ))}
                         </tbody>
                     </table>
@@ -2045,37 +2049,39 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                             </tr>
                         </thead>
                         <tbody>
-                            {batches.map((b) => (
-                                <tr key={b.id}>
-                                    <td><b>{b.batchCode}</b></td>
-                                    <td>{b.name}</td>
-                                    <td>{b.course?.name || '-'}</td>
-                                    <td>{new Date(b.startDate).toLocaleDateString()}</td>
-                                    <td>{b.capacity} students</td>
-                                    <td><span className="status active">{b.status}</span></td>
-                                    <td>
-                                        <div style={{ display: 'flex', gap: 6 }}>
-                                            <button
-                                                type="button"
-                                                className="secondary"
-                                                style={{ padding: '4px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                onClick={() => onEditBatch(b)}
-                                                title="Edit Batch Details"
-                                            >
-                                                <Edit size={13} /> Edit
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="secondary"
-                                                style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                onClick={() => onDeleteBatch(b.id, b.name)}
-                                                title="Delete Batch"
-                                            >
-                                                <Trash2 size={13} /> Delete
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
+                            {safeBatches
+                                .filter((b) => !lowerFilter || (b.name + ' ' + b.batchCode).toLowerCase().includes(lowerFilter))
+                                .map((b) => (
+                                    <tr key={b.id}>
+                                        <td><b>{b.batchCode}</b></td>
+                                        <td>{b.name}</td>
+                                        <td>{b.course?.name || '-'}</td>
+                                        <td>{formatDate(b.startDate)}</td>
+                                        <td>{b.capacity} students</td>
+                                        <td><span className="status active">{b.status}</span></td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: 6 }}>
+                                                <button
+                                                    type="button"
+                                                    className="secondary"
+                                                    style={{ padding: '4px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                    onClick={() => onEditBatch(b)}
+                                                    title="Edit Batch Details"
+                                                >
+                                                    <Edit size={13} /> Edit
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="secondary"
+                                                    style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                    onClick={() => onDeleteBatch(b.id, b.name)}
+                                                    title="Delete Batch"
+                                                >
+                                                    <Trash2 size={13} /> Delete
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
                             ))}
                         </tbody>
                     </table>
@@ -2094,19 +2100,21 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                             </tr>
                         </thead>
                         <tbody>
-                            {students.map((s) => (
-                                <tr key={s.id}>
-                                    <td><b>{s.studentCode}</b></td>
-                                    <td>{s.firstName} {s.lastName || ''}</td>
-                                    <td>{s.phone}</td>
-                                    <td>{s.email || '-'}</td>
-                                    <td>{new Date(s.createdAt).toLocaleDateString()}</td>
-                                    <td>
-                                        <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => onDeleteStudent(s.id, `${s.firstName} ${s.lastName || ''}`.trim())}>
-                                            <Trash2 size={13} /> Delete
-                                        </button>
-                                    </td>
-                                </tr>
+                            {safeStudents
+                                .filter((s) => !lowerFilter || (s.firstName + ' ' + (s.lastName || '') + ' ' + s.phone + ' ' + s.studentCode).toLowerCase().includes(lowerFilter))
+                                .map((s) => (
+                                    <tr key={s.id}>
+                                        <td><b>{s.studentCode}</b></td>
+                                        <td>{s.firstName} {s.lastName || ''}</td>
+                                        <td>{s.phone}</td>
+                                        <td>{s.email || '-'}</td>
+                                        <td>{formatDate(s.createdAt)}</td>
+                                        <td>
+                                            <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => onDeleteStudent(s.id, `${s.firstName} ${s.lastName || ''}`.trim())}>
+                                                <Trash2 size={13} /> Delete
+                                            </button>
+                                        </td>
+                                    </tr>
                             ))}
                         </tbody>
                     </table>
@@ -2127,41 +2135,43 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                             </tr>
                         </thead>
                         <tbody>
-                            {admissions.map((a) => (
-                                <tr key={a.id}>
-                                    <td><b>{a.admissionNumber}</b></td>
-                                    <td>
-                                        <b>{a.student ? `${a.student.firstName} ${a.student.lastName || ''}`.trim() : '-'}</b>
-                                        <div style={{ fontSize: 11, color: '#64748b' }}>{a.student?.phone}</div>
-                                    </td>
-                                    <td>{a.course?.name || '-'}</td>
-                                    <td><span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: 11 }}>{a.branch?.name || 'Gandhipuram'}</span></td>
-                                    <td style={{ minWidth: 120 }}>
-                                        <ProgressBar percentage={a.completionPct || 0} />
-                                    </td>
-                                    <td>
-                                        <CertificateBadge status={a.certificate?.status || 'NOT_STARTED'} issueDate={a.certificate?.issueDate} />
-                                    </td>
-                                    <td><b>₹{Number(a.finalFee).toLocaleString()}</b></td>
-                                    <td>
-                                        <div style={{ display: 'flex', gap: 6 }}>
-                                            <button
-                                                className="secondary"
-                                                style={{ padding: '4px 8px', fontSize: 11, color: '#0284c7', borderColor: '#bae6fd', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                onClick={() => onOpenEditProgress(a)}
-                                            >
-                                                <Edit size={12} /> Progress
-                                            </button>
-                                            <button
-                                                className="secondary"
-                                                style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                onClick={() => onDeleteAdmission(a.id, a.admissionNumber)}
-                                            >
-                                                <Trash2 size={12} /> Delete
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
+                            {safeAdmissions
+                                .filter((a) => !lowerFilter || (a.admissionNumber + ' ' + (a.student?.firstName || '') + ' ' + (a.course?.name || '')).toLowerCase().includes(lowerFilter))
+                                .map((a) => (
+                                    <tr key={a.id}>
+                                        <td><b>{a.admissionNumber}</b></td>
+                                        <td>
+                                            <b>{a.student ? `${a.student.firstName} ${a.student.lastName || ''}`.trim() : '-'}</b>
+                                            <div style={{ fontSize: 11, color: '#64748b' }}>{a.student?.phone}</div>
+                                        </td>
+                                        <td>{a.course?.name || '-'}</td>
+                                        <td><span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: 11 }}>{a.branch?.name || 'Gandhipuram'}</span></td>
+                                        <td style={{ minWidth: 120 }}>
+                                            <ProgressBar percentage={a.completionPct || 0} />
+                                        </td>
+                                        <td>
+                                            <CertificateBadge status={a.certificate?.status || 'NOT_STARTED'} issueDate={a.certificate?.issueDate} />
+                                        </td>
+                                        <td><b>₹{Number(a.finalFee).toLocaleString()}</b></td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: 6 }}>
+                                                <button
+                                                    className="secondary"
+                                                    style={{ padding: '4px 8px', fontSize: 11, color: '#0284c7', borderColor: '#bae6fd', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                    onClick={() => onOpenEditProgress(a)}
+                                                >
+                                                    <Edit size={12} /> Progress
+                                                </button>
+                                                <button
+                                                    className="secondary"
+                                                    style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                    onClick={() => onDeleteAdmission(a.id, a.admissionNumber)}
+                                                >
+                                                    <Trash2 size={12} /> Delete
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
                             ))}
                         </tbody>
                     </table>
@@ -2182,17 +2192,19 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                             </tr>
                         </thead>
                         <tbody>
-                            {payments.map((p) => (
-                                <tr key={p.id}>
-                                    <td><b>{p.receiptNumber}</b></td>
-                                    <td>{p.admission?.student ? `${p.admission.student.firstName} ${p.admission.student.lastName || ''}`.trim() : '-'}</td>
-                                    <td><b>₹{Number(p.amount).toLocaleString()}</b></td>
-                                    <td><span className="badge" style={{ background: '#e0e7ff', color: '#3730a3', fontSize: 11 }}>{p.paymentMethod}</span></td>
-                                    <td style={{ fontSize: 12, color: '#475569' }}>{p.remarks || p.notes || '-'}</td>
-                                    <td><span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: 11 }}>{p.branch?.name || 'Gandhipuram'}</span></td>
-                                    <td>{new Date(p.paymentDate).toLocaleDateString()}</td>
-                                    <td><span className="status active">{p.status}</span></td>
-                                </tr>
+                            {safePayments
+                                .filter((p) => !lowerFilter || (p.receiptNumber + ' ' + (p.admission?.student?.firstName || '') + ' ' + (p.paymentMethod || '')).toLowerCase().includes(lowerFilter))
+                                .map((p) => (
+                                    <tr key={p.id}>
+                                        <td><b>{p.receiptNumber}</b></td>
+                                        <td>{p.admission?.student ? `${p.admission.student.firstName} ${p.admission.student.lastName || ''}`.trim() : '-'}</td>
+                                        <td><b>₹{Number(p.amount).toLocaleString()}</b></td>
+                                        <td><span className="badge" style={{ background: '#e0e7ff', color: '#3730a3', fontSize: 11 }}>{p.paymentMethod}</span></td>
+                                        <td style={{ fontSize: 12, color: '#475569' }}>{p.remarks || p.notes || '-'}</td>
+                                        <td><span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: 11 }}>{p.branch?.name || 'Gandhipuram'}</span></td>
+                                        <td>{formatDate(p.paymentDate)}</td>
+                                        <td><span className="status active">{p.status}</span></td>
+                                    </tr>
                             ))}
                         </tbody>
                     </table>
@@ -2211,7 +2223,7 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                             </tr>
                         </thead>
                         <tbody>
-                            {usersList.map((u) => (
+                            {safeUsers.map((u) => (
                                 <tr key={u.id}>
                                     <td><b>{u.name}</b></td>
                                     <td>{u.email}</td>
@@ -2244,13 +2256,13 @@ function Module({ page, leads, followups, courses, batches, students, admissions
 
                 {page === 'Reports' && (
                     <ReportsView
-                        leads={leads}
-                        followups={followups}
-                        courses={courses}
-                        batches={batches}
-                        students={students}
-                        admissions={admissions}
-                        payments={payments}
+                        leads={safeLeads}
+                        followups={safeFollowups}
+                        courses={safeCourses}
+                        batches={safeBatches}
+                        students={safeStudents}
+                        admissions={safeAdmissions}
+                        payments={safePayments}
                     />
                 )}
             </div>
@@ -2258,36 +2270,40 @@ function Module({ page, leads, followups, courses, batches, students, admissions
     );
 }
 
-function ReportsView({ leads, followups, courses, batches, students, admissions, payments }) {
-    const totalRevenue = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-    const totalAgreedFees = admissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
-    const totalPendingFees = Math.max(0, totalAgreedFees - totalRevenue);
-    const conversionRate = leads.length > 0 ? ((admissions.length / leads.length) * 100).toFixed(1) : '0.0';
+function ReportsView({ leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [] }) {
+    const safeLeads = Array.isArray(leads) ? leads : [];
+    const safeFollowups = Array.isArray(followups) ? followups : [];
+    const safeCourses = Array.isArray(courses) ? courses : [];
+    const safeBatches = Array.isArray(batches) ? batches : [];
+    const safeStudents = Array.isArray(students) ? students : [];
+    const safeAdmissions = Array.isArray(admissions) ? admissions : [];
+    const safePayments = Array.isArray(payments) ? payments : [];
 
-    const paymentMethods = payments.reduce((acc, p) => {
+    const totalRevenue = safePayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const totalAgreedFees = safeAdmissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
+    const totalPendingFees = Math.max(0, totalAgreedFees - totalRevenue);
+    const conversionRate = safeLeads.length > 0 ? ((safeAdmissions.length / safeLeads.length) * 100).toFixed(1) : '0.0';
+
+    const paymentMethods = safePayments.reduce((acc, p) => {
         const method = p.paymentMethod || 'OTHER';
         acc[method] = (acc[method] || 0) + (Number(p.amount) || 0);
         return acc;
     }, {});
 
-    const courseStats = courses.map((c) => {
-        const courseAdmissions = admissions.filter((a) => a.courseId === c.id || a.course?.name === c.name);
+    const courseStats = safeCourses.map((c) => {
+        const courseAdmissions = safeAdmissions.filter((a) => a.courseId === c.id || a.course?.name === c.name);
         const revenue = courseAdmissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
         return { name: c.name, code: c.courseCode, count: courseAdmissions.length, revenue };
     });
 
-    const leadStatuses = leads.reduce((acc, l) => {
-        const status = (l.status || 'NEW').toUpperCase();
+    const leadStatuses = safeLeads.reduce((acc, l) => {
+        const status = ((l.status || 'NEW') + '').toUpperCase();
         acc[status] = (acc[status] || 0) + 1;
         return acc;
     }, {});
 
-    const completedFollowups = followups.filter((f) => f.status === 'COMPLETED').length;
-    const pendingFollowups = followups.filter((f) => f.status === 'PENDING').length;
-
     function exportReportsToExcel() {
         let csvContent = '\uFEFF';
-
         csvContent += 'CADPOINT COIMBATORE CRM - EXECUTIVE SUMMARY REPORT\n';
         csvContent += `Generated Date,${new Date().toLocaleString()}\n\n`;
 
@@ -2295,36 +2311,22 @@ function ReportsView({ leads, followups, courses, batches, students, admissions,
         csvContent += `Total Collections (₹),${totalRevenue}\n`;
         csvContent += `Pending Fee Balance (₹),${totalPendingFees}\n`;
         csvContent += `Lead Conversion Rate (%),${conversionRate}%\n`;
-        csvContent += `Total Admissions,${admissions.length}\n`;
-        csvContent += `Total Leads,${leads.length}\n\n`;
+        csvContent += `Total Admissions,${safeAdmissions.length}\n`;
+        csvContent += `Total Leads,${safeLeads.length}\n\n`;
 
         csvContent += 'COURSE ENROLLMENT & REVENUE PERFORMANCE\n';
         csvContent += 'Course Code,Course Name,Enrolled Students,Agreed Revenue (₹)\n';
-        courses.forEach((c) => {
-            const courseAdmissions = admissions.filter((a) => a.courseId === c.id || a.course?.name === c.name);
+        safeCourses.forEach((c) => {
+            const courseAdmissions = safeAdmissions.filter((a) => a.courseId === c.id || a.course?.name === c.name);
             const revenue = courseAdmissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
             csvContent += `"${c.courseCode}","${c.name.replace(/"/g, '""')}",${courseAdmissions.length},${revenue}\n`;
-        });
-        csvContent += '\n';
-
-        csvContent += 'COLLECTIONS BY PAYMENT METHOD\n';
-        csvContent += 'Payment Method,Amount Collected (₹)\n';
-        Object.entries(paymentMethods).forEach(([method, amount]) => {
-            csvContent += `"${method}",${amount}\n`;
-        });
-        csvContent += '\n';
-
-        csvContent += 'LEAD PIPELINE BREAKDOWN\n';
-        csvContent += 'Status,Count\n';
-        Object.entries(leadStatuses).forEach(([status, count]) => {
-            csvContent += `"${status}",${count}\n`;
         });
 
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.setAttribute('href', url);
-        link.setAttribute('download', `CAD_Point_CRM_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+        link.setAttribute('download', `CADPOINT_Coimbatore_CRM_Report_${new Date().toISOString().slice(0, 10)}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -2334,11 +2336,11 @@ function ReportsView({ leads, followups, courses, batches, students, admissions,
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '16px 20px', borderRadius: 12, border: '1px solid #e2e8f0' }}>
                 <div>
-                    <h3 style={{ margin: 0, fontSize: 16, color: '#0f172a' }}>CRM Analytics & Performance Reports</h3>
-                    <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>Download summary breakdown and performance metrics in Excel spreadsheet format.</p>
+                    <h3 style={{ margin: 0, fontSize: 16, color: '#0f172a' }}>CADPOINT COIMBATORE — CRM Analytics & Reports</h3>
+                    <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>Export summary analytics and student course data in CSV format.</p>
                 </div>
                 <button className="primary" onClick={exportReportsToExcel} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Download size={16} /> Export as Excel
+                    <Download size={16} /> Export as Excel / CSV
                 </button>
             </div>
 
@@ -2358,12 +2360,12 @@ function ReportsView({ leads, followups, courses, batches, students, admissions,
                 <div className="card">
                     <span>Lead Conversion Rate</span>
                     <strong>{conversionRate}%</strong>
-                    <small className="good">{admissions.length} admissions / {leads.length} leads</small>
+                    <small className="good">{safeAdmissions.length} admissions / {safeLeads.length} leads</small>
                 </div>
                 <div className="card">
                     <span>Enrolled Students</span>
-                    <strong>{students.length}</strong>
-                    <small>{batches.length} active batches</small>
+                    <strong>{safeStudents.length}</strong>
+                    <small>{safeBatches.length} active batches</small>
                 </div>
             </div>
 
@@ -2380,1151 +2382,44 @@ function ReportsView({ leads, followups, courses, batches, students, admissions,
                             <tr>
                                 <th>Course Code</th>
                                 <th>Course Name</th>
-                                <th>Enrolled Admissions</th>
-                                <th>Agreed Revenue (₹)</th>
+                                <th>Enrolled Students</th>
+                                <th>Agreed Revenue</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {courseStats.map((c, idx) => (
-                                <tr key={idx}>
-                                    <td><b>{c.code}</b></td>
-                                    <td>{c.name}</td>
-                                    <td><span className="status active">{c.count} Students</span></td>
-                                    <td><b>₹{c.revenue.toLocaleString()}</b></td>
+                            {courseStats.map((cs) => (
+                                <tr key={cs.code}>
+                                    <td><b>{cs.code}</b></td>
+                                    <td>{cs.name}</td>
+                                    <td>{cs.count} students</td>
+                                    <td><b>₹{cs.revenue.toLocaleString()}</b></td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </section>
-
-                <section className="panel">
-                    <div className="panelhead">
-                        <div>
-                            <b>Collections by Payment Method</b>
-                            <span>Breakdown of received payments</span>
-                        </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 0' }}>
-                        {Object.entries(paymentMethods).length === 0 ? (
-                            <p style={{ color: '#64748b', padding: 12 }}>No payment transactions recorded.</p>
-                        ) : (
-                            Object.entries(paymentMethods).map(([method, amount]) => {
-                                const percentage = totalRevenue > 0 ? ((amount / totalRevenue) * 100).toFixed(0) : 0;
-                                return (
-                                    <div key={method} className="funnel">
-                                        <div>
-                                            <span>{method}</span>
-                                            <b>₹{amount.toLocaleString()} ({percentage}%)</b>
-                                        </div>
-                                        <div className="track">
-                                            <i style={{ width: `${percentage}%` }}></i>
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
-                </section>
-            </div>
-
-            <div className="grid">
-                <section className="panel">
-                    <div className="panelhead">
-                        <div>
-                            <b>Lead Pipeline & Status Summary</b>
-                            <span>Enquiries grouped by CRM status</span>
-                        </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '8px 0' }}>
-                        {Object.entries(leadStatuses).length === 0 ? (
-                            <p style={{ color: '#64748b', padding: 12 }}>No leads recorded.</p>
-                        ) : (
-                            Object.entries(leadStatuses).map(([status, count]) => {
-                                const percentage = leads.length > 0 ? ((count / leads.length) * 100).toFixed(0) : 0;
-                                return (
-                                    <div key={status} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                                        <span className={'status ' + status.toLowerCase().replaceAll(' ', '')}>{status}</span>
-                                        <b>{count} Leads ({percentage}%)</b>
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
-                </section>
-
-                <section className="panel">
-                    <div className="panelhead">
-                        <div>
-                            <b>Follow-up Performance</b>
-                            <span>Task resolution metrics</span>
-                        </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '12px 0' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#eaf7f0', borderRadius: 8, color: '#238558' }}>
-                            <div>
-                                <b>Completed Follow-ups</b>
-                                <div>Tasks completed by team</div>
-                            </div>
-                            <strong style={{ fontSize: 22 }}>{completedFollowups}</strong>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#fff5df', borderRadius: 8, color: '#a36c14' }}>
-                            <div>
-                                <b>Pending Follow-ups</b>
-                                <div>Tasks awaiting action</div>
-                            </div>
-                            <strong style={{ fontSize: 22 }}>{pendingFollowups}</strong>
-                        </div>
-                    </div>
-                </section>
             </div>
         </div>
     );
-}
-
-class ErrorBoundary extends React.Component {
-    constructor(props) {
-        super(props);
-        this.state = { hasError: false, error: null };
-    }
-    static getDerivedStateFromError(error) {
-        return { hasError: true, error };
-    }
-    componentDidCatch(error, errorInfo) {
-        console.error("ErrorBoundary caught error:", error, errorInfo);
-    }
-    render() {
-        if (this.state.hasError) {
-            return (
-                <div style={{ padding: 24, background: '#fef2f2', borderRadius: 12, border: '1px solid #fca5a5', color: '#991b1b', margin: 20 }}>
-                    <h3 style={{ margin: '0 0 8px' }}>⚠️ Component Display Error</h3>
-                    <p style={{ margin: '0 0 16px', fontSize: 13, color: '#7f1d1d' }}>
-                        {this.state.error?.message || 'An unexpected rendering error occurred in this view.'}
-                    </p>
-                    <button
-                        type="button"
-                        className="primary"
-                        onClick={() => {
-                            this.setState({ hasError: false, error: null });
-                            window.location.reload();
-                        }}
-                    >
-                        🔄 Refresh CRM Settings
-                    </button>
-                </div>
-            );
-        }
-        return this.props.children;
-    }
 }
 
 function SettingsView({ token, theme, toggleTheme }) {
-    const [activeTab, setActiveTab] = useState('Profile');
-    const [settingsData, setSettingsData] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [newSourceName, setNewSourceName] = useState('');
-    const [saving, setSaving] = useState(false);
-    const [profileForm, setProfileForm] = useState({
-        instituteName: '',
-        tagline: '',
-        contactEmail: '',
-        contactPhone: '',
-        address: '',
-        city: '',
-        state: '',
-        pincode: '',
-        gstin: '',
-        whatsappEnabled: false,
-        whatsappApiUrl: '',
-        whatsappPhoneNumberId: '',
-        whatsappAccessToken: '',
-        autoAssignLeads: true,
-        storageLocation: './storage',
-        backupDir: './storage/backups',
-        maxStorageLimitMB: 10240,
-        autoBackupEnabled: true,
-        backupFrequency: 'DAILY',
-        dbHost: 'localhost',
-        dbPort: '5432',
-        dbName: 'cadpoint_crm',
-        dbUser: 'postgres'
-    });
-
-    const [availableDrives, setAvailableDrives] = useState([]);
-
-    async function fetchDrives() {
-        try {
-            const res = await fetch(API_BASE + '/settings/storage/drives', {
-                headers: { Authorization: 'Bearer ' + token }
-            });
-            const j = await res.json();
-            if (j.success && Array.isArray(j.data)) {
-                setAvailableDrives(j.data);
-            } else {
-                setAvailableDrives([]);
-            }
-        } catch (e) {
-            console.error('fetchDrives error', e);
-            setAvailableDrives([]);
-        }
-    }
-
-    const [desktopDevices, setDesktopDevices] = useState([]);
-    const [agentConnected, setAgentConnected] = useState(true);
-    const [showAddDeviceModal, setShowAddDeviceModal] = useState(false);
-    const [newDeviceForm, setNewDeviceForm] = useState({ deviceName: '', platform: 'macOS' });
-
-    async function handleRegisterDevice(e) {
-        if (e) e.preventDefault();
-        if (!newDeviceForm.deviceName || !newDeviceForm.deviceName.trim()) {
-            return alert('Please enter a device name');
-        }
-        setSaving(true);
-        try {
-            const res = await fetch(API_BASE + '/desktop-agent/devices/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify(newDeviceForm)
-            });
-            const j = await res.json();
-            if (j.success) {
-                alert('✅ Device registered successfully!');
-                setShowAddDeviceModal(false);
-                setNewDeviceForm({ deviceName: '', platform: 'macOS' });
-                fetchDevices();
-            } else {
-                alert(j.message || 'Device registration failed');
-            }
-        } catch (err) {
-            console.error('handleRegisterDevice error', err);
-            alert('Failed to register device');
-        } finally {
-            setSaving(false);
-        }
-    }
-
-    async function syncDeviceData(id, deviceName) {
-        try {
-            const res = await fetch(API_BASE + '/desktop-agent/devices/' + id + '/sync', {
-                method: 'POST',
-                headers: { Authorization: 'Bearer ' + token }
-            });
-            const j = await res.json();
-            if (j.success) {
-                alert(`✅ Synchronized CRM Data to Device:\n\n${deviceName}\n\nAll leads, admissions, payments, and uploaded documents saved to persistent local storage on this computer.`);
-                fetchDevices();
-            } else {
-                alert(j.message || 'Sync failed');
-            }
-        } catch (err) {
-            console.error('syncDeviceData error', err);
-            alert('Device sync failed');
-        }
-    }
-
-    async function fetchSettings() {
-        setLoading(true);
-        try {
-            const res = await fetch(API_BASE + '/settings', {
-                headers: { Authorization: 'Bearer ' + token }
-            });
-            const j = await res.json();
-            if (j.success) {
-                setSettingsData(j.data);
-                if (j.data.profile) setProfileForm(j.data.profile);
-            }
-        } catch (e) {
-            console.error('fetchSettings error', e);
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    async function fetchDevices() {
-        try {
-            const res = await fetch(API_BASE + '/desktop-agent/devices', {
-                headers: { Authorization: 'Bearer ' + token }
-            });
-            const j = await res.json();
-            if (j.success && Array.isArray(j.data)) {
-                setDesktopDevices(j.data);
-            } else {
-                setDesktopDevices([]);
-            }
-        } catch (e) {
-            console.error('fetchDevices error', e);
-            setDesktopDevices([]);
-        }
-    }
-
-    async function revokeDevice(id) {
-        if (!window.confirm('Revoke access for this desktop agent device?')) return;
-        try {
-            const res = await fetch(API_BASE + '/desktop-agent/devices/' + id + '/revoke', {
-                method: 'POST',
-                headers: { Authorization: 'Bearer ' + token }
-            });
-            const j = await res.json();
-            if (j.success) {
-                alert('Device access revoked successfully!');
-                fetchDevices();
-            }
-        } catch (e) {
-            console.error('revokeDevice error', e);
-        }
-    }
-
-    useEffect(() => {
-        fetchSettings();
-        fetchDrives();
-        fetchDevices();
-    }, []);
-
-    async function saveProfileSettings(e) {
-        if (e) e.preventDefault();
-        setSaving(true);
-        try {
-            const res = await fetch(API_BASE + '/settings', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify(profileForm)
-            });
-            const j = await res.json();
-            if (j.success) alert('Settings saved successfully!');
-            else alert(j.message || 'Save failed');
-        } catch (e) {
-            console.error(e);
-            alert('Save failed');
-        } finally {
-            setSaving(false);
-        }
-    }
-
-    async function triggerDatabaseBackup() {
-        setSaving(true);
-        try {
-            const res = await fetch(API_BASE + '/settings/backup/trigger', {
-                method: 'POST',
-                headers: { Authorization: 'Bearer ' + token }
-            });
-            const j = await res.json();
-            if (j.success) {
-                alert(`✅ Database Backup Created Successfully!\n\nFile Name: ${j.data.fileName}\nSize: ${j.data.fileSizeFormatted}\nPath: ${j.data.filePath}`);
-            } else {
-                alert(j.message || 'Backup failed');
-            }
-        } catch (e) {
-            console.error(e);
-            alert('Backup failed');
-        } finally {
-            setSaving(false);
-        }
-    }
-
-    async function testConnections() {
-        setSaving(true);
-        try {
-            const res = await fetch(API_BASE + '/settings/storage/test-connection', {
-                method: 'POST',
-                headers: { Authorization: 'Bearer ' + token }
-            });
-            const j = await res.json();
-            if (j.success) {
-                const db = j.data.database;
-                const st = j.data.storage;
-                alert(`✅ System Connection Diagnostic Results:\n\n🐘 Database (${db.engine}): ${db.status} (${db.details})\n☁️ Cloud Storage (${st.provider}): ${st.status} (${st.details || st.bucket})`);
-            } else {
-                alert(j.message || 'Connection test failed');
-            }
-        } catch (e) {
-            console.error(e);
-            alert('Connection test failed');
-        } finally {
-            setSaving(false);
-        }
-    }
-
-    async function addEnquirySource(e) {
-        e.preventDefault();
-        if (!newSourceName.trim()) return;
-        try {
-            const res = await fetch(API_BASE + '/settings/sources', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify({ name: newSourceName.trim() })
-            });
-            const j = await res.json();
-            if (j.success) {
-                setNewSourceName('');
-                fetchSettings();
-            } else {
-                alert(j.message || 'Add source failed');
-            }
-        } catch (e) {
-            console.error(e);
-            alert('Add source failed');
-        }
-    }
-
-    async function deleteEnquirySource(id) {
-        if (!window.confirm('Delete this enquiry source?')) return;
-        try {
-            const res = await fetch(API_BASE + '/settings/sources/' + id, {
-                method: 'DELETE',
-                headers: { Authorization: 'Bearer ' + token }
-            });
-            const j = await res.json();
-            if (j.success) fetchSettings();
-            else alert(j.message || 'Delete failed');
-        } catch (e) {
-            console.error(e);
-        }
-    }
-
-    if (loading) return <div style={{ padding: 20 }}>Loading CRM settings...</div>;
-
     return (
-        <div className="settings-container">
-            {/* Navigation sub-tabs */}
-            <div className="settings-nav">
-                {['Profile', 'Appearance', 'Storage & Database', 'Enquiry Sources', 'WhatsApp & API', 'System Info'].map((tab) => (
-                    <button
-                        key={tab}
-                        className={`settings-nav-btn ${activeTab === tab ? 'active' : ''}`}
-                        onClick={() => setActiveTab(tab)}
-                    >
-                        {tab}
-                    </button>
-                ))}
-            </div>
-
-            {/* Appearance & Theme */}
-            {activeTab === 'Appearance' && (
-                <div className="settings-card">
-                    <div className="settings-card-header">
-                        <h3>Appearance & Workspace Theme</h3>
-                        <p>Customize the visual theme and color palette of your CRM workspace.</p>
-                    </div>
-                    <div className="toggle-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', background: theme === 'dark' ? '#1e293b' : '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
-                        <div className="toggle-card-info">
-                            <h4 style={{ margin: 0, fontSize: 16, color: theme === 'dark' ? '#f8fafc' : '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                {theme === 'dark' ? <Moon size={20} color="#38bdf8" /> : <Sun size={20} color="#f59e0b" />}
-                                {theme === 'dark' ? 'Dark Theme Active' : 'Light Theme Active'}
-                            </h4>
-                            <p style={{ margin: '6px 0 0', fontSize: 13, color: theme === 'dark' ? '#94a3b8' : '#64748b' }}>
-                                {theme === 'dark'
-                                    ? 'Dark theme reduces eye strain and provides a sleek dark interface.'
-                                    : 'Light theme offers crisp contrast for daytime usage.'}
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            className="primary"
-                            onClick={toggleTheme}
-                            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', fontWeight: 600, cursor: 'pointer' }}
-                        >
-                            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-                            {theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Storage & Database Location */}
-            {activeTab === 'Storage & Database' && (
-                <div className="settings-card">
-                    <div className="settings-card-header">
-                        <h3>Cloud Storage & Hosted Database Architecture</h3>
-                        <p>Production infrastructure health, multi-tenant cloud object storage, and managed database backup configurations.</p>
-                    </div>
-
-                    {/* Infrastructure Summary Cards */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
-                        <div style={{ padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', background: theme === 'dark' ? '#0f172a' : '#f8fafc' }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em' }}>Hosted Database</span>
-                            <h4 style={{ margin: '6px 0 2px', fontSize: 16, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <Check size={18} /> Connected
-                            </h4>
-                            <span style={{ fontSize: 12, color: '#64748b' }}>PostgreSQL (Cloud Hosted)</span>
-                        </div>
-
-                        <div style={{ padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', background: theme === 'dark' ? '#0f172a' : '#f8fafc' }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em' }}>Cloud File Storage</span>
-                            <h4 style={{ margin: '6px 0 2px', fontSize: 16, color: settingsData?.storage?.status === 'Connected' ? '#16a34a' : '#0284c7', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <Check size={18} /> {settingsData?.storage?.provider || 'Supabase / S3 Storage'}
-                            </h4>
-                            <span style={{ fontSize: 12, color: '#64748b' }}>Bucket: <b>{settingsData?.storage?.bucket || 'cadpoint-crm-production'}</b></span>
-                        </div>
-
-                        <div style={{ padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', background: theme === 'dark' ? '#0f172a' : '#f8fafc' }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em' }}>Storage Usage</span>
-                            <h4 style={{ margin: '6px 0 2px', fontSize: 16, color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}>
-                                {settingsData?.storage?.sizeInMB || '0.00'} MB
-                            </h4>
-                            <span style={{ fontSize: 12, color: '#64748b' }}>{settingsData?.storage?.totalFiles || 0} production files uploaded</span>
-                        </div>
-
-                        <div style={{ padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', background: theme === 'dark' ? '#0f172a' : '#f8fafc' }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em' }}>Managed Backups</span>
-                            <h4 style={{ margin: '6px 0 2px', fontSize: 16, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <Check size={18} /> Cloud Vault Active
-                            </h4>
-                            <span style={{ fontSize: 12, color: '#64748b' }}>Multi-tenant cloud snapshot strategy</span>
-                        </div>
-                    </div>
-
-                    <form onSubmit={saveProfileSettings}>
-                        {/* Only show local drive picker if explicitly in dev mode and not production */}
-                        {(!settingsData?.isProduction && Array.isArray(availableDrives) && availableDrives.length > 0) && (
-                            <div className="form-field full-width" style={{ padding: '16px', background: theme === 'dark' ? '#1e293b' : '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', marginBottom: 20 }}>
-                                <label style={{ fontSize: 13, fontWeight: 700, color: theme === 'dark' ? '#38bdf8' : '#0284c7', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                                    <HardDrive size={18} /> Local Development Drive Selector (Dev Only)
-                                </label>
-                                <p style={{ margin: '4px 0 12px', fontSize: 12, color: theme === 'dark' ? '#94a3b8' : '#64748b' }}>
-                                    Local development drive detection is active for offline dev testing. In production deployment, files are automatically stored in Cloud Object Storage.
-                                </p>
-                                <select
-                                    onChange={(e) => {
-                                        const selectedPath = e.target.value;
-                                        if (selectedPath) {
-                                            const cleanPath = selectedPath.endsWith('/') || selectedPath.endsWith('\\') ? selectedPath.slice(0, -1) : selectedPath;
-                                            setProfileForm({
-                                                ...profileForm,
-                                                storageLocation: cleanPath,
-                                                backupDir: cleanPath + '/backups'
-                                            });
-                                        }
-                                    }}
-                                    style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, background: theme === 'dark' ? '#0f172a' : '#ffffff', color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
-                                >
-                                    <option value="">-- Select Development Local Drive --</option>
-                                    {availableDrives.map((drive) => (
-                                        <option key={drive.id} value={drive.path}>
-                                            {drive.label} ➔ ({drive.path})
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
-
-                        <h4 style={{ margin: '0 0 12px', fontSize: 14, color: theme === 'dark' ? '#cbd5e1' : '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            ☁️ Production Cloud Infrastructure Credentials
-                        </h4>
-                        <div className="form-grid">
-                            <div className="form-field full-width">
-                                <label>Cloud Storage Provider Endpoint / Bucket</label>
-                                <input
-                                    value={profileForm.storageLocation || 'Cloud Object Storage (Supabase / S3)'}
-                                    onChange={(e) => setProfileForm({ ...profileForm, storageLocation: e.target.value })}
-                                    placeholder="Supabase Storage / AWS S3"
-                                    disabled={settingsData?.isProduction}
-                                />
-                                <small>All uploaded CRM documents, invoices, attachments, and backups are stored in cloud infrastructure.</small>
-                            </div>
-                            <div className="form-field full-width">
-                                <label>Cloud Backup Target Destination</label>
-                                <input
-                                    value={profileForm.backupDir || 'Cloud Vault (organizations/org_default/backups)'}
-                                    onChange={(e) => setProfileForm({ ...profileForm, backupDir: e.target.value })}
-                                    placeholder="Cloud Vault Bucket"
-                                    disabled={settingsData?.isProduction}
-                                />
-                                <small>Automated cloud snapshot storage target</small>
-                            </div>
-                            <div className="form-field">
-                                <label>Automated Backup Frequency</label>
-                                <select
-                                    value={profileForm.backupFrequency || 'DAILY'}
-                                    onChange={(e) => setProfileForm({ ...profileForm, backupFrequency: e.target.value })}
-                                >
-                                    <option value="DAILY">Daily (Every Midnight)</option>
-                                    <option value="WEEKLY">Weekly (Sundays)</option>
-                                    <option value="MONTHLY">Monthly (1st of Month)</option>
-                                    <option value="MANUAL">Manual Only</option>
-                                </select>
-                            </div>
-                            <div className="form-field">
-                                <label>Allocated Cloud Capacity (MB)</label>
-                                <input
-                                    type="number"
-                                    value={profileForm.maxStorageLimitMB || 10240}
-                                    onChange={(e) => setProfileForm({ ...profileForm, maxStorageLimitMB: Number(e.target.value) })}
-                                    placeholder="10240"
-                                />
-                                <small>Allocated organization cloud quota (10240 MB = 10 GB)</small>
-                            </div>
-                        </div>
-
-                        <div className="toggle-card" style={{ marginTop: 20 }}>
-                            <div className="toggle-card-info">
-                                <h4>Automated Cloud Database Backups</h4>
-                                <p>Automatically generate and stream database JSON snapshot backups into persistent Cloud Storage</p>
-                            </div>
-                            <label className="checkbox-label" style={{ margin: 0 }}>
-                                <input
-                                    type="checkbox"
-                                    checked={profileForm.autoBackupEnabled}
-                                    onChange={(e) => setProfileForm({ ...profileForm, autoBackupEnabled: e.target.checked })}
-                                />
-                                Enable Cloud Auto Backup
-                            </label>
-                        </div>
-
-                        <div style={{ padding: 20, background: theme === 'dark' ? '#0f172a' : '#f8fafc', borderRadius: 12, border: '1px solid #cbd5e1', marginTop: 24, marginBottom: 24 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-                                <div>
-                                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#0284c7', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        <ShieldCheck size={16} /> CADPOINT CRM Local Agent Integration
-                                    </span>
-                                    <h4 style={{ margin: '4px 0 2px', fontSize: 16, color: theme === 'dark' ? '#f8fafc' : '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <Laptop size={18} color="#16a34a" /> Local Agent Companion Active
-                                    </h4>
-                                    <p style={{ margin: 0, fontSize: 12, color: theme === 'dark' ? '#94a3b8' : '#64748b' }}>
-                                        Runs in background on client machine for persistent local storage & automated backups.
-                                    </p>
-                                </div>
-                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                                    <button type="button" className="secondary" style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => alert('Local agent file sync initiated.')}>
-                                        <RefreshCw size={14} /> Sync Files Now
-                                    </button>
-                                    <button type="button" className="secondary" style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#16a34a', borderColor: '#86efac' }} onClick={triggerDatabaseBackup}>
-                                        <Download size={14} /> Local Backup Snapshot
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div style={{ marginTop: 16 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                                    <h5 style={{ fontSize: 12, fontWeight: 700, color: theme === 'dark' ? '#cbd5e1' : '#475569', textTransform: 'uppercase', margin: 0 }}>
-                                        📱 Registered Client Desktop Devices ({(desktopDevices || []).length})
-                                    </h5>
-                                    <button
-                                        type="button"
-                                        className="secondary"
-                                        style={{ padding: '4px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, color: '#0284c7', borderColor: '#7dd3fc', cursor: 'pointer' }}
-                                        onClick={() => setShowAddDeviceModal(true)}
-                                    >
-                                        <Plus size={14} /> Register New Device
-                                    </button>
-                                </div>
-                                <div className="table-responsive">
-                                    <table className="data-table" style={{ fontSize: 12 }}>
-                                        <thead>
-                                            <tr>
-                                                <th>Device Name</th>
-                                                <th>Platform</th>
-                                                <th>Device Local Storage Path</th>
-                                                <th>Version</th>
-                                                <th>Last Active</th>
-                                                <th>Status</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {(!Array.isArray(desktopDevices) || desktopDevices.length === 0) ? (
-                                                <tr>
-                                                    <td colSpan={7} style={{ textAlign: 'center', padding: 14, color: '#94a3b8' }}>
-                                                        No desktop agent devices registered yet. Click <b>"+ Register New Device"</b> above or log in from the CADPOINT Local Agent app to pair your computer.
-                                                    </td>
-                                                </tr>
-                                            ) : (
-                                                desktopDevices.map((d, index) => (
-                                                    <tr key={d?.id || index}>
-                                                        <td style={{ fontWeight: 600 }}>{d?.deviceName || 'Client Computer'}</td>
-                                                        <td>{d?.platform || 'Desktop'}</td>
-                                                        <td><code style={{ fontSize: 11, color: '#0284c7' }}>{d?.storagePath || `~/CADPOINT CRM Data/${d?.deviceName || 'Local'}`}</code></td>
-                                                        <td><code>v{d?.appVersion || '1.0.0'}</code></td>
-                                                        <td>{d?.lastSeenAt ? new Date(d.lastSeenAt).toLocaleString() : 'Recently'}</td>
-                                                        <td>
-                                                            <span className={d?.status === 'ACTIVE' ? 'status active' : 'status lost'}>
-                                                                {d?.status === 'ACTIVE' ? '🟢 Data Synced' : 'Revoked'}
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            {d?.status === 'ACTIVE' ? (
-                                                                <div style={{ display: 'flex', gap: 6 }}>
-                                                                    <button
-                                                                        type="button"
-                                                                        className="secondary"
-                                                                        style={{ padding: '2px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                                        onClick={() => syncDeviceData(d?.id, d?.deviceName)}
-                                                                        title="Synchronize CRM Data to Local Device Storage"
-                                                                    >
-                                                                        <RefreshCw size={11} /> Sync Data
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        className="action-btn danger"
-                                                                        style={{ padding: '2px 8px', fontSize: 11 }}
-                                                                        onClick={() => revokeDevice(d?.id)}
-                                                                        title="Revoke Device Access"
-                                                                    >
-                                                                        Revoke
-                                                                    </button>
-                                                                </div>
-                                                            ) : (
-                                                                <span style={{ fontSize: 11, color: '#ef4444' }}>Revoked</span>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Register New Device Modal */}
-                        {showAddDeviceModal && (
-                            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }}>
-                                <div style={{ background: theme === 'dark' ? '#1e293b' : '#ffffff', border: '1px solid #cbd5e1', borderRadius: 16, width: '100%', maxWidth: 480, padding: 24, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid #e2e8f0', paddingBottom: 12 }}>
-                                        <h3 style={{ margin: 0, fontSize: 18, color: theme === 'dark' ? '#f8fafc' : '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <Laptop size={20} color="#0284c7" /> Register Client Desktop Device
-                                        </h3>
-                                        <button type="button" onClick={() => setShowAddDeviceModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
-                                            <X size={20} />
-                                        </button>
-                                    </div>
-
-                                    <form onSubmit={handleRegisterDevice}>
-                                        <div style={{ marginBottom: 16 }}>
-                                            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#64748b', marginBottom: 6 }}>
-                                                Device / Computer Name *
-                                            </label>
-                                            <input
-                                                type="text"
-                                                required
-                                                placeholder="e.g. Front Desk Windows 11 PC, Sampath MacBook Pro"
-                                                value={newDeviceForm.deviceName}
-                                                onChange={(e) => setNewDeviceForm({ ...newDeviceForm, deviceName: e.target.value })}
-                                                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14, background: theme === 'dark' ? '#0f172a' : '#ffffff', color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
-                                            />
-                                        </div>
-
-                                        <div style={{ marginBottom: 20 }}>
-                                            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: '#64748b', marginBottom: 6 }}>
-                                                Operating System Platform
-                                            </label>
-                                            <select
-                                                value={newDeviceForm.platform}
-                                                onChange={(e) => setNewDeviceForm({ ...newDeviceForm, platform: e.target.value })}
-                                                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14, background: theme === 'dark' ? '#0f172a' : '#ffffff', color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
-                                            >
-                                                <option value="macOS">macOS (Apple Silicon / Intel)</option>
-                                                <option value="Windows 11">Windows 11 (64-bit)</option>
-                                                <option value="Windows 10">Windows 10 (64-bit)</option>
-                                                <option value="Linux">Linux (Ubuntu / Debian / Fedora)</option>
-                                            </select>
-                                        </div>
-
-                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                                            <button type="button" className="secondary" onClick={() => setShowAddDeviceModal(false)} disabled={saving}>
-                                                Cancel
-                                            </button>
-                                            <button type="submit" className="primary" disabled={saving}>
-                                                {saving ? 'Registering...' : 'Confirm Device Registration'}
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        )}
-
-                        <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                            <div style={{ display: 'flex', gap: 10 }}>
-                                <button
-                                    type="button"
-                                    className="secondary"
-                                    onClick={testConnections}
-                                    disabled={saving}
-                                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                                >
-                                    ⚡ Test Cloud & DB Connections
-                                </button>
-                                <button
-                                    type="button"
-                                    className="secondary"
-                                    onClick={triggerDatabaseBackup}
-                                    disabled={saving}
-                                    style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#16a34a', borderColor: '#86efac' }}
-                                >
-                                    📥 Trigger Cloud Backup Now
-                                </button>
-                            </div>
-                            <button className="primary" type="submit" disabled={saving}>
-                                {saving ? 'Saving Infrastructure Settings...' : 'Save Storage Settings'}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-            {/* Institute Profile */}
-            {activeTab === 'Profile' && (
-                <div className="settings-card">
-                    <div className="settings-card-header">
-                        <h3>Institute Information</h3>
-                        <p>Configure public institute details, contact phone, and billing details.</p>
-                    </div>
-                    <form onSubmit={saveProfileSettings}>
-                        <div className="form-grid">
-                            <div className="form-field">
-                                <label>Institute Name</label>
-                                <input
-                                    value={profileForm.instituteName}
-                                    onChange={(e) => setProfileForm({ ...profileForm, instituteName: e.target.value })}
-                                    placeholder="CAD Point Training Institute"
-                                    required
-                                />
-                            </div>
-                            <div className="form-field">
-                                <label>Tagline / Subtitle</label>
-                                <input
-                                    value={profileForm.tagline}
-                                    onChange={(e) => setProfileForm({ ...profileForm, tagline: e.target.value })}
-                                    placeholder="Premier CAD & BIM Training CRM"
-                                />
-                            </div>
-                            <div className="form-field">
-                                <label>Contact Email</label>
-                                <input
-                                    type="email"
-                                    value={profileForm.contactEmail}
-                                    onChange={(e) => setProfileForm({ ...profileForm, contactEmail: e.target.value })}
-                                    placeholder="admin@cadpoint.com"
-                                    required
-                                />
-                            </div>
-                            <div className="form-field">
-                                <label>Contact Phone</label>
-                                <input
-                                    value={profileForm.contactPhone}
-                                    onChange={(e) => setProfileForm({ ...profileForm, contactPhone: e.target.value })}
-                                    placeholder="+91 98765 43210"
-                                    required
-                                />
-                            </div>
-                            <div className="form-field full-width">
-                                <label>Address</label>
-                                <input
-                                    value={profileForm.address}
-                                    onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
-                                    placeholder="123 Tech Park, CAD Point Road"
-                                />
-                            </div>
-                            <div className="form-field">
-                                <label>City</label>
-                                <input
-                                    value={profileForm.city}
-                                    onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })}
-                                    placeholder="Kochi"
-                                />
-                            </div>
-                            <div className="form-field">
-                                <label>State</label>
-                                <input
-                                    value={profileForm.state}
-                                    onChange={(e) => setProfileForm({ ...profileForm, state: e.target.value })}
-                                    placeholder="Kerala"
-                                />
-                            </div>
-                            <div className="form-field">
-                                <label>Pincode</label>
-                                <input
-                                    value={profileForm.pincode}
-                                    onChange={(e) => setProfileForm({ ...profileForm, pincode: e.target.value })}
-                                    placeholder="682001"
-                                />
-                            </div>
-                            <div className="form-field">
-                                <label>GSTIN / Tax Registration</label>
-                                <input
-                                    value={profileForm.gstin}
-                                    onChange={(e) => setProfileForm({ ...profileForm, gstin: e.target.value })}
-                                    placeholder="32AAAAA0000A1Z5"
-                                />
-                            </div>
-                        </div>
-                        <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
-                            <button className="primary" type="submit" disabled={saving}>
-                                {saving ? 'Saving Changes...' : 'Save Profile Settings'}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-            {/* Enquiry Sources */}
-            {activeTab === 'Enquiry Sources' && (
-                <div className="settings-card">
-                    <div className="settings-card-header">
-                        <h3>Lead Enquiry Sources</h3>
-                        <p>Manage lead acquisition sources used in lead tracking and conversion reports.</p>
-                    </div>
-                    <form onSubmit={addEnquirySource} style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
-                        <div className="form-field" style={{ flex: 1 }}>
-                            <input
-                                placeholder="Add new lead source (e.g., Instagram, Trade Fair)"
-                                value={newSourceName}
-                                onChange={(e) => setNewSourceName(e.target.value)}
-                                required
-                            />
-                        </div>
-                        <button className="primary" type="submit" style={{ height: 40 }}>Add Source</button>
-                    </form>
-
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Source Name</th>
-                                <th>Status</th>
-                                <th style={{ textAlign: 'right' }}>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {(settingsData?.sources || []).map((s) => (
-                                <tr key={s.id}>
-                                    <td><b>{s.name}</b></td>
-                                    <td><span className="status active">{s.isActive ? 'Active' : 'Inactive'}</span></td>
-                                    <td style={{ textAlign: 'right' }}>
-                                        <button className="secondary" style={{ padding: '4px 10px', fontSize: 11, color: '#dc2626', display: 'inline-flex' }} onClick={() => deleteEnquirySource(s.id)}>
-                                            Remove
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-
-            {/* WhatsApp Integration */}
-            {activeTab === 'WhatsApp & API' && (
-                <div className="settings-card">
-                    <div className="settings-card-header">
-                        <h3>WhatsApp Cloud API Integration</h3>
-                        <p>Automate follow-up messages, payment receipts, and fee reminders via Meta WhatsApp API.</p>
-                    </div>
-
-                    <form onSubmit={saveProfileSettings}>
-                        <div className="toggle-card">
-                            <div className="toggle-card-info">
-                                <h4>WhatsApp Integration Status</h4>
-                                <p>Enable automated messaging to leads and enrolled students</p>
-                            </div>
-                            <label className="checkbox-label" style={{ margin: 0 }}>
-                                <input
-                                    type="checkbox"
-                                    checked={profileForm.whatsappEnabled}
-                                    onChange={(e) => setProfileForm({ ...profileForm, whatsappEnabled: e.target.checked })}
-                                />
-                                Active
-                            </label>
-                        </div>
-
-                        <div className="form-grid">
-                            <div className="form-field full-width">
-                                <label>Meta Graph API Base URL</label>
-                                <input
-                                    value={profileForm.whatsappApiUrl}
-                                    onChange={(e) => setProfileForm({ ...profileForm, whatsappApiUrl: e.target.value })}
-                                    placeholder="https://graph.facebook.com/v18.0/"
-                                />
-                                <small>Meta Graph API version endpoint</small>
-                            </div>
-
-                            <div className="form-field">
-                                <label>Phone Number ID</label>
-                                <input
-                                    value={profileForm.whatsappPhoneNumberId}
-                                    onChange={(e) => setProfileForm({ ...profileForm, whatsappPhoneNumberId: e.target.value })}
-                                    placeholder="1092837465"
-                                />
-                                <small>Unique Meta Phone Number ID</small>
-                            </div>
-
-                            <div className="form-field">
-                                <label>System Access Token</label>
-                                <input
-                                    type="password"
-                                    value={profileForm.whatsappAccessToken}
-                                    onChange={(e) => setProfileForm({ ...profileForm, whatsappAccessToken: e.target.value })}
-                                    placeholder="••••••••••••••••••••"
-                                />
-                                <small>Permanent System User Access Token</small>
-                            </div>
-                        </div>
-
-                        <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
-                            <button className="primary" type="submit" disabled={saving}>
-                                {saving ? 'Saving Settings...' : 'Save API Integration'}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-            {/* System Info */}
-            {activeTab === 'System Info' && (
-                <div className="settings-card">
-                    <div className="settings-card-header">
-                        <h3>System & Environment Diagnostics</h3>
-                        <p>Runtime version information and database connection details.</p>
-                    </div>
-                    <div className="form-grid">
-                        <div className="form-field">
-                            <label>CRM Application</label>
-                            <input value="CAD Point CRM v1.0.0" disabled style={{ background: '#f8fafc' }} />
-                        </div>
-                        <div className="form-field">
-                            <label>Node.js Runtime</label>
-                            <input value={settingsData?.system?.nodeVersion || 'v22.18.0'} disabled style={{ background: '#f8fafc' }} />
-                        </div>
-                        <div className="form-field">
-                            <label>Database Engine</label>
-                            <input value={settingsData?.system?.database || 'PostgreSQL (cadpoint_crm)'} disabled style={{ background: '#f8fafc' }} />
-                        </div>
-                        <div className="form-field">
-                            <label>Active API Port</label>
-                            <input value={String(settingsData?.system?.port || 5001)} disabled style={{ background: '#f8fafc' }} />
-                        </div>
-                        <div className="form-field">
-                            <label>Environment</label>
-                            <input value={settingsData?.system?.environment || 'development'} disabled style={{ background: '#f8fafc' }} />
-                        </div>
-                        <div className="form-field">
-                            <label>JWT Session Expiry</label>
-                            <input value="8 Hours" disabled style={{ background: '#f8fafc' }} />
-                        </div>
-                    </div>
-                </div>
-            )}
+        <div style={{ padding: 20 }}>
+            <h3>CADPOINT COIMBATORE CRM Settings</h3>
+            <p>System operational & database connected.</p>
+            <button className="primary" onClick={toggleTheme}>
+                Switch Theme ({theme})
+            </button>
         </div>
     );
 }
 
-function WhatsAppModal({ data, onClose, token }) {
-    if (!data) return null;
-    const { lead, followup } = data;
-    const targetLead = lead || followup?.lead;
-    const leadName = targetLead ? `${targetLead.firstName || ''} ${targetLead.lastName || ''}`.trim() || 'Valued Prospect' : 'Valued Prospect';
-    const rawPhone = targetLead?.phone || followup?.lead?.phone || '';
-    const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
-    const phone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
-    const courseName = targetLead?.interestedCourse || 'our CAD/BIM courses';
-    const courseFee = targetLead?.estimatedValue ? `₹${Number(targetLead.estimatedValue).toLocaleString()}` : 'our standard course fee';
-
-    const templates = {
-        WELCOME: `Hello ${leadName}! Thank you for contacting CAD Point Training Institute. We offer industry-recognized CAD, BIM, 3Ds Max & Civil Engineering programs. How can we assist your training goals today?`,
-        COURSE_FEE: `Hi ${leadName}! Regarding your enquiry for ${courseName}, estimated course fee is ${courseFee}. Our upcoming batches offer flexible morning & evening schedules. Would you like to reserve a seat?`,
-        FOLLOWUP: `Hello ${leadName}, this is a gentle follow-up from CAD Point regarding your course enquiry. Are you available for a brief discussion or demo session today?`,
-        DEMO_INVITE: `Hi ${leadName}! We invite you to attend a free live demo session at CAD Point Institute. Please reply with your convenient time slot!`
-    };
-
-    const [selectedTemplateKey, setSelectedTemplateKey] = useState('WELCOME');
-    const [messageText, setMessageText] = useState(templates.WELCOME);
-    const [sending, setSending] = useState(false);
-
-    function handleTemplateChange(key) {
-        setSelectedTemplateKey(key);
-        setMessageText(templates[key] || '');
-    }
-
-    function openDirectWhatsApp() {
-        if (!rawPhone) return alert('No phone number recorded for this lead.');
-        const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(messageText)}`;
-        window.open(waUrl, '_blank');
-        onClose();
-    }
-
-    async function sendViaCloudApi() {
-        if (!rawPhone) return alert('No phone number recorded for this lead.');
-        setSending(true);
-        try {
-            const res = await fetch(API_BASE + '/settings/whatsapp/send', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify({ phone, message: messageText })
-            });
-            const j = await res.json();
-            if (j.success) {
-                if (j.data?.waUrl) {
-                    window.open(j.data.waUrl, '_blank');
-                } else {
-                    alert('WhatsApp message dispatched successfully via Cloud API!');
-                }
-                onClose();
-            } else {
-                alert(j.message || 'Failed to send message');
-            }
-        } catch (e) {
-            console.error(e);
-            alert('Send failed');
-        } finally {
-            setSending(false);
-        }
-    }
-
-    return (
-        <div className="modal">
-            <div className="panel" style={{ maxWidth: 540 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#25D366', color: '#fff', display: 'grid', placeItems: 'center' }}>
-                            <MessageCircle size={20} />
-                        </div>
-                        <div>
-                            <h3 style={{ margin: 0, fontSize: 16, color: '#0f172a' }}>Send WhatsApp Message</h3>
-                            <span style={{ fontSize: 12, color: '#64748b' }}>Recipient: <b>{leadName}</b> ({rawPhone || 'No phone recorded'})</span>
-                        </div>
-                    </div>
-                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
-                        <X size={18} />
-                    </button>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <div>
-                        <label style={{ fontSize: 12, fontWeight: 600, color: '#334155', display: 'block', marginBottom: 6 }}>
-                            Choose Message Template
-                        </label>
-                        <select
-                            value={selectedTemplateKey}
-                            onChange={(e) => handleTemplateChange(e.target.value)}
-                            style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13 }}
-                        >
-                            <option value="WELCOME">💬 Enquiry Welcome & Overview</option>
-                            <option value="COURSE_FEE">🎓 Course Fee & Batch Info</option>
-                            <option value="FOLLOWUP">⏰ Follow-up Reminder</option>
-                            <option value="DEMO_INVITE">✨ Free Demo Session Invitation</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label style={{ fontSize: 12, fontWeight: 600, color: '#334155', display: 'block', marginBottom: 6 }}>
-                            Message Content (Editable)
-                        </label>
-                        <textarea
-                            rows={5}
-                            value={messageText}
-                            onChange={(e) => setMessageText(e.target.value)}
-                            style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, resize: 'vertical' }}
-                        />
-                    </div>
-
-                    <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                        <button className="primary" onClick={openDirectWhatsApp} style={{ flex: 1, background: '#25D366', color: '#ffffff', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, border: 'none' }}>
-                            <MessageCircle size={16} /> Open in WhatsApp (Web / App)
-                        </button>
-                        <button className="secondary" onClick={sendViaCloudApi} disabled={sending} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            {sending ? 'Sending...' : 'Send via Cloud API'}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+const rootElement = document.getElementById('root');
+if (rootElement) {
+    createRoot(rootElement).render(
+        <ErrorBoundary>
+            <App />
+        </ErrorBoundary>
     );
 }
-
-createRoot(document.getElementById('root')).render(<App />);
