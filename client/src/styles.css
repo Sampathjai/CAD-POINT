@@ -1352,6 +1352,8 @@ td {
 @media(max-width:600px) {
     header {
         padding: 15px;
+        flex-wrap: wrap;
+        gap: 10px;
     }
     .content {
         padding: 15px;
@@ -1364,5 +1366,20 @@ td {
     }
     .card strong {
         font-size: 20px;
+    }
+    .headright {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
+/* Touch targets and component accessibility */
+button, select, input[type="text"], input[type="email"], input[type="tel"], input[type="date"] {
+    min-height: 40px;
+}
+
+@media (max-width: 640px) {
+    button, select, input {
+        min-height: 48px;
     }
 }

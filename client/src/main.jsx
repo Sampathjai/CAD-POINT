@@ -36,8 +36,59 @@ const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env && impor
     ? String(import.meta.env.VITE_API_URL).trim().replace(/\/+$/, '')
     : '/api';
 
+
+function ProgressBar({ percentage }) {
+  const pct = Math.min(100, Math.max(0, Number(percentage) || 0));
+  let color = '#3b82f6';
+  if (pct === 100) color = '#10b981';
+  else if (pct >= 50) color = '#f59e0b';
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
+      <div style={{ flex: 1, height: 7, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: color, transition: 'width 0.3s' }} />
+      </div>
+      <span style={{ fontSize: 11, fontWeight: 700, minWidth: 30 }}>{pct}%</span>
+    </div>
+  );
+}
+
+function CertificateBadge({ status, issueDate }) {
+  let style = { background: '#f1f5f9', color: '#64748b' };
+  let label = 'Not Started';
+
+  if (status === 'IN_PROGRESS') {
+    style = { background: '#e0f2fe', color: '#0369a1' };
+    label = 'In Progress';
+  } else if (status === 'COMPLETED') {
+    style = { background: '#fef3c7', color: '#b45309' };
+    label = 'Completed';
+  } else if (status === 'ISSUED') {
+    style = { background: '#dcfce7', color: '#15803d' };
+    label = 'Issued';
+  } else if (status === 'REVOKED') {
+    style = { background: '#fee2e2', color: '#b91c1c' };
+    label = 'Revoked';
+  }
+
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, ...style }}>
+      ● {label}
+    </span>
+  );
+}
+
 function App() {
     const [page, setPage] = useState('Dashboard');
+
+    const [activeBranch, setActiveBranch] = useState(() => localStorage.getItem('cadpoint_branch') || 'gandhipuram');
+    const [branchesList, setBranchesList] = useState([]);
+    const [sourcesList, setSourcesList] = useState([]);
+    const [showAddSourceModal, setShowAddSourceModal] = useState(false);
+    const [newSourceName, setNewSourceName] = useState('');
+    const [editingAdmissionProgress, setEditingAdmissionProgress] = useState(null);
+    const [progressForm, setProgressForm] = useState({ id: '', startDate: '', endDate: '', completionPct: 0, certificateStatus: 'NOT_STARTED', issueDate: '' });
+
     const [token, setToken] = useState(() => localStorage.getItem('cadpoint_token') || '');
     const [user, setUser] = useState(null);
     const [loginForm, setLoginForm] = useState({ email: '', password: '' });
@@ -100,7 +151,59 @@ function App() {
     const [addUserForm, setAddUserForm] = useState({ name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true });
 
     useEffect(() => {
-        if (!token) return;
+        
+    async function handleCreateSourceInline(e) {
+        e.preventDefault();
+        if (!newSourceName.trim()) return alert('Please enter source name');
+        try {
+            const res = await fetch(API_BASE + '/settings/sources', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify({ name: newSourceName.trim() })
+            });
+            const j = await res.json();
+            if (!j.success) return alert(j.message || 'Failed to add source');
+            fetchSources();
+            setAddLeadForm(prev => ({ ...prev, sourceId: j.data.id }));
+            setNewSourceName('');
+            setShowAddSourceModal(false);
+        } catch (err) {
+            console.error(err);
+            alert('Failed to add lead source');
+        }
+    }
+
+    function openEditProgress(admission) {
+        setEditingAdmissionProgress(admission);
+        setProgressForm({
+            id: admission.id,
+            startDate: admission.startDate ? admission.startDate.slice(0, 10) : '',
+            endDate: admission.endDate ? admission.endDate.slice(0, 10) : '',
+            completionPct: admission.completionPct || 0,
+            certificateStatus: admission.certificate?.status || 'NOT_STARTED',
+            issueDate: admission.certificate?.issueDate ? admission.certificate.issueDate.slice(0, 10) : ''
+        });
+    }
+
+    async function updateAdmissionProgress() {
+        try {
+            const res = await fetch(API_BASE + '/admissions/' + progressForm.id + '/progress', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify(progressForm)
+            });
+            const j = await res.json();
+            if (!j.success) return alert(j.message || 'Failed to update progress');
+            fetchAdmissions();
+            fetchStudents();
+            setEditingAdmissionProgress(null);
+        } catch (err) {
+            console.error(err);
+            alert('Failed to update progress');
+        }
+    }
+
+    if (!token) return;
         fetch(API_BASE + '/auth/me', { headers: { Authorization: 'Bearer ' + token } })
             .then((r) => r.json())
             .then((j) => {
@@ -125,6 +228,44 @@ function App() {
             }
         }
     }, [token, user?.role]);
+
+    
+    async function fetchBranches() {
+        try {
+            const res = await fetch(API_BASE + '/branches');
+            const j = await res.json();
+            if (j.success) setBranchesList(j.data || []);
+        } catch (e) {
+            console.error('fetchBranches', e);
+        }
+    }
+
+    async function fetchSources() {
+        try {
+            const res = await fetch(API_BASE + '/settings/sources', { headers: { Authorization: 'Bearer ' + token } });
+            const j = await res.json();
+            if (j.success) setSourcesList(j.data || []);
+        } catch (e) {
+            console.error('fetchSources', e);
+        }
+    }
+
+    useEffect(() => {
+        fetchBranches();
+    }, []);
+
+    useEffect(() => {
+        if (token) fetchSources();
+    }, [token]);
+
+    useEffect(() => {
+        if (token) {
+            fetchLeads();
+            fetchStudents();
+            fetchAdmissions();
+            fetchPayments();
+        }
+    }, [activeBranch]);
 
     function logout() {
         setToken('');
@@ -170,7 +311,7 @@ function App() {
 
     async function fetchLeads() {
         try {
-            const res = await fetch(API_BASE + '/leads', { headers: { Authorization: 'Bearer ' + token } });
+            const res = await fetch(API_BASE + `/leads?branchId=${activeBranch}`, { headers: { Authorization: 'Bearer ' + token } });
             const j = await res.json();
             if (j.success) setLeads(j.data || []);
         } catch (e) {
@@ -210,7 +351,7 @@ function App() {
 
     async function fetchStudents() {
         try {
-            const res = await fetch(API_BASE + '/students', { headers: { Authorization: 'Bearer ' + token } });
+            const res = await fetch(API_BASE + `/students?branchId=${activeBranch}`, { headers: { Authorization: 'Bearer ' + token } });
             const j = await res.json();
             if (j.success) setStudents(j.data || []);
         } catch (e) {
@@ -220,7 +361,7 @@ function App() {
 
     async function fetchAdmissions() {
         try {
-            const res = await fetch(API_BASE + '/admissions', { headers: { Authorization: 'Bearer ' + token } });
+            const res = await fetch(API_BASE + `/admissions?branchId=${activeBranch}`, { headers: { Authorization: 'Bearer ' + token } });
             const j = await res.json();
             if (j.success) setAdmissions(j.data || []);
         } catch (e) {
@@ -230,7 +371,7 @@ function App() {
 
     async function fetchPayments() {
         try {
-            const res = await fetch(API_BASE + '/payments', { headers: { Authorization: 'Bearer ' + token } });
+            const res = await fetch(API_BASE + `/payments?branchId=${activeBranch}`, { headers: { Authorization: 'Bearer ' + token } });
             const j = await res.json();
             if (j.success) setPayments(j.data || []);
         } catch (e) {
@@ -284,7 +425,7 @@ function App() {
             const res = await fetch(API_BASE + '/leads', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify(addLeadForm)
+                body: JSON.stringify({ ...addLeadForm, branchId: activeBranch })
             });
             const j = await res.json();
             if (!j.success) return alert(j.message || 'Create lead failed');
@@ -679,7 +820,7 @@ function App() {
             <div className="login">
                 <div className="loginbox">
                     <div className="logo big">CP</div>
-                    <h1>CAD POINT</h1>
+                    <h1>CADPOINT COIMBATORE</h1>
                     <p>CRM Platform</p>
                     <form onSubmit={(e) => { e.preventDefault(); doLogin(); }}>
                         <label>
@@ -718,7 +859,7 @@ function App() {
                 <div className="brand">
                     <div className="logo">CP</div>
                     <div>
-                        <b>CAD POINT</b>
+                        <b>CADPOINT COIMBATORE</b>
                         <span>CRM PLATFORM</span>
                     </div>
                 </div>
@@ -844,7 +985,24 @@ function App() {
                             )}
                         </div>
 
-                        <button className="user" onClick={logout} title="Click to Logout">
+                        
+                        <div className="branch-selector" style={{ display: 'flex', alignItems: 'center', gap: 6, background: theme === 'dark' ? '#1e293b' : '#f1f5f9', padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
+                            <span style={{ color: '#64748b' }}>Branch:</span>
+                            <select
+                                value={activeBranch}
+                                onChange={(e) => {
+                                    setActiveBranch(e.target.value);
+                                    localStorage.setItem('cadpoint_branch', e.target.value);
+                                }}
+                                style={{ border: 'none', background: 'transparent', fontWeight: 700, cursor: 'pointer', color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
+                            >
+                                <option value="gandhipuram">Gandhipuram</option>
+                                <option value="saravanapatti">Saravanapatti</option>
+                                <option value="all">All Branches</option>
+                            </select>
+                        </div>
+                        <button className="user"
+ onClick={logout} title="Click to Logout">
                             {(user && user.name && user.name.split(' ').map((s) => s[0]).slice(0, 2).join('')) || 'SK'}
                         </button>
                     </div>
@@ -884,6 +1042,7 @@ function App() {
                         onDeleteBatch={deleteBatch}
                         onDeleteStudent={deleteStudent}
                         onDeleteAdmission={deleteAdmission}
+                        onOpenEditProgress={openEditProgress}
                         currentUserId={user?.id}
                         token={token}
                         theme={theme}
@@ -899,6 +1058,81 @@ function App() {
                     onClose={() => setWhatsAppModalData(null)}
                     token={token}
                 />
+            )}
+
+            {/* Add Source Modal */}
+            {showAddSourceModal && (
+                <div className="modal">
+                    <form className="panel" onSubmit={handleCreateSourceInline}>
+                        <h3>Add New Enquiry Source</h3>
+                        <label>
+                            Source Name *
+                            <input
+                                value={newSourceName}
+                                onChange={(e) => setNewSourceName(e.target.value)}
+                                placeholder="e.g. YouTube, Instagram Ads, Telecaller"
+                                required
+                            />
+                        </label>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                            <button className="primary" type="submit">Add Source</button>
+                            <button type="button" onClick={() => setShowAddSourceModal(false)}>Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {/* Course Progress & Certificate Status Modal */}
+            {editingAdmissionProgress && (
+                <div className="modal">
+                    <form className="panel" onSubmit={(e) => { e.preventDefault(); updateAdmissionProgress(); }}>
+                        <h3>Course Progress & Certificate Details</h3>
+                        <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 12px' }}>
+                            Student: <b>{editingAdmissionProgress.student?.firstName} {editingAdmissionProgress.student?.lastName}</b> ({editingAdmissionProgress.course?.name})
+                        </p>
+                        <label>
+                            Course Start Date
+                            <input type="date" value={progressForm.startDate} onChange={(e) => setProgressForm({ ...progressForm, startDate: e.target.value })} />
+                        </label>
+                        <label>
+                            Course End Date
+                            <input type="date" value={progressForm.endDate} onChange={(e) => setProgressForm({ ...progressForm, endDate: e.target.value })} />
+                        </label>
+                        <label>
+                            Completion Percentage (0 - 100%)
+                            <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={progressForm.completionPct}
+                                onChange={(e) => setProgressForm({ ...progressForm, completionPct: Number(e.target.value) })}
+                            />
+                        </label>
+                        <label>
+                            Certificate Status
+                            <select
+                                value={progressForm.certificateStatus}
+                                onChange={(e) => setProgressForm({ ...progressForm, certificateStatus: e.target.value })}
+                            >
+                                <option value="NOT_STARTED">Not Started</option>
+                                <option value="IN_PROGRESS">In Progress</option>
+                                <option value="COMPLETED">Completed</option>
+                                <option value="ISSUED">Issued</option>
+                                <option value="REVOKED">Revoked</option>
+                            </select>
+                        </label>
+                        {progressForm.certificateStatus === 'ISSUED' && (
+                            <label>
+                                Issue Date
+                                <input type="date" value={progressForm.issueDate} onChange={(e) => setProgressForm({ ...progressForm, issueDate: e.target.value })} />
+                            </label>
+                        )}
+                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                            <button className="primary" type="submit">Save Changes</button>
+                            <button type="button" onClick={() => setEditingAdmissionProgress(null)}>Cancel</button>
+                        </div>
+                    </form>
+                </div>
             )}
 
             {/* Modals */}
@@ -1053,6 +1287,54 @@ function App() {
                             Email
                             <input value={addLeadForm.email} onChange={(e) => setAddLeadForm({ ...addLeadForm, email: e.target.value })} />
                         </label>
+                        <label>
+                            Source *
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <select
+                                    value={addLeadForm.sourceId || ''}
+                                    onChange={(e) => setAddLeadForm({ ...addLeadForm, sourceId: e.target.value })}
+                                    required
+                                    style={{ flex: 1 }}
+                                >
+                                    <option value="">Select enquiry source</option>
+                                    {sourcesList.map((s) => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </select>
+                                <button
+                                    type="button"
+                                    className="secondary"
+                                    style={{ padding: '0 10px', fontSize: 12, whiteSpace: 'nowrap' }}
+                                    onClick={() => setShowAddSourceModal(true)}
+                                >
+                                    + Add New Source
+                                </button>
+                            </div>
+                        </label>
+                        <label>
+                            Lead Type
+                            <select
+                                value={addLeadForm.leadType || 'STANDARD'}
+                                onChange={(e) => setAddLeadForm({ ...addLeadForm, leadType: e.target.value })}
+                            >
+                                <option value="STANDARD">Standard Enquiry</option>
+                                <option value="TELECALLER">Telecaller Lead</option>
+                            </select>
+                        </label>
+                        {addLeadForm.leadType === 'TELECALLER' && (
+                            <label>
+                                Assigned Telecaller / Counsellor
+                                <select
+                                    value={addLeadForm.assignedCounsellorId || ''}
+                                    onChange={(e) => setAddLeadForm({ ...addLeadForm, assignedCounsellorId: e.target.value })}
+                                >
+                                    <option value="">Select Telecaller</option>
+                                    {usersList.map((u) => (
+                                        <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                                    ))}
+                                </select>
+                            </label>
+                        )}
                         <label>
                             Interested Course
                             <input value={addLeadForm.interestedCourse} onChange={(e) => setAddLeadForm({ ...addLeadForm, interestedCourse: e.target.value })} placeholder="e.g. AutoCAD" />
@@ -1336,6 +1618,14 @@ function App() {
                             Transaction Reference
                             <input value={addPaymentForm.transactionReference} onChange={(e) => setAddPaymentForm({ ...addPaymentForm, transactionReference: e.target.value })} placeholder="UPI-12345678" />
                         </label>
+                        <label>
+                            Remarks
+                            <textarea
+                                value={addPaymentForm.remarks || ''}
+                                onChange={(e) => setAddPaymentForm({ ...addPaymentForm, remarks: e.target.value })}
+                                placeholder="e.g. First installment, paid via PhonePe"
+                            />
+                        </label>
                         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                             <button className="primary" type="submit">Record Payment</button>
                             <button type="button" onClick={() => setShowAddPayment(false)}>Cancel</button>
@@ -1586,7 +1876,7 @@ function Dashboard({ leads, followups, admissions, payments, onAddLead, onSchedu
     );
 }
 
-function Module({ page, leads, followups, courses, batches, students, admissions, payments, usersList, onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onDeleteStudent, onDeleteAdmission, currentUserId, token, theme, toggleTheme }) {
+function Module({ page, leads, followups, courses, batches, students, admissions, payments, usersList, onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onDeleteStudent, onDeleteAdmission, onOpenEditProgress, currentUserId, token, theme, toggleTheme }) {
     const itemSingular = page.slice(0, -1);
 
     return (
@@ -1829,8 +2119,10 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                                 <th>Admission #</th>
                                 <th>Student</th>
                                 <th>Course</th>
+                                <th>Branch</th>
+                                <th>Completion %</th>
+                                <th>Certificate Status</th>
                                 <th>Final Fee</th>
-                                <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -1838,14 +2130,36 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                             {admissions.map((a) => (
                                 <tr key={a.id}>
                                     <td><b>{a.admissionNumber}</b></td>
-                                    <td>{a.student ? `${a.student.firstName} ${a.student.lastName || ''}`.trim() : '-'}</td>
-                                    <td>{a.course?.name || '-'}</td>
-                                    <td><b>₹{Number(a.finalFee).toLocaleString()}</b></td>
-                                    <td><span className="status active">{a.status}</span></td>
                                     <td>
-                                        <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => onDeleteAdmission(a.id, a.admissionNumber)}>
-                                            <Trash2 size={13} /> Delete
-                                        </button>
+                                        <b>{a.student ? `${a.student.firstName} ${a.student.lastName || ''}`.trim() : '-'}</b>
+                                        <div style={{ fontSize: 11, color: '#64748b' }}>{a.student?.phone}</div>
+                                    </td>
+                                    <td>{a.course?.name || '-'}</td>
+                                    <td><span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: 11 }}>{a.branch?.name || 'Gandhipuram'}</span></td>
+                                    <td style={{ minWidth: 120 }}>
+                                        <ProgressBar percentage={a.completionPct || 0} />
+                                    </td>
+                                    <td>
+                                        <CertificateBadge status={a.certificate?.status || 'NOT_STARTED'} issueDate={a.certificate?.issueDate} />
+                                    </td>
+                                    <td><b>₹{Number(a.finalFee).toLocaleString()}</b></td>
+                                    <td>
+                                        <div style={{ display: 'flex', gap: 6 }}>
+                                            <button
+                                                className="secondary"
+                                                style={{ padding: '4px 8px', fontSize: 11, color: '#0284c7', borderColor: '#bae6fd', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                onClick={() => onOpenEditProgress(a)}
+                                            >
+                                                <Edit size={12} /> Progress
+                                            </button>
+                                            <button
+                                                className="secondary"
+                                                style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                onClick={() => onDeleteAdmission(a.id, a.admissionNumber)}
+                                            >
+                                                <Trash2 size={12} /> Delete
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -1861,6 +2175,8 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                                 <th>Student</th>
                                 <th>Amount</th>
                                 <th>Method</th>
+                                <th>Remarks</th>
+                                <th>Branch</th>
                                 <th>Date</th>
                                 <th>Status</th>
                             </tr>
@@ -1871,7 +2187,9 @@ function Module({ page, leads, followups, courses, batches, students, admissions
                                     <td><b>{p.receiptNumber}</b></td>
                                     <td>{p.admission?.student ? `${p.admission.student.firstName} ${p.admission.student.lastName || ''}`.trim() : '-'}</td>
                                     <td><b>₹{Number(p.amount).toLocaleString()}</b></td>
-                                    <td>{p.paymentMethod}</td>
+                                    <td><span className="badge" style={{ background: '#e0e7ff', color: '#3730a3', fontSize: 11 }}>{p.paymentMethod}</span></td>
+                                    <td style={{ fontSize: 12, color: '#475569' }}>{p.remarks || p.notes || '-'}</td>
+                                    <td><span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: 11 }}>{p.branch?.name || 'Gandhipuram'}</span></td>
                                     <td>{new Date(p.paymentDate).toLocaleDateString()}</td>
                                     <td><span className="status active">{p.status}</span></td>
                                 </tr>
@@ -1970,7 +2288,7 @@ function ReportsView({ leads, followups, courses, batches, students, admissions,
     function exportReportsToExcel() {
         let csvContent = '\uFEFF';
 
-        csvContent += 'CAD POINT CRM - EXECUTIVE SUMMARY REPORT\n';
+        csvContent += 'CADPOINT COIMBATORE CRM - EXECUTIVE SUMMARY REPORT\n';
         csvContent += `Generated Date,${new Date().toLocaleString()}\n\n`;
 
         csvContent += 'Metric,Value\n';

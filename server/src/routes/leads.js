@@ -15,15 +15,50 @@ const createLeadSchema = z.object({
   city: z.string().optional(),
   interestedCourse: z.string().optional(),
   sourceId: z.string().optional(),
-  estimatedValue: z.string().optional()
+  estimatedValue: z.string().optional(),
+  branchId: z.string().optional(),
+  leadType: z.string().optional(),
+  assignedCounsellorId: z.string().optional()
 });
 
 // Create lead
-router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR'), async (req, res) => {
+router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR','RECEPTIONIST'), async (req, res) => {
   try {
     const data = createLeadSchema.parse(req.body);
     const leadNumber = 'LD-' + Date.now().toString(36).toUpperCase();
-    const lead = await prisma.lead.create({ data: { leadNumber, firstName: data.firstName, lastName: data.lastName, phone: data.phone, whatsappNumber: data.whatsappNumber, email: data.email, qualification: data.qualification, city: data.city, interestedCourse: data.interestedCourse, sourceId: data.sourceId, estimatedValue: data.estimatedValue ? data.estimatedValue : null } });
+
+    // Resolve branch ID if code is passed
+    let finalBranchId = data.branchId;
+    if (finalBranchId) {
+      const b = await prisma.branch.findFirst({
+        where: { OR: [{ id: finalBranchId }, { code: finalBranchId.toLowerCase() }] }
+      });
+      if (b) finalBranchId = b.id;
+    }
+    if (!finalBranchId) {
+      const defaultBranch = await prisma.branch.findFirst({ where: { code: 'gandhipuram' } });
+      if (defaultBranch) finalBranchId = defaultBranch.id;
+    }
+
+    const lead = await prisma.lead.create({
+      data: {
+        leadNumber,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+        whatsappNumber: data.whatsappNumber,
+        email: data.email,
+        qualification: data.qualification,
+        city: data.city,
+        interestedCourse: data.interestedCourse,
+        sourceId: data.sourceId,
+        branchId: finalBranchId,
+        leadType: data.leadType || 'STANDARD',
+        assignedCounsellorId: data.assignedCounsellorId || null,
+        estimatedValue: data.estimatedValue ? data.estimatedValue : null
+      },
+      include: { source: true, branch: true, assignedCounsellor: { select: { id: true, name: true, email: true } } }
+    });
     res.status(201).json({ success: true, data: lead });
   } catch (err) {
     if (err.name === 'ZodError') return res.status(400).json({ success: false, message: err.errors });
@@ -32,11 +67,30 @@ router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR'), as
   }
 });
 
-// List leads (simple pagination)
-router.get('/', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR'), async (req, res) => {
+// List leads with branchId, leadType & source filtering
+router.get('/', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR','RECEPTIONIST'), async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
-  const take = Math.min(100, Number(req.query.take) || 20);
-  const leads = await prisma.lead.findMany({ skip: (page-1)*take, take, orderBy: { createdAt: 'desc' } });
+  const take = Math.min(250, Number(req.query.take) || 250);
+  const { branchId, leadType, sourceId, status } = req.query;
+
+  const where = {};
+  if (branchId && branchId !== 'all') {
+    const b = await prisma.branch.findFirst({
+      where: { OR: [{ id: branchId }, { code: branchId.toLowerCase() }] }
+    });
+    if (b) where.branchId = b.id;
+  }
+  if (leadType) where.leadType = leadType;
+  if (sourceId) where.sourceId = sourceId;
+  if (status) where.status = status;
+
+  const leads = await prisma.lead.findMany({
+    where,
+    skip: (page - 1) * take,
+    take,
+    orderBy: { createdAt: 'desc' },
+    include: { source: true, branch: true, assignedCounsellor: { select: { id: true, name: true, email: true } } }
+  });
   res.json({ success: true, data: leads });
 });
 
