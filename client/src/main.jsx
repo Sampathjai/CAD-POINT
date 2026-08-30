@@ -32,7 +32,12 @@ import {
     Database,
     Cloud,
     Filter,
-    AlertCircle
+    AlertCircle,
+    Smartphone,
+    Monitor,
+    Printer,
+    Server,
+    Wifi
 } from 'lucide-react';
 import './styles.css';
 
@@ -2326,11 +2331,9 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
     const safeAdmissions = Array.isArray(admissions) ? admissions : [];
     const safePayments = Array.isArray(payments) ? payments : [];
 
-    // Monthly-wise filter states
-    const [selectedMonth, setSelectedMonth] = useState('ALL'); // 'ALL' or 'YYYY-MM' e.g. '2026-08'
+    const [selectedMonth, setSelectedMonth] = useState('ALL');
     const [selectedCourseId, setSelectedCourseId] = useState('ALL');
 
-    // Build unique list of admission months (YYYY-MM)
     const availableMonths = Array.from(new Set(
         safeAdmissions.map(a => {
             const dateStr = a.createdAt || a.startDate;
@@ -2340,7 +2343,6 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
         }).filter(Boolean)
     )).sort().reverse();
 
-    // Filter admissions by selected month & course
     const filteredAdmissions = safeAdmissions.filter(a => {
         if (selectedCourseId !== 'ALL' && a.courseId !== selectedCourseId) return false;
         if (selectedMonth !== 'ALL') {
@@ -2354,10 +2356,8 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
         return true;
     });
 
-    // Calculate pending student balances
     const pendingStudentsList = filteredAdmissions.map(a => {
         const agreedFee = Number(a.finalFee) || 0;
-        // Total payments recorded for this admission
         const admissionPayments = safePayments.filter(p => p.admissionId === a.id);
         const totalPaid = admissionPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
         const pendingBalance = Math.max(0, agreedFee - totalPaid);
@@ -2383,7 +2383,6 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
 
     const totalFilteredAgreed = filteredAdmissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
     const totalFilteredPending = Math.max(0, totalFilteredAgreed - totalFilteredRevenue);
-
     const conversionRate = safeLeads.length > 0 ? ((safeAdmissions.length / safeLeads.length) * 100).toFixed(1) : '0.0';
 
     const courseStats = safeCourses.map((c) => {
@@ -2417,7 +2416,6 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-            {/* Header & Filter Controls */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '18px 24px', borderRadius: 12, border: '1px solid #e2e8f0', flexWrap: 'wrap', gap: 12 }}>
                 <div>
                     <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800 }}>CADPOINT COIMBATORE — Monthly Reports & Pending Analytics</h3>
@@ -2462,7 +2460,6 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
                 </div>
             </div>
 
-            {/* Metric Overview Cards */}
             <div className="cards">
                 <div className="card">
                     <span>Total Revenue (Selected Period)</span>
@@ -2488,7 +2485,6 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
                 </div>
             </div>
 
-            {/* Monthly Pending Fee Report Table */}
             <div className="panel wide" style={{ background: '#ffffff', borderRadius: 12, padding: 20, border: '1px solid #e2e8f0' }}>
                 <div className="panelhead" style={{ marginBottom: 16 }}>
                     <div>
@@ -2551,7 +2547,6 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
                 )}
             </div>
 
-            {/* Course Performance Table */}
             <div className="grid">
                 <section className="panel wide">
                     <div className="panelhead">
@@ -2590,6 +2585,21 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
     const [activeTab, setActiveTab] = useState('Profile');
     const [saving, setSaving] = useState(false);
     const [newSourceName, setNewSourceName] = useState('');
+    const [showAddDeviceModal, setShowAddDeviceModal] = useState(false);
+
+    const [devicesList, setDevicesList] = useState([
+        { id: 'dev-1', name: 'Gandhipuram Reception Laptop', type: 'Laptop', branch: 'Gandhipuram', ipAddress: '192.168.1.42', macAddress: 'A4:C3:F0:12:88:9B', status: 'ACTIVE', lastSync: 'Just now' },
+        { id: 'dev-2', name: 'Saravanapatti Billing Desktop', type: 'Desktop PC', branch: 'Saravanapatti', ipAddress: '192.168.2.18', macAddress: 'B2:D4:E1:99:34:7C', status: 'ACTIVE', lastSync: '10 mins ago' },
+        { id: 'dev-3', name: 'Coimbatore Counselor Tablet', type: 'Tablet', branch: 'Gandhipuram', ipAddress: '192.168.1.88', macAddress: 'C8:F1:D2:44:11:00', status: 'PENDING', lastSync: '1 hour ago' }
+    ]);
+
+    const [newDeviceForm, setNewDeviceForm] = useState({
+        name: '',
+        type: 'Desktop PC',
+        branch: 'Gandhipuram',
+        ipAddress: '',
+        macAddress: ''
+    });
 
     const [profileForm, setProfileForm] = useState({
         instituteName: 'CADPOINT COIMBATORE',
@@ -2668,6 +2678,30 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
         }
     }
 
+    function handleRegisterDeviceSubmit(e) {
+        e.preventDefault();
+        if (!newDeviceForm.name.trim()) return alert('Please enter device name');
+        const newDev = {
+            id: 'dev-' + (devicesList.length + 1),
+            name: newDeviceForm.name.trim(),
+            type: newDeviceForm.type,
+            branch: newDeviceForm.branch,
+            ipAddress: newDeviceForm.ipAddress || '192.168.1.100',
+            macAddress: newDeviceForm.macAddress || 'D4:E5:F6:77:88:99',
+            status: 'ACTIVE',
+            lastSync: 'Just now'
+        };
+        setDevicesList(prev => [...prev, newDev]);
+        setNewDeviceForm({ name: '', type: 'Desktop PC', branch: 'Gandhipuram', ipAddress: '', macAddress: '' });
+        setShowAddDeviceModal(false);
+        alert('✅ Device registered successfully!');
+    }
+
+    function removeDevice(id, devName) {
+        if (!window.confirm(`Are you sure you want to remove authorized device "${devName}"?`)) return;
+        setDevicesList(prev => prev.filter(d => d.id !== id));
+    }
+
     async function triggerDatabaseBackup() {
         setSaving(true);
         try {
@@ -2677,10 +2711,7 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
             });
             const j = await res.json();
             if (j.success) {
-                alert(`✅ Database Backup Created Successfully!
-
-File Name: ${j.data?.fileName || 'cadpoint_backup.sql'}
-Size: ${j.data?.fileSizeFormatted || '2.4 MB'}`);
+                alert(`✅ Database Backup Created Successfully!\n\nFile Name: ${j.data?.fileName || 'cadpoint_backup.sql'}\nSize: ${j.data?.fileSizeFormatted || '2.4 MB'}`);
             } else {
                 alert(j.message || 'Backup completed');
             }
@@ -2702,9 +2733,9 @@ Size: ${j.data?.fileSizeFormatted || '2.4 MB'}`);
     ];
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div className="settings-container">
             {/* Sub-tabs Pills */}
-            <div style={{ display: 'flex', gap: 10, background: '#ffffff', padding: 8, borderRadius: 12, border: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
+            <div className="settings-nav">
                 {tabs.map((t) => {
                     const IconComp = t.icon;
                     const isActive = activeTab === t.id;
@@ -2712,23 +2743,10 @@ Size: ${j.data?.fileSizeFormatted || '2.4 MB'}`);
                         <button
                             key={t.id}
                             type="button"
+                            className={`settings-nav-btn ${isActive ? 'active' : ''}`}
                             onClick={() => setActiveTab(t.id)}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                padding: '10px 18px',
-                                borderRadius: 8,
-                                border: 'none',
-                                fontWeight: 700,
-                                fontSize: 13,
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                background: isActive ? '#0f172a' : 'transparent',
-                                color: isActive ? '#ffffff' : '#64748b'
-                            }}
                         >
-                            <IconComp size={16} color={isActive ? '#38bdf8' : '#94a3b8'} />
+                            <IconComp size={16} />
                             {t.label}
                         </button>
                     );
@@ -2737,61 +2755,59 @@ Size: ${j.data?.fileSizeFormatted || '2.4 MB'}`);
 
             {/* Profile Tab */}
             {activeTab === 'Profile' && (
-                <div style={{ background: '#ffffff', padding: 24, borderRadius: 12, border: '1px solid #e2e8f0', maxWidth: 700 }}>
-                    <div style={{ marginBottom: 20 }}>
-                        <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800 }}>Institute Profile & Branding</h3>
-                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Configure official branch details, header branding, and contact details.</p>
+                <div className="settings-card">
+                    <div className="settings-card-header">
+                        <h3>Institute Profile & Branding</h3>
+                        <p>Configure official branch details, header branding, and contact details.</p>
                     </div>
 
-                    <form onSubmit={saveProfileSettings} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                        <label>
-                            Institute Name
+                    <form onSubmit={saveProfileSettings} className="form-grid">
+                        <div className="form-field full-width">
+                            <label>Institute Name</label>
                             <input value={profileForm.instituteName} onChange={(e) => setProfileForm({ ...profileForm, instituteName: e.target.value })} required />
-                        </label>
-                        <label>
-                            Tagline / Subtitle
+                        </div>
+                        <div className="form-field full-width">
+                            <label>Tagline / Subtitle</label>
                             <input value={profileForm.tagline} onChange={(e) => setProfileForm({ ...profileForm, tagline: e.target.value })} />
-                        </label>
-                        <div style={{ display: 'flex', gap: 12 }}>
-                            <label style={{ flex: 1 }}>
-                                Contact Email
-                                <input type="email" value={profileForm.contactEmail} onChange={(e) => setProfileForm({ ...profileForm, contactEmail: e.target.value })} required />
-                            </label>
-                            <label style={{ flex: 1 }}>
-                                Contact Phone
-                                <input value={profileForm.contactPhone} onChange={(e) => setProfileForm({ ...profileForm, contactPhone: e.target.value })} required />
-                            </label>
                         </div>
-                        <label>
-                            Branches Address
+                        <div className="form-field">
+                            <label>Contact Email</label>
+                            <input type="email" value={profileForm.contactEmail} onChange={(e) => setProfileForm({ ...profileForm, contactEmail: e.target.value })} required />
+                        </div>
+                        <div className="form-field">
+                            <label>Contact Phone</label>
+                            <input value={profileForm.contactPhone} onChange={(e) => setProfileForm({ ...profileForm, contactPhone: e.target.value })} required />
+                        </div>
+                        <div className="form-field full-width">
+                            <label>Branches Address</label>
                             <input value={profileForm.address} onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })} />
-                        </label>
-                        <div style={{ display: 'flex', gap: 12 }}>
-                            <label style={{ flex: 1 }}>
-                                City
-                                <input value={profileForm.city} onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })} />
-                            </label>
-                            <label style={{ flex: 1 }}>
-                                State
-                                <input value={profileForm.state} onChange={(e) => setProfileForm({ ...profileForm, state: e.target.value })} />
-                            </label>
                         </div>
-                        <button className="primary" type="submit" disabled={saving} style={{ width: 'fit-content', marginTop: 10 }}>
-                            {saving ? 'Saving...' : 'Save Profile Settings'}
-                        </button>
+                        <div className="form-field">
+                            <label>City</label>
+                            <input value={profileForm.city} onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })} />
+                        </div>
+                        <div className="form-field">
+                            <label>State</label>
+                            <input value={profileForm.state} onChange={(e) => setProfileForm({ ...profileForm, state: e.target.value })} />
+                        </div>
+                        <div className="form-field full-width" style={{ marginTop: 10 }}>
+                            <button className="primary" type="submit" disabled={saving} style={{ width: 'fit-content' }}>
+                                {saving ? 'Saving...' : 'Save Profile Settings'}
+                            </button>
+                        </div>
                     </form>
                 </div>
             )}
 
             {/* Appearance Tab */}
             {activeTab === 'Appearance' && (
-                <div style={{ background: '#ffffff', padding: 24, borderRadius: 12, border: '1px solid #e2e8f0', maxWidth: 650 }}>
-                    <div style={{ marginBottom: 20 }}>
-                        <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800 }}>Appearance & Workspace Theme</h3>
-                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Customize the visual theme and color palette of your CRM workspace.</p>
+                <div className="settings-card">
+                    <div className="settings-card-header">
+                        <h3>Appearance & Workspace Theme</h3>
+                        <p>Customize the visual theme and color palette of your CRM workspace.</p>
                     </div>
 
-                    <div style={{ padding: 20, background: theme === 'dark' ? '#1e293b' : '#f8fafc', borderRadius: 12, border: '1px solid #cbd5e1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="toggle-card">
                         <div>
                             <h4 style={{ margin: 0, color: theme === 'dark' ? '#f8fafc' : '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
                                 {theme === 'dark' ? <Moon size={20} color="#38bdf8" /> : <Sun size={20} color="#f59e0b" />}
@@ -2808,47 +2824,51 @@ Size: ${j.data?.fileSizeFormatted || '2.4 MB'}`);
                 </div>
             )}
 
-            {/* Storage & Database Tab — Redesigned Modern UI */}
+            {/* Storage & Database Tab — Redesigned with Device Management */}
             {activeTab === 'Storage & Database' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 800 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                     {/* Database Health Header Card */}
-                    <div style={{ background: '#ffffff', padding: 24, borderRadius: 12, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
-                            <div>
-                                <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <Database size={20} color="#0284c7" /> Cloud Hosted PostgreSQL Database
-                                </h3>
-                                <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Supabase Managed Postgres Cluster (`postgres.khnrcfvczwhoklkokrbl` on AWS ap-northeast-1).</p>
+                    <div className="settings-card">
+                        <div className="settings-card-header" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+                                <div>
+                                    <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <Database size={20} color="#0284c7" /> Cloud Hosted PostgreSQL Database
+                                    </h3>
+                                    <p>Supabase Managed Postgres Cluster (`postgres.khnrcfvczwhoklkokrbl` on AWS ap-northeast-1).</p>
+                                </div>
+                                <span className="badge" style={{ background: '#dcfce7', color: '#15803d', padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    ● Live & Operational
+                                </span>
                             </div>
-                            <span className="badge" style={{ background: '#dcfce7', color: '#15803d', padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                ● Live & Operational
-                            </span>
-                        </div>
 
-                        {/* Status Grid */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginTop: 8 }}>
-                            <div style={{ padding: 16, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>ORM Provider</span>
-                                <b style={{ display: 'block', fontSize: 15, color: '#0f172a', marginTop: 4 }}>Prisma Client v6.15</b>
-                            </div>
-                            <div style={{ padding: 16, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>Connection Pooler</span>
-                                <b style={{ display: 'block', fontSize: 15, color: '#0284c7', marginTop: 4 }}>Transaction Pool (6543)</b>
-                            </div>
-                            <div style={{ padding: 16, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>Direct Migration URL</span>
-                                <b style={{ display: 'block', fontSize: 15, color: '#16a34a', marginTop: 4 }}>Direct Session (5432)</b>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginTop: 16 }}>
+                                <div style={{ padding: 14, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>ORM Provider</span>
+                                    <b style={{ display: 'block', fontSize: 14, color: '#0f172a', marginTop: 4 }}>Prisma Client v6.15</b>
+                                </div>
+                                <div style={{ padding: 14, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>Connection Pooler</span>
+                                    <b style={{ display: 'block', fontSize: 14, color: '#0284c7', marginTop: 4 }}>Transaction Pool (6543)</b>
+                                </div>
+                                <div style={{ padding: 14, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>Direct Migration URL</span>
+                                    <b style={{ display: 'block', fontSize: 14, color: '#16a34a', marginTop: 4 }}>Direct Session (5432)</b>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Storage Meter Card */}
-                    <div style={{ background: '#ffffff', padding: 24, borderRadius: 12, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                        <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <Cloud size={20} color="#3b82f6" /> Multi-Tenant Cloud Storage Quota
-                        </h3>
+                    {/* Storage Meter & Backup Card */}
+                    <div className="settings-card">
+                        <div className="settings-card-header">
+                            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <Cloud size={20} color="#3b82f6" /> Multi-Tenant Cloud Storage Quota & Backups
+                            </h3>
+                            <p>Allocated disk space and automated daily cloud snapshots.</p>
+                        </div>
 
-                        <div>
+                        <div style={{ marginBottom: 20 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8, fontWeight: 600 }}>
                                 <span style={{ color: '#475569' }}>Database & Media File Usage</span>
                                 <span style={{ color: '#0f172a' }}><b>2.4 GB</b> / 10.0 GB (24% Used)</span>
@@ -2868,15 +2888,68 @@ Size: ${j.data?.fileSizeFormatted || '2.4 MB'}`);
                             </button>
                         </div>
                     </div>
+
+                    {/* Add Device Setting Card */}
+                    <div className="settings-card">
+                        <div className="settings-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                            <div>
+                                <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <Monitor size={20} color="#8b5cf6" /> Authorized Devices & Terminal Settings
+                                </h3>
+                                <p>Manage laptops, desktops, and tablet terminals connected to CADPOINT COIMBATORE CRM.</p>
+                            </div>
+                            <button className="primary" onClick={() => setShowAddDeviceModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#8b5cf6', borderColor: '#8b5cf6' }}>
+                                <Plus size={16} /> + Add Device
+                            </button>
+                        </div>
+
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Device Name</th>
+                                    <th>Type</th>
+                                    <th>Branch</th>
+                                    <th>IP / MAC Address</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {devicesList.map((dev) => (
+                                    <tr key={dev.id}>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                {dev.type === 'Laptop' ? <Laptop size={16} color="#64748b" /> : dev.type === 'Tablet' ? <Smartphone size={16} color="#64748b" /> : <Monitor size={16} color="#64748b" />}
+                                                <b>{dev.name}</b>
+                                            </div>
+                                        </td>
+                                        <td>{dev.type}</td>
+                                        <td><span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: 11 }}>{dev.branch}</span></td>
+                                        <td><code style={{ fontSize: 11, background: '#f8fafc', padding: '2px 6px', borderRadius: 4 }}>{dev.ipAddress}</code></td>
+                                        <td>
+                                            <span className={dev.status === 'ACTIVE' ? 'status active' : 'status follow_up'}>
+                                                {dev.status}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => removeDevice(dev.id, dev.name)}>
+                                                Remove
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             )}
 
             {/* Enquiry Sources Tab */}
             {activeTab === 'Enquiry Sources' && (
-                <div style={{ background: '#ffffff', padding: 24, borderRadius: 12, border: '1px solid #e2e8f0', maxWidth: 650 }}>
-                    <div style={{ marginBottom: 20 }}>
-                        <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800 }}>Lead Enquiry Sources</h3>
-                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Configure available enquiry channels for student lead tracking.</p>
+                <div className="settings-card">
+                    <div className="settings-card-header">
+                        <h3>Lead Enquiry Sources</h3>
+                        <p>Configure available enquiry channels for student lead tracking.</p>
                     </div>
 
                     <form onSubmit={addEnquirySource} style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
@@ -2884,7 +2957,7 @@ Size: ${j.data?.fileSizeFormatted || '2.4 MB'}`);
                             value={newSourceName}
                             onChange={(e) => setNewSourceName(e.target.value)}
                             placeholder="Enter new source (e.g. Instagram Ads, Telecaller)"
-                            style={{ flex: 1 }}
+                            style={{ flex: 1, padding: '10px 14px', borderRadius: 8, border: '1px solid #cbd5e1' }}
                             required
                         />
                         <button className="primary" type="submit">+ Add Source</button>
@@ -2915,39 +2988,41 @@ Size: ${j.data?.fileSizeFormatted || '2.4 MB'}`);
 
             {/* WhatsApp & API Tab */}
             {activeTab === 'WhatsApp & API' && (
-                <div style={{ background: '#ffffff', padding: 24, borderRadius: 12, border: '1px solid #e2e8f0', maxWidth: 650 }}>
-                    <div style={{ marginBottom: 20 }}>
-                        <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800 }}>WhatsApp Integration & API</h3>
-                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Configure Meta WhatsApp Cloud API credentials.</p>
+                <div className="settings-card">
+                    <div className="settings-card-header">
+                        <h3>WhatsApp Integration & API</h3>
+                        <p>Configure Meta WhatsApp Cloud API credentials.</p>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                        <label>
-                            WhatsApp Cloud API Endpoint
+                    <form className="form-grid" onSubmit={(e) => e.preventDefault()}>
+                        <div className="form-field full-width">
+                            <label>WhatsApp Cloud API Endpoint</label>
                             <input value={whatsappForm.whatsappApiUrl} onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappApiUrl: e.target.value })} />
-                        </label>
-                        <label>
-                            Phone Number ID
+                        </div>
+                        <div className="form-field">
+                            <label>Phone Number ID</label>
                             <input value={whatsappForm.whatsappPhoneNumberId} onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappPhoneNumberId: e.target.value })} />
-                        </label>
-                        <label>
-                            Access Token
+                        </div>
+                        <div className="form-field">
+                            <label>Access Token</label>
                             <input type="password" value={whatsappForm.whatsappAccessToken} onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappAccessToken: e.target.value })} placeholder="••••••••••••••••" />
-                        </label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginTop: 6 }}>
-                            <input type="checkbox" checked={whatsappForm.autoAssignLeads} onChange={(e) => setWhatsappForm({ ...whatsappForm, autoAssignLeads: e.target.checked })} />
-                            Auto-assign incoming WhatsApp leads to online counsellors
-                        </label>
-                    </div>
+                        </div>
+                        <div className="form-field full-width">
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginTop: 6 }}>
+                                <input type="checkbox" checked={whatsappForm.autoAssignLeads} onChange={(e) => setWhatsappForm({ ...whatsappForm, autoAssignLeads: e.target.checked })} />
+                                Auto-assign incoming WhatsApp leads to online counsellors
+                            </label>
+                        </div>
+                    </form>
                 </div>
             )}
 
             {/* System Info Tab */}
             {activeTab === 'System Info' && (
-                <div style={{ background: '#ffffff', padding: 24, borderRadius: 12, border: '1px solid #e2e8f0', maxWidth: 650 }}>
-                    <div style={{ marginBottom: 20 }}>
-                        <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800 }}>System Architecture & Environment</h3>
-                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Production deployment environment diagnostics.</p>
+                <div className="settings-card">
+                    <div className="settings-card-header">
+                        <h3>System Architecture & Environment</h3>
+                        <p>Production deployment environment diagnostics.</p>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13 }}>
@@ -2957,6 +3032,59 @@ Size: ${j.data?.fileSizeFormatted || '2.4 MB'}`);
                         <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}><b>Database Cluster:</b> Supabase PostgreSQL via Prisma ORM</div>
                         <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}><b>Active API URL:</b> {API_BASE}</div>
                     </div>
+                </div>
+            )}
+
+            {/* Add Device Modal */}
+            {showAddDeviceModal && (
+                <div className="modal" style={{ zIndex: 1200 }}>
+                    <form className="panel" onSubmit={handleRegisterDeviceSubmit} style={{ maxWidth: 480 }}>
+                        <h3 style={{ margin: 0, fontSize: 18 }}>Register Authorized Device</h3>
+                        <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 16px' }}>Authorize a laptop, desktop, or mobile device for CADPOINT COIMBATORE CRM.</p>
+
+                        <div className="form-field full-width" style={{ marginBottom: 12 }}>
+                            <label>Device Name *</label>
+                            <input
+                                value={newDeviceForm.name}
+                                onChange={(e) => setNewDeviceForm({ ...newDeviceForm, name: e.target.value })}
+                                placeholder="e.g. Reception Desk PC 1"
+                                required
+                                autoFocus
+                            />
+                        </div>
+
+                        <div className="form-field full-width" style={{ marginBottom: 12 }}>
+                            <label>Device Type</label>
+                            <select value={newDeviceForm.type} onChange={(e) => setNewDeviceForm({ ...newDeviceForm, type: e.target.value })}>
+                                <option value="Desktop PC">Desktop PC</option>
+                                <option value="Laptop">Laptop</option>
+                                <option value="Tablet">Tablet / Mobile</option>
+                                <option value="POS Terminal">POS / Receipt Printer</option>
+                            </select>
+                        </div>
+
+                        <div className="form-field full-width" style={{ marginBottom: 12 }}>
+                            <label>Branch Assignment</label>
+                            <select value={newDeviceForm.branch} onChange={(e) => setNewDeviceForm({ ...newDeviceForm, branch: e.target.value })}>
+                                <option value="Gandhipuram">Gandhipuram</option>
+                                <option value="Saravanapatti">Saravanapatti</option>
+                            </select>
+                        </div>
+
+                        <div className="form-field full-width" style={{ marginBottom: 12 }}>
+                            <label>IP / MAC Address (Optional)</label>
+                            <input
+                                value={newDeviceForm.ipAddress}
+                                onChange={(e) => setNewDeviceForm({ ...newDeviceForm, ipAddress: e.target.value })}
+                                placeholder="192.168.1.50"
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                            <button className="primary" type="submit">Authorize Device</button>
+                            <button type="button" onClick={() => setShowAddDeviceModal(false)}>Cancel</button>
+                        </div>
+                    </form>
                 </div>
             )}
         </div>
