@@ -32,6 +32,10 @@ import {
 } from 'lucide-react';
 import './styles.css';
 
+const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL && String(import.meta.env.VITE_API_URL).trim())
+    ? String(import.meta.env.VITE_API_URL).trim().replace(/\/+$/, '')
+    : '/api';
+
 function App() {
     const [page, setPage] = useState('Dashboard');
     const [token, setToken] = useState(() => localStorage.getItem('cadpoint_token') || '');
@@ -97,7 +101,7 @@ function App() {
 
     useEffect(() => {
         if (!token) return;
-        fetch(import.meta.env.VITE_API_URL + '/auth/me', { headers: { Authorization: 'Bearer ' + token } })
+        fetch(API_BASE + '/auth/me', { headers: { Authorization: 'Bearer ' + token } })
             .then((r) => r.json())
             .then((j) => {
                 if (j.success) setUser(j.data);
@@ -146,8 +150,7 @@ function App() {
             return alert('Please enter your password');
         }
         try {
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
-            const res = await fetch(apiUrl + '/auth/login', {
+            const res = await fetch(API_BASE + '/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(loginForm)
@@ -167,7 +170,7 @@ function App() {
 
     async function fetchLeads() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/leads', { headers: { Authorization: 'Bearer ' + token } });
+            const res = await fetch(API_BASE + '/leads', { headers: { Authorization: 'Bearer ' + token } });
             const j = await res.json();
             if (j.success) setLeads(j.data || []);
         } catch (e) {
@@ -177,7 +180,7 @@ function App() {
 
     async function fetchFollowups() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/followups', { headers: { Authorization: 'Bearer ' + token } });
+            const res = await fetch(API_BASE + '/followups', { headers: { Authorization: 'Bearer ' + token } });
             const j = await res.json();
             if (j.success) setFollowups(j.data || []);
         } catch (e) {
@@ -187,7 +190,7 @@ function App() {
 
     async function fetchCourses() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/courses', { headers: { Authorization: 'Bearer ' + token } });
+            const res = await fetch(API_BASE + '/courses', { headers: { Authorization: 'Bearer ' + token } });
             const j = await res.json();
             if (j.success) setCourses(j.data || []);
         } catch (e) {
@@ -197,7 +200,7 @@ function App() {
 
     async function fetchBatches() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/batches', { headers: { Authorization: 'Bearer ' + token } });
+            const res = await fetch(API_BASE + '/batches', { headers: { Authorization: 'Bearer ' + token } });
             const j = await res.json();
             if (j.success) setBatches(j.data || []);
         } catch (e) {
@@ -207,7 +210,7 @@ function App() {
 
     async function fetchStudents() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/students', { headers: { Authorization: 'Bearer ' + token } });
+            const res = await fetch(API_BASE + '/students', { headers: { Authorization: 'Bearer ' + token } });
             const j = await res.json();
             if (j.success) setStudents(j.data || []);
         } catch (e) {
@@ -217,7 +220,7 @@ function App() {
 
     async function fetchAdmissions() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/admissions', { headers: { Authorization: 'Bearer ' + token } });
+            const res = await fetch(API_BASE + '/admissions', { headers: { Authorization: 'Bearer ' + token } });
             const j = await res.json();
             if (j.success) setAdmissions(j.data || []);
         } catch (e) {
@@ -227,7 +230,7 @@ function App() {
 
     async function fetchPayments() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/payments', { headers: { Authorization: 'Bearer ' + token } });
+            const res = await fetch(API_BASE + '/payments', { headers: { Authorization: 'Bearer ' + token } });
             const j = await res.json();
             if (j.success) setPayments(j.data || []);
         } catch (e) {
@@ -237,7 +240,7 @@ function App() {
 
     async function fetchUsers() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/users', { headers: { Authorization: 'Bearer ' + token } });
+            const res = await fetch(API_BASE + '/users', { headers: { Authorization: 'Bearer ' + token } });
             const j = await res.json();
             if (j.success) setUsersList(j.data || []);
         } catch (e) {
@@ -247,7 +250,7 @@ function App() {
 
     async function fetchNotifications() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/notifications', { headers: { Authorization: 'Bearer ' + token } });
+            const res = await fetch(API_BASE + '/notifications', { headers: { Authorization: 'Bearer ' + token } });
             const j = await res.json();
             if (j.success) setNotifications(j.data || []);
         } catch (e) {
@@ -265,7 +268,7 @@ function App() {
         setIsSearching(true);
         setShowSearchModal(true);
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/search?q=' + encodeURIComponent(query), { headers: { Authorization: 'Bearer ' + token } });
+            const res = await fetch(API_BASE + '/search?q=' + encodeURIComponent(query), { headers: { Authorization: 'Bearer ' + token } });
             const j = await res.json();
             if (j.success) setSearchResults(j.data);
         } catch (e) {
@@ -278,7 +281,7 @@ function App() {
     // Submit Handlers
     async function createLead() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/leads', {
+            const res = await fetch(API_BASE + '/leads', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
                 body: JSON.stringify(addLeadForm)
@@ -296,7 +299,7 @@ function App() {
 
     async function createFollowup() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/followups', {
+            const res = await fetch(API_BASE + '/followups', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
                 body: JSON.stringify(scheduleForm)
@@ -314,7 +317,7 @@ function App() {
 
     async function completeFollowup(id) {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/followups/' + id + '/complete', {
+            const res = await fetch(API_BASE + '/followups/' + id + '/complete', {
                 method: 'PATCH',
                 headers: { Authorization: 'Bearer ' + token }
             });
@@ -329,7 +332,7 @@ function App() {
 
     async function createCourse() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/courses', {
+            const res = await fetch(API_BASE + '/courses', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
                 body: JSON.stringify({ ...addCourseForm, standardFee: Number(addCourseForm.standardFee) || 0 })
@@ -347,7 +350,7 @@ function App() {
 
     async function createBatch() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/batches', {
+            const res = await fetch(API_BASE + '/batches', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
                 body: JSON.stringify({ ...addBatchForm, capacity: Number(addBatchForm.capacity) || 25 })
@@ -371,7 +374,7 @@ function App() {
                 email: addStudentForm.email.trim() || undefined,
                 lastName: addStudentForm.lastName.trim() || undefined
             };
-            const res = await fetch(import.meta.env.VITE_API_URL + '/students', {
+            const res = await fetch(API_BASE + '/students', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
                 body: JSON.stringify(payload)
@@ -396,7 +399,7 @@ function App() {
                 agreedFee: Number(addAdmissionForm.agreedFee) || Number(addAdmissionForm.finalFee),
                 finalFee: Number(addAdmissionForm.finalFee)
             };
-            const res = await fetch(import.meta.env.VITE_API_URL + '/admissions', {
+            const res = await fetch(API_BASE + '/admissions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
                 body: JSON.stringify(payload)
@@ -414,7 +417,7 @@ function App() {
 
     async function createPayment() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/payments', {
+            const res = await fetch(API_BASE + '/payments', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
                 body: JSON.stringify({
@@ -435,7 +438,7 @@ function App() {
 
     async function createUserSubmit() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/users', {
+            const res = await fetch(API_BASE + '/users', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
                 body: JSON.stringify(addUserForm)
@@ -466,7 +469,7 @@ function App() {
 
     async function updateUserSubmit() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/users/' + editUserForm.id, {
+            const res = await fetch(API_BASE + '/users/' + editUserForm.id, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
                 body: JSON.stringify(editUserForm)
@@ -484,7 +487,7 @@ function App() {
     async function deleteUser(id, name) {
         if (!window.confirm(`Are you sure you want to delete user account "${name}"?`)) return;
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/users/' + id, {
+            const res = await fetch(API_BASE + '/users/' + id, {
                 method: 'DELETE',
                 headers: { Authorization: 'Bearer ' + token }
             });
@@ -500,7 +503,7 @@ function App() {
     async function deleteStudent(id, name) {
         if (!window.confirm(`Are you sure you want to delete student "${name}"?`)) return;
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/students/' + id, {
+            const res = await fetch(API_BASE + '/students/' + id, {
                 method: 'DELETE',
                 headers: { Authorization: 'Bearer ' + token }
             });
@@ -516,7 +519,7 @@ function App() {
     async function deleteAdmission(id, admissionNumber) {
         if (!window.confirm(`Are you sure you want to delete admission "${admissionNumber}"?`)) return;
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/admissions/' + id, {
+            const res = await fetch(API_BASE + '/admissions/' + id, {
                 method: 'DELETE',
                 headers: { Authorization: 'Bearer ' + token }
             });
@@ -543,7 +546,7 @@ function App() {
 
     async function updateCourseSubmit() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/courses/' + editCourseForm.id, {
+            const res = await fetch(API_BASE + '/courses/' + editCourseForm.id, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
                 body: JSON.stringify({
@@ -564,7 +567,7 @@ function App() {
     async function deleteCourse(id, courseName) {
         if (!window.confirm(`Are you sure you want to PERMANENTLY delete course "${courseName}" from the database? This action cannot be undone.`)) return;
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/courses/' + id, {
+            const res = await fetch(API_BASE + '/courses/' + id, {
                 method: 'DELETE',
                 headers: { Authorization: 'Bearer ' + token }
             });
@@ -595,7 +598,7 @@ function App() {
             return alert('Please enter batch name');
         }
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/batches/' + editBatchForm.id, {
+            const res = await fetch(API_BASE + '/batches/' + editBatchForm.id, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
                 body: JSON.stringify({
@@ -616,7 +619,7 @@ function App() {
     async function deleteBatch(id, batchName) {
         if (!window.confirm(`Are you sure you want to delete batch "${batchName}"?`)) return;
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/batches/' + id, {
+            const res = await fetch(API_BASE + '/batches/' + id, {
                 method: 'DELETE',
                 headers: { Authorization: 'Bearer ' + token }
             });
@@ -2232,7 +2235,7 @@ function SettingsView({ token, theme, toggleTheme }) {
 
     async function fetchDrives() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/settings/storage/drives', {
+            const res = await fetch(API_BASE + '/settings/storage/drives', {
                 headers: { Authorization: 'Bearer ' + token }
             });
             const j = await res.json();
@@ -2259,7 +2262,7 @@ function SettingsView({ token, theme, toggleTheme }) {
         }
         setSaving(true);
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/desktop-agent/devices/register', {
+            const res = await fetch(API_BASE + '/desktop-agent/devices/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
                 body: JSON.stringify(newDeviceForm)
@@ -2283,7 +2286,7 @@ function SettingsView({ token, theme, toggleTheme }) {
 
     async function syncDeviceData(id, deviceName) {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/desktop-agent/devices/' + id + '/sync', {
+            const res = await fetch(API_BASE + '/desktop-agent/devices/' + id + '/sync', {
                 method: 'POST',
                 headers: { Authorization: 'Bearer ' + token }
             });
@@ -2303,7 +2306,7 @@ function SettingsView({ token, theme, toggleTheme }) {
     async function fetchSettings() {
         setLoading(true);
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/settings', {
+            const res = await fetch(API_BASE + '/settings', {
                 headers: { Authorization: 'Bearer ' + token }
             });
             const j = await res.json();
@@ -2320,7 +2323,7 @@ function SettingsView({ token, theme, toggleTheme }) {
 
     async function fetchDevices() {
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/desktop-agent/devices', {
+            const res = await fetch(API_BASE + '/desktop-agent/devices', {
                 headers: { Authorization: 'Bearer ' + token }
             });
             const j = await res.json();
@@ -2338,7 +2341,7 @@ function SettingsView({ token, theme, toggleTheme }) {
     async function revokeDevice(id) {
         if (!window.confirm('Revoke access for this desktop agent device?')) return;
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/desktop-agent/devices/' + id + '/revoke', {
+            const res = await fetch(API_BASE + '/desktop-agent/devices/' + id + '/revoke', {
                 method: 'POST',
                 headers: { Authorization: 'Bearer ' + token }
             });
@@ -2362,7 +2365,7 @@ function SettingsView({ token, theme, toggleTheme }) {
         if (e) e.preventDefault();
         setSaving(true);
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/settings', {
+            const res = await fetch(API_BASE + '/settings', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
                 body: JSON.stringify(profileForm)
@@ -2381,7 +2384,7 @@ function SettingsView({ token, theme, toggleTheme }) {
     async function triggerDatabaseBackup() {
         setSaving(true);
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/settings/backup/trigger', {
+            const res = await fetch(API_BASE + '/settings/backup/trigger', {
                 method: 'POST',
                 headers: { Authorization: 'Bearer ' + token }
             });
@@ -2402,7 +2405,7 @@ function SettingsView({ token, theme, toggleTheme }) {
     async function testConnections() {
         setSaving(true);
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/settings/storage/test-connection', {
+            const res = await fetch(API_BASE + '/settings/storage/test-connection', {
                 method: 'POST',
                 headers: { Authorization: 'Bearer ' + token }
             });
@@ -2426,7 +2429,7 @@ function SettingsView({ token, theme, toggleTheme }) {
         e.preventDefault();
         if (!newSourceName.trim()) return;
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/settings/sources', {
+            const res = await fetch(API_BASE + '/settings/sources', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
                 body: JSON.stringify({ name: newSourceName.trim() })
@@ -2447,7 +2450,7 @@ function SettingsView({ token, theme, toggleTheme }) {
     async function deleteEnquirySource(id) {
         if (!window.confirm('Delete this enquiry source?')) return;
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/settings/sources/' + id, {
+            const res = await fetch(API_BASE + '/settings/sources/' + id, {
                 method: 'DELETE',
                 headers: { Authorization: 'Bearer ' + token }
             });
@@ -3121,7 +3124,7 @@ function WhatsAppModal({ data, onClose, token }) {
         if (!rawPhone) return alert('No phone number recorded for this lead.');
         setSending(true);
         try {
-            const res = await fetch(import.meta.env.VITE_API_URL + '/settings/whatsapp/send', {
+            const res = await fetch(API_BASE + '/settings/whatsapp/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
                 body: JSON.stringify({ phone, message: messageText })
