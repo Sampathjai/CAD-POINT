@@ -236,6 +236,7 @@ model Student {
   pincode               String?
   emergencyContactName  String?
   emergencyContactPhone String?
+  photoUrl              String?
   branchId              String?
   branch                Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
   admissions            Admission[]

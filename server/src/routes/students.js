@@ -4,7 +4,6 @@ const prisma = require('../config/prisma');
 const { authenticate, authorize } = require('../middleware/auth');
 const { z } = require('zod');
 
-
 // GET /api/students
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -42,6 +41,7 @@ router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR','REC
       lastName: z.string().optional().or(z.literal('')).nullable(),
       phone: z.string().min(6, 'Valid phone number is required'),
       email: z.string().email('Invalid email address').optional().or(z.literal('')).nullable(),
+      photoUrl: z.string().optional().or(z.literal('')).nullable(),
       branchId: z.string().optional()
     });
 
@@ -51,7 +51,7 @@ router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR','REC
       return res.status(400).json({ success: false, message: `${issue.path.join('.')}: ${issue.message}` });
     }
 
-    let { studentCode, firstName, lastName, phone, email, branchId } = parsed.data;
+    let { studentCode, firstName, lastName, phone, email, photoUrl, branchId } = parsed.data;
 
     if (!studentCode || !studentCode.trim()) {
       const count = await prisma.student.count();
@@ -77,6 +77,7 @@ router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR','REC
         lastName: lastName && lastName.trim() ? lastName.trim() : null,
         phone: phone.trim(),
         email: email && email.trim() ? email.trim() : null,
+        photoUrl: photoUrl && photoUrl.trim() ? photoUrl.trim() : null,
         branchId: finalBranchId
       },
       include: { branch: true }
@@ -88,6 +89,32 @@ router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR','REC
     if (err.code === 'P2002') {
       return res.status(400).json({ success: false, message: 'Student code or phone number already exists' });
     }
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// PUT /api/students/:id
+router.put('/:id', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR','RECEPTIONIST'), async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { firstName, lastName, phone, email, photoUrl, branchId } = req.body;
+    const updateData = {};
+    if (firstName !== undefined) updateData.firstName = firstName.trim();
+    if (lastName !== undefined) updateData.lastName = lastName ? lastName.trim() : null;
+    if (phone !== undefined) updateData.phone = phone.trim();
+    if (email !== undefined) updateData.email = email ? email.trim() : null;
+    if (photoUrl !== undefined) updateData.photoUrl = photoUrl ? photoUrl.trim() : null;
+    if (branchId !== undefined) updateData.branchId = branchId;
+
+    const updated = await prisma.student.update({
+      where: { id },
+      data: updateData,
+      include: { branch: true, admissions: { include: { course: true, batch: true } } }
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    console.error('students.update', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });

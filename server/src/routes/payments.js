@@ -4,17 +4,33 @@ const prisma = require('../config/prisma');
 const { authenticate, authorize } = require('../middleware/auth');
 const { z } = require('zod');
 
-
-// GET /api/payments
+// GET /api/payments with branch, date range, and month filtering
 router.get('/', authenticate, async (req, res) => {
   try {
-    const { branchId } = req.query;
+    const { branchId, fromDate, toDate, month } = req.query;
     const where = {};
+
     if (branchId && branchId !== 'all') {
       const b = await prisma.branch.findFirst({
         where: { OR: [{ id: branchId }, { code: branchId.toLowerCase() }] }
       });
       if (b) where.branchId = b.id;
+    }
+
+    // Filter by paymentDate timestamp
+    if (fromDate || toDate) {
+      where.paymentDate = {};
+      if (fromDate) where.paymentDate.gte = new Date(fromDate);
+      if (toDate) where.paymentDate.lte = new Date(toDate + 'T23:59:59.999Z');
+    } else if (month && month !== 'ALL') {
+      const parts = month.split('-');
+      if (parts.length === 2) {
+        const year = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const start = new Date(year, m - 1, 1);
+        const end = new Date(year, m, 0, 23, 59, 59, 999);
+        where.paymentDate = { gte: start, lte: end };
+      }
     }
 
     const payments = await prisma.payment.findMany({

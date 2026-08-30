@@ -240,15 +240,36 @@ function App() {
     const [isSearching, setIsSearching] = useState(false);
     const [showSearchModal, setShowSearchModal] = useState(false);
 
-    // Forms
-    const [addLeadForm, setAddLeadForm] = useState({ firstName: '', lastName: '', phone: '', email: '', interestedCourse: '', estimatedValue: '', sourceId: '', leadType: 'STANDARD', assignedCounsellorId: '' });
+    // Forms & Filters
+    const [addLeadForm, setAddLeadForm] = useState({ firstName: '', lastName: '', phone: '', email: '', interestedCourse: '', estimatedValue: '', sourceId: '', leadType: 'STANDARD', assignedCounsellorId: '', branchId: '' });
     const [scheduleForm, setScheduleForm] = useState({ leadId: '', scheduledAt: '', type: 'CALL', notes: '' });
     const [addCourseForm, setAddCourseForm] = useState({ courseCode: '', name: '', description: '', standardFee: '' });
     const [addBatchForm, setAddBatchForm] = useState({ batchCode: '', name: '', courseId: '', startDate: '', capacity: 25 });
-    const [addStudentForm, setAddStudentForm] = useState({ studentCode: '', firstName: '', lastName: '', phone: '', email: '' });
+    const [addStudentForm, setAddStudentForm] = useState({ studentCode: '', firstName: '', lastName: '', phone: '', email: '', photoUrl: '' });
     const [addAdmissionForm, setAddAdmissionForm] = useState({ admissionNumber: '', studentId: '', courseId: '', batchId: '', agreedFee: '', finalFee: '' });
     const [addPaymentForm, setAddPaymentForm] = useState({ admissionId: '', receiptNumber: '', amount: '', paymentMethod: 'UPI', transactionReference: '', remarks: '' });
     const [addUserForm, setAddUserForm] = useState({ name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true });
+
+    // Payment Filters
+    const [paymentFromDate, setPaymentFromDate] = useState('');
+    const [paymentToDate, setPaymentToDate] = useState('');
+    const [paymentMonth, setPaymentMonth] = useState('ALL');
+
+    function handleStudentPhotoUpload(e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+            return alert('Please select a valid image file (JPG, PNG, or WebP).');
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            return alert('Image file size must be less than 5MB.');
+        }
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            setAddStudentForm(prev => ({ ...prev, photoUrl: event.target.result }));
+        };
+        reader.readAsDataURL(file);
+    }
 
     useEffect(() => {
         if (!token || user) return;
@@ -441,13 +462,13 @@ function App() {
             const res = await fetch(API_BASE + '/leads', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify({ ...addLeadForm, branchId: activeBranch })
+                body: JSON.stringify({ ...addLeadForm, branchId: addLeadForm.branchId || activeBranch })
             });
             const j = await res.json();
             if (!j.success) return alert(formatErrorMessage(j.message) || 'Create lead failed');
             fetchAllData();
             setShowAddLead(false);
-            setAddLeadForm({ firstName: '', lastName: '', phone: '', email: '', interestedCourse: '', estimatedValue: '', sourceId: '', leadType: 'STANDARD', assignedCounsellorId: '' });
+            setAddLeadForm({ firstName: '', lastName: '', phone: '', email: '', interestedCourse: '', estimatedValue: '', sourceId: '', leadType: 'STANDARD', assignedCounsellorId: '', branchId: '' });
         } catch (e) {
             console.error(e);
             alert('Create lead failed');
@@ -1263,6 +1284,19 @@ function App() {
                             <input value={addLeadForm.email} onChange={(e) => setAddLeadForm({ ...addLeadForm, email: e.target.value })} />
                         </label>
                         <label>
+                            Branch *
+                            <select
+                                value={addLeadForm.branchId || activeBranch || ''}
+                                onChange={(e) => setAddLeadForm({ ...addLeadForm, branchId: e.target.value })}
+                                required
+                            >
+                                <option value="">Select Branch</option>
+                                {branchesList.map((b) => (
+                                    <option key={b.id} value={b.id}>{b.name}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label>
                             Source *
                             <div style={{ display: 'flex', gap: 8 }}>
                                 <select
@@ -1497,6 +1531,29 @@ function App() {
                         <label>
                             Email
                             <input type="email" value={addStudentForm.email} onChange={(e) => setAddStudentForm({ ...addStudentForm, email: e.target.value })} />
+                        </label>
+                        <label>
+                            Student Photo
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
+                                {addStudentForm.photoUrl ? (
+                                    <img src={addStudentForm.photoUrl} alt="Student Preview" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: '2px solid #3b82f6' }} />
+                                ) : (
+                                    <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#e2e8f0', display: 'grid', placeItems: 'center', color: '#64748b', fontSize: 18, fontWeight: 700 }}>
+                                        📷
+                                    </div>
+                                )}
+                                <input
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    onChange={handleStudentPhotoUpload}
+                                    style={{ fontSize: 12, flex: 1 }}
+                                />
+                                {addStudentForm.photoUrl && (
+                                    <button type="button" className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => setAddStudentForm(prev => ({ ...prev, photoUrl: '' }))}>
+                                        Remove
+                                    </button>
+                                )}
+                            </div>
                         </label>
                         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                             <button className="primary" type="submit">Create Student</button>
@@ -2188,126 +2245,192 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
                 )}
 
                 {page === 'Students' && (
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Code</th>
-                                <th>Name</th>
-                                <th>Phone</th>
-                                <th>Email</th>
-                                <th>Joined</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {safeStudents
-                                .filter((s) => !lowerFilter || (s.firstName + ' ' + (s.lastName || '') + ' ' + s.phone + ' ' + s.studentCode).toLowerCase().includes(lowerFilter))
-                                .map((s) => (
-                                    <tr key={s.id}>
-                                        <td><b>{s.studentCode}</b></td>
-                                        <td>{s.firstName} {s.lastName || ''}</td>
-                                        <td>{s.phone}</td>
-                                        <td>{s.email || '-'}</td>
-                                        <td>{formatDate(s.createdAt)}</td>
-                                        <td>
-                                            <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => onDeleteStudent(s.id, `${s.firstName} ${s.lastName || ''}`.trim())}>
-                                                <Trash2 size={13} /> Delete
-                                            </button>
-                                        </td>
-                                    </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    <div className="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Student</th>
+                                    <th>Phone</th>
+                                    <th>Email</th>
+                                    <th>Joined</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {safeStudents
+                                    .filter((s) => !lowerFilter || (s.firstName + ' ' + (s.lastName || '') + ' ' + s.phone + ' ' + s.studentCode).toLowerCase().includes(lowerFilter))
+                                    .map((s) => (
+                                        <tr key={s.id}>
+                                            <td><b>{s.studentCode}</b></td>
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                    {s.photoUrl ? (
+                                                        <img src={s.photoUrl} alt="Photo" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '1px solid #cbd5e1' }} />
+                                                    ) : (
+                                                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#e2e8f0', display: 'grid', placeItems: 'center', color: '#64748b', fontSize: 13, fontWeight: 700 }}>
+                                                            {s.firstName ? s.firstName.charAt(0).toUpperCase() : 'S'}
+                                                        </div>
+                                                    )}
+                                                    <b>{s.firstName} {s.lastName || ''}</b>
+                                                </div>
+                                            </td>
+                                            <td>{s.phone}</td>
+                                            <td>{s.email || '-'}</td>
+                                            <td>{formatDate(s.createdAt)}</td>
+                                            <td>
+                                                <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => onDeleteStudent(s.id, `${s.firstName} ${s.lastName || ''}`.trim())}>
+                                                    <Trash2 size={13} /> Delete
+                                                </button>
+                                            </td>
+                                        </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
 
                 {page === 'Admissions' && (
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Admission #</th>
-                                <th>Student</th>
-                                <th>Course</th>
-                                <th>Branch</th>
-                                <th>Completion %</th>
-                                <th>Certificate Status</th>
-                                <th>Final Fee</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {safeAdmissions
-                                .filter((a) => !lowerFilter || (a.admissionNumber + ' ' + (a.student?.firstName || '') + ' ' + (a.course?.name || '')).toLowerCase().includes(lowerFilter))
-                                .map((a) => (
-                                    <tr key={a.id}>
-                                        <td><b>{a.admissionNumber}</b></td>
-                                        <td>
-                                            <b>{a.student ? `${a.student.firstName} ${a.student.lastName || ''}`.trim() : '-'}</b>
-                                            <div style={{ fontSize: 11, color: '#64748b' }}>{a.student?.phone}</div>
-                                        </td>
-                                        <td>{a.course?.name || '-'}</td>
-                                        <td><span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: 11 }}>{a.branch?.name || 'Gandhipuram'}</span></td>
-                                        <td style={{ minWidth: 120 }}>
-                                            <ProgressBar percentage={a.completionPct || 0} />
-                                        </td>
-                                        <td>
-                                            <CertificateBadge status={a.certificate?.status || 'NOT_STARTED'} issueDate={a.certificate?.issueDate} />
-                                        </td>
-                                        <td><b>₹{Number(a.finalFee).toLocaleString()}</b></td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: 6 }}>
-                                                <button
-                                                    className="secondary"
-                                                    style={{ padding: '4px 8px', fontSize: 11, color: '#0284c7', borderColor: '#bae6fd', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                    onClick={() => onOpenEditProgress(a)}
-                                                >
-                                                    <Edit size={12} /> Progress
-                                                </button>
-                                                <button
-                                                    className="secondary"
-                                                    style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                    onClick={() => onDeleteAdmission(a.id, a.admissionNumber)}
-                                                >
-                                                    <Trash2 size={12} /> Delete
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    <div className="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Admission #</th>
+                                    <th>Student</th>
+                                    <th>Course</th>
+                                    <th>Branch</th>
+                                    <th>Syllabus Progress</th>
+                                    <th>Certificate</th>
+                                    <th>Final Fee</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {safeAdmissions
+                                    .filter((a) => !lowerFilter || (a.admissionNumber + ' ' + (a.student?.firstName || '') + ' ' + (a.course?.name || '')).toLowerCase().includes(lowerFilter))
+                                    .map((a) => (
+                                        <tr key={a.id}>
+                                            <td><b>{a.admissionNumber}</b></td>
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    {a.student?.photoUrl ? (
+                                                        <img src={a.student.photoUrl} alt="Student" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
+                                                    ) : null}
+                                                    <div>
+                                                        <b>{a.student ? `${a.student.firstName} ${a.student.lastName || ''}`.trim() : '-'}</b>
+                                                        <div style={{ fontSize: 11, color: '#64748b' }}>{a.student?.phone}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>{a.course?.name || '-'}</td>
+                                            <td><span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: 11 }}>{a.branch?.name || 'Gandhipuram'}</span></td>
+                                            <td style={{ minWidth: 120 }}>
+                                                <ProgressBar percentage={a.completionPct || 0} />
+                                            </td>
+                                            <td>
+                                                <CertificateBadge status={a.certificate?.status || 'NOT_STARTED'} issueDate={a.certificate?.issueDate} />
+                                            </td>
+                                            <td><b>₹{Number(a.finalFee).toLocaleString()}</b></td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: 6 }}>
+                                                    <button
+                                                        className="secondary"
+                                                        style={{ padding: '4px 8px', fontSize: 11, color: '#0284c7', borderColor: '#bae6fd', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                        onClick={() => onOpenEditProgress(a)}
+                                                    >
+                                                        <Edit size={12} /> Progress
+                                                    </button>
+                                                    <button
+                                                        className="secondary"
+                                                        style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                        onClick={() => onDeleteAdmission(a.id, a.admissionNumber)}
+                                                    >
+                                                        <Trash2 size={12} /> Delete
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
 
                 {page === 'Payments' && (
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Receipt #</th>
-                                <th>Student</th>
-                                <th>Amount</th>
-                                <th>Method</th>
-                                <th>Remarks</th>
-                                <th>Branch</th>
-                                <th>Date</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {safePayments
-                                .filter((p) => !lowerFilter || (p.receiptNumber + ' ' + (p.admission?.student?.firstName || '') + ' ' + (p.paymentMethod || '')).toLowerCase().includes(lowerFilter))
-                                .map((p) => (
-                                    <tr key={p.id}>
-                                        <td><b>{p.receiptNumber}</b></td>
-                                        <td>{p.admission?.student ? `${p.admission.student.firstName} ${p.admission.student.lastName || ''}`.trim() : '-'}</td>
-                                        <td><b>₹{Number(p.amount).toLocaleString()}</b></td>
-                                        <td><span className="badge" style={{ background: '#e0e7ff', color: '#3730a3', fontSize: 11 }}>{p.paymentMethod}</span></td>
-                                        <td style={{ fontSize: 12, color: '#475569' }}>{p.remarks || p.notes || '-'}</td>
-                                        <td><span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: 11 }}>{p.branch?.name || 'Gandhipuram'}</span></td>
-                                        <td>{formatDate(p.paymentDate)}</td>
-                                        <td><span className="status active">{p.status}</span></td>
+                    <div>
+                        <div className="filter-bar" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16, background: '#f8fafc', padding: '12px 16px', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>From:</span>
+                                <input type="date" value={paymentFromDate} onChange={(e) => setPaymentFromDate(e.target.value)} style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #cbd5e1' }} />
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>To:</span>
+                                <input type="date" value={paymentToDate} onChange={(e) => setPaymentToDate(e.target.value)} style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #cbd5e1' }} />
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>Month:</span>
+                                <select value={paymentMonth} onChange={(e) => setPaymentMonth(e.target.value)} style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #cbd5e1' }}>
+                                    <option value="ALL">All Months</option>
+                                    <option value="2026-08">August 2026</option>
+                                    <option value="2026-07">July 2026</option>
+                                    <option value="2026-06">June 2026</option>
+                                    <option value="2026-05">May 2026</option>
+                                    <option value="2026-04">April 2026</option>
+                                    <option value="2026-03">March 2026</option>
+                                    <option value="2026-02">February 2026</option>
+                                    <option value="2026-01">January 2026</option>
+                                </select>
+                            </div>
+                            {(paymentFromDate || paymentToDate || paymentMonth !== 'ALL') && (
+                                <button type="button" className="secondary" style={{ padding: '6px 12px', fontSize: 12, color: '#ef4444', borderColor: '#fca5a5' }} onClick={() => { setPaymentFromDate(''); setPaymentToDate(''); setPaymentMonth('ALL'); }}>
+                                    Clear Filter
+                                </button>
+                            )}
+                        </div>
+                        <div className="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Receipt #</th>
+                                        <th>Student</th>
+                                        <th>Amount</th>
+                                        <th>Method</th>
+                                        <th>Remarks</th>
+                                        <th>Branch</th>
+                                        <th>Date</th>
+                                        <th>Status</th>
                                     </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                </thead>
+                                <tbody>
+                                    {safePayments
+                                        .filter((p) => {
+                                            if (lowerFilter && !(p.receiptNumber + ' ' + (p.admission?.student?.firstName || '') + ' ' + (p.paymentMethod || '')).toLowerCase().includes(lowerFilter)) {
+                                                return false;
+                                            }
+                                            const pDateStr = p.paymentDate ? new Date(p.paymentDate).toISOString().split('T')[0] : '';
+                                            if (paymentFromDate && pDateStr < paymentFromDate) return false;
+                                            if (paymentToDate && pDateStr > paymentToDate) return false;
+                                            if (paymentMonth && paymentMonth !== 'ALL') {
+                                                if (!pDateStr.startsWith(paymentMonth)) return false;
+                                            }
+                                            return true;
+                                        })
+                                        .map((p) => (
+                                            <tr key={p.id}>
+                                                <td><b>{p.receiptNumber}</b></td>
+                                                <td>{p.admission?.student ? `${p.admission.student.firstName} ${p.admission.student.lastName || ''}`.trim() : '-'}</td>
+                                                <td><b>₹{Number(p.amount).toLocaleString()}</b></td>
+                                                <td><span className="badge" style={{ background: '#e0e7ff', color: '#3730a3', fontSize: 11 }}>{p.paymentMethod}</span></td>
+                                                <td style={{ fontSize: 12, color: '#475569' }}>{p.remarks || p.notes || '-'}</td>
+                                                <td><span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: 11 }}>{p.branch?.name || 'Gandhipuram'}</span></td>
+                                                <td>{formatDate(p.paymentDate)}</td>
+                                                <td><span className="status active">{p.status}</span></td>
+                                            </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 )}
 
                 {page === 'Users' && (
