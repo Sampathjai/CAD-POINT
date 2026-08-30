@@ -3,7 +3,7 @@ services:
     name: cad-point-api
     env: node
     rootDir: server
-    buildCommand: npm install && npx prisma generate && DATABASE_URL="$DIRECT_URL" npx prisma db push --schema=./prisma/schema.prisma
+    buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV

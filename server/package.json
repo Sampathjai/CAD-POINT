@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "node --watch src/server.js",
+    "build": "node scripts/build.js",
     "start": "node src/server.js",
     "lint": "echo \"No linter configured yet\"",
     "test": "vitest run",
