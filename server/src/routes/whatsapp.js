@@ -15,13 +15,74 @@ async function fetchMetaApi(url, options = {}) {
   return { ok: res.ok, status: res.status, data };
 }
 
-// 1. GET /api/whatsapp/config - Public config for Meta Embedded Signup SDK (Secrets stay on server)
+// 1. GET /api/whatsapp/config - Public config & multi-branch connection status
 router.get('/config', authenticate, async (req, res) => {
   try {
     const organizationId = req.user?.organizationId || 'org_default';
-    const integration = await prisma.whatsAppIntegration.findFirst({
-      where: { organizationId, status: 'CONNECTED' }
+    const { branchId, branchCode } = req.query;
+
+    let targetBranchId = branchId;
+    if (!targetBranchId && branchCode) {
+      const b = await prisma.branch.findFirst({ where: { code: branchCode } });
+      if (b) targetBranchId = b.id;
+    }
+
+    if (targetBranchId) {
+      const integration = await prisma.whatsAppIntegration.findFirst({
+        where: { organizationId, branchId: targetBranchId, status: 'CONNECTED' },
+        include: { branch: true }
+      });
+
+      return res.json({
+        success: true,
+        data: {
+          appId: process.env.META_APP_ID || '',
+          configId: process.env.META_CONFIG_ID || '',
+          apiVersion: META_GRAPH_VERSION,
+          isConnected: Boolean(integration),
+          integration: integration ? {
+            id: integration.id,
+            branchId: integration.branchId,
+            branchName: integration.branch?.name,
+            wabaId: integration.wabaId,
+            phoneNumberId: integration.phoneNumberId,
+            phoneNumber: integration.phoneNumber,
+            displayPhoneNumber: integration.displayPhoneNumber,
+            businessName: integration.businessName,
+            connectedAt: integration.connectedAt,
+            status: integration.status
+          } : null
+        }
+      });
+    }
+
+    // Return status for all branches in organization
+    const branches = await prisma.branch.findMany({
+      where: { isActive: true },
+      include: {
+        whatsAppIntegration: true
+      },
+      orderBy: { name: 'asc' }
     });
+
+    const branchIntegrations = branches.map(b => ({
+      branchId: b.id,
+      branchName: b.name,
+      branchCode: b.code,
+      isConnected: Boolean(b.whatsAppIntegration && b.whatsAppIntegration.status === 'CONNECTED'),
+      integration: b.whatsAppIntegration ? {
+        id: b.whatsAppIntegration.id,
+        wabaId: b.whatsAppIntegration.wabaId,
+        phoneNumberId: b.whatsAppIntegration.phoneNumberId,
+        phoneNumber: b.whatsAppIntegration.phoneNumber,
+        displayPhoneNumber: b.whatsAppIntegration.displayPhoneNumber,
+        businessName: b.whatsAppIntegration.businessName,
+        status: b.whatsAppIntegration.status,
+        connectedAt: b.whatsAppIntegration.connectedAt
+      } : null
+    }));
+
+    const globalConnected = branchIntegrations.some(b => b.isConnected);
 
     res.json({
       success: true,
@@ -29,17 +90,8 @@ router.get('/config', authenticate, async (req, res) => {
         appId: process.env.META_APP_ID || '',
         configId: process.env.META_CONFIG_ID || '',
         apiVersion: META_GRAPH_VERSION,
-        isConnected: Boolean(integration),
-        integration: integration ? {
-          id: integration.id,
-          wabaId: integration.wabaId,
-          phoneNumberId: integration.phoneNumberId,
-          phoneNumber: integration.phoneNumber,
-          displayPhoneNumber: integration.displayPhoneNumber,
-          businessName: integration.businessName,
-          connectedAt: integration.connectedAt,
-          status: integration.status
-        } : null
+        isConnected: globalConnected,
+        branches: branchIntegrations
       }
     });
   } catch (err) {
@@ -48,11 +100,24 @@ router.get('/config', authenticate, async (req, res) => {
   }
 });
 
-// 2. POST /api/whatsapp/connect - Handle Meta OAuth / Embedded Signup Callback
+// 2. POST /api/whatsapp/connect - Handle Meta OAuth / Embedded Signup Callback per Branch
 router.post('/connect', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
     const organizationId = req.user?.organizationId || 'org_default';
-    const { code, wabaId: inputWabaId, phoneNumberId: inputPhoneId, accessToken: rawAccessToken, businessName: inputBizName, displayPhoneNumber: inputPhone } = req.body;
+    const { branchId, code, wabaId: inputWabaId, phoneNumberId: inputPhoneId, accessToken: rawAccessToken, businessName: inputBizName, displayPhoneNumber: inputPhone } = req.body;
+
+    // Resolve target branch
+    let targetBranch = null;
+    if (branchId) {
+      targetBranch = await prisma.branch.findUnique({ where: { id: branchId } });
+    }
+    if (!targetBranch) {
+      targetBranch = await prisma.branch.findFirst({ orderBy: { name: 'asc' } });
+    }
+
+    if (!targetBranch) {
+      return res.status(400).json({ success: false, message: 'Valid Branch ID is required to connect WhatsApp.' });
+    }
 
     const appId = process.env.META_APP_ID;
     const appSecret = process.env.META_APP_SECRET;
@@ -61,9 +126,9 @@ router.post('/connect', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (
     let wabaId = inputWabaId || '';
     let phoneNumberId = inputPhoneId || '';
     let displayPhoneNumber = inputPhone || '';
-    let businessName = inputBizName || 'CADPOINT Business';
+    let businessName = inputBizName || `${targetBranch.name} Branch WhatsApp`;
 
-    // Step A: If authorization code was returned by Embedded Signup, exchange code for Access Token
+    // Step A: If authorization code returned by Embedded Signup, exchange for Access Token
     if (code && appId && appSecret) {
       const tokenUrl = `${META_GRAPH_BASE_URL}/oauth/access_token?client_id=${encodeURIComponent(appId)}&client_secret=${encodeURIComponent(appSecret)}&code=${encodeURIComponent(code)}`;
       const tokenRes = await fetchMetaApi(tokenUrl);
@@ -81,7 +146,7 @@ router.post('/connect', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (
       });
     }
 
-    // Step B: Fetch WABA & Phone details from Meta Graph API if missing
+    // Step B: Fetch WABA & Phone details from Meta Graph API
     if (systemAccessToken) {
       try {
         if (!wabaId) {
@@ -111,22 +176,21 @@ router.post('/connect', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (
     }
 
     if (!wabaId || !phoneNumberId) {
-      wabaId = wabaId || 'WABA-CADPOINT-' + Date.now();
-      phoneNumberId = phoneNumberId || 'PNID-' + Date.now();
+      wabaId = wabaId || `WABA-${targetBranch.code.toUpperCase()}-${Date.now()}`;
+      phoneNumberId = phoneNumberId || `PNID-${targetBranch.code.toUpperCase()}-${Date.now()}`;
     }
 
     const encryptedToken = encryptToken(systemAccessToken);
 
-    // Upsert integration bound securely to organizationId
+    // Upsert branch-specific WhatsApp integration
     const integration = await prisma.whatsAppIntegration.upsert({
       where: {
-        organizationId_phoneNumberId: {
-          organizationId,
-          phoneNumberId
-        }
+        branchId: targetBranch.id
       },
       update: {
+        organizationId,
         wabaId,
+        phoneNumberId,
         phoneNumber: displayPhoneNumber,
         displayPhoneNumber,
         businessName,
@@ -136,6 +200,7 @@ router.post('/connect', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (
       },
       create: {
         organizationId,
+        branchId: targetBranch.id,
         wabaId,
         phoneNumberId,
         phoneNumber: displayPhoneNumber,
@@ -148,9 +213,11 @@ router.post('/connect', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (
 
     res.json({
       success: true,
-      message: '✅ WhatsApp Business Account connected successfully!',
+      message: `✅ WhatsApp connected successfully for ${targetBranch.name} Branch!`,
       data: {
         id: integration.id,
+        branchId: targetBranch.id,
+        branchName: targetBranch.name,
         businessName: integration.businessName,
         displayPhoneNumber: integration.displayPhoneNumber,
         wabaId: integration.wabaId,
@@ -165,14 +232,25 @@ router.post('/connect', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (
   }
 });
 
-// 3. GET /api/whatsapp/status - Check connection status
+// 3. GET /api/whatsapp/status - Check connection status per Branch
 router.get('/status', authenticate, async (req, res) => {
   try {
     const organizationId = req.user?.organizationId || 'org_default';
-    const integration = await prisma.whatsAppIntegration.findFirst({
-      where: { organizationId, status: 'CONNECTED' },
-      orderBy: { updatedAt: 'desc' }
-    });
+    const { branchId } = req.query;
+
+    let integration = null;
+    if (branchId) {
+      integration = await prisma.whatsAppIntegration.findFirst({
+        where: { organizationId, branchId, status: 'CONNECTED' },
+        include: { branch: true }
+      });
+    } else {
+      integration = await prisma.whatsAppIntegration.findFirst({
+        where: { organizationId, status: 'CONNECTED' },
+        orderBy: { updatedAt: 'desc' },
+        include: { branch: true }
+      });
+    }
 
     if (!integration) {
       return res.json({
@@ -187,7 +265,9 @@ router.get('/status', authenticate, async (req, res) => {
       isConnected: true,
       integration: {
         id: integration.id,
-        businessName: integration.businessName || 'CADPOINT Business',
+        branchId: integration.branchId,
+        branchName: integration.branch?.name || 'Main Branch',
+        businessName: integration.businessName || `${integration.branch?.name || 'CADPOINT'} Business`,
         displayPhoneNumber: integration.displayPhoneNumber || integration.phoneNumber || '- ',
         wabaId: integration.wabaId,
         phoneNumberId: integration.phoneNumberId,
@@ -201,28 +281,37 @@ router.get('/status', authenticate, async (req, res) => {
   }
 });
 
-// 4. POST /api/whatsapp/test - Test connection by sending real message or checking Meta Cloud API status
+// 4. POST /api/whatsapp/test - Test branch WhatsApp connection
 router.post('/test', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
     const organizationId = req.user?.organizationId || 'org_default';
-    const { recipientPhone, message } = req.body;
+    const { branchId, recipientPhone, message } = req.body;
 
-    const integration = await prisma.whatsAppIntegration.findFirst({
-      where: { organizationId, status: 'CONNECTED' },
-      orderBy: { updatedAt: 'desc' }
-    });
+    let integration = null;
+    if (branchId) {
+      integration = await prisma.whatsAppIntegration.findFirst({
+        where: { organizationId, branchId, status: 'CONNECTED' },
+        include: { branch: true }
+      });
+    } else {
+      integration = await prisma.whatsAppIntegration.findFirst({
+        where: { organizationId, status: 'CONNECTED' },
+        orderBy: { updatedAt: 'desc' },
+        include: { branch: true }
+      });
+    }
 
     if (!integration) {
       return res.status(400).json({
         success: false,
-        message: 'No active WhatsApp Business integration found. Please click [Connect WhatsApp].'
+        message: 'No active WhatsApp Business integration found for this branch. Please click [Connect WhatsApp].'
       });
     }
 
     const accessToken = decryptToken(integration.accessTokenEncrypted);
     const targetPhone = (recipientPhone || '9994512345').replace(/[^0-9]/g, '');
     const formattedPhone = targetPhone.length === 10 ? '91' + targetPhone : targetPhone;
-    const testMsg = message || 'Hello from CADPOINT COIMBATORE CRM! Your WhatsApp Business Cloud API integration is active and connected. 🚀';
+    const testMsg = message || `Hello from CADPOINT ${integration.branch?.name || ''} Branch! WhatsApp Cloud API test successful. 🚀`;
 
     if (accessToken && integration.phoneNumberId) {
       const sendUrl = `${META_GRAPH_BASE_URL}/${integration.phoneNumberId}/messages`;
@@ -243,14 +332,14 @@ router.post('/test', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req
       if (metaRes.ok && metaRes.data?.messages) {
         return res.json({
           success: true,
-          message: `✅ Test WhatsApp message delivered to +${formattedPhone} via Meta Cloud API!`,
+          message: `✅ Test WhatsApp message delivered via ${integration.branch?.name || ''} WhatsApp to +${formattedPhone}!`,
           messageId: metaRes.data.messages[0]?.id
         });
       } else {
         console.warn('Meta send test response:', metaRes.data);
         return res.json({
           success: true,
-          message: `WhatsApp integration active. Meta API notice: ${metaRes.data?.error?.message || 'Connection verified'}`,
+          message: `${integration.branch?.name || ''} WhatsApp integration active. Meta API notice: ${metaRes.data?.error?.message || 'Connection verified'}`,
           waUrl: `https://wa.me/${formattedPhone}?text=${encodeURIComponent(testMsg)}`
         });
       }
@@ -258,7 +347,7 @@ router.post('/test', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req
 
     res.json({
       success: true,
-      message: `✅ Connection verified for +${formattedPhone}!`,
+      message: `✅ ${integration.branch?.name || ''} WhatsApp connection verified for +${formattedPhone}!`,
       waUrl: `https://wa.me/${formattedPhone}?text=${encodeURIComponent(testMsg)}`
     });
   } catch (err) {
@@ -267,20 +356,35 @@ router.post('/test', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req
   }
 });
 
-// 5. POST /api/whatsapp/send - Send outgoing message via Meta Cloud API
+// 5. POST /api/whatsapp/send - Send outgoing message using the Lead's / Branch's specific WhatsApp
 router.post('/send', authenticate, async (req, res) => {
   try {
     const organizationId = req.user?.organizationId || 'org_default';
-    const { recipientPhone, message } = req.body;
+    const { leadId, branchId, recipientPhone, message } = req.body;
 
     if (!recipientPhone || !message) {
       return res.status(400).json({ success: false, message: 'recipientPhone and message are required.' });
     }
 
-    const integration = await prisma.whatsAppIntegration.findFirst({
-      where: { organizationId, status: 'CONNECTED' },
-      orderBy: { updatedAt: 'desc' }
-    });
+    let targetBranchId = branchId;
+    if (!targetBranchId && leadId) {
+      const lead = await prisma.lead.findUnique({ where: { id: leadId }, select: { branchId: true } });
+      if (lead) targetBranchId = lead.branchId;
+    }
+
+    let integration = null;
+    if (targetBranchId) {
+      integration = await prisma.whatsAppIntegration.findFirst({
+        where: { organizationId, branchId: targetBranchId, status: 'CONNECTED' }
+      });
+    }
+
+    if (!integration) {
+      integration = await prisma.whatsAppIntegration.findFirst({
+        where: { organizationId, status: 'CONNECTED' },
+        orderBy: { updatedAt: 'desc' }
+      });
+    }
 
     const targetPhone = recipientPhone.replace(/[^0-9]/g, '');
     const formattedPhone = targetPhone.length === 10 ? '91' + targetPhone : targetPhone;
@@ -318,18 +422,27 @@ router.post('/send', authenticate, async (req, res) => {
   }
 });
 
-// 6. POST /api/whatsapp/disconnect - Disconnect WhatsApp Business Account
+// 6. POST /api/whatsapp/disconnect - Disconnect WhatsApp per Branch
 router.post('/disconnect', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
     const organizationId = req.user?.organizationId || 'org_default';
-    await prisma.whatsAppIntegration.updateMany({
-      where: { organizationId },
-      data: { status: 'DISCONNECTED', updatedAt: new Date() }
-    });
+    const { branchId } = req.body;
+
+    if (branchId) {
+      await prisma.whatsAppIntegration.updateMany({
+        where: { organizationId, branchId },
+        data: { status: 'DISCONNECTED', updatedAt: new Date() }
+      });
+    } else {
+      await prisma.whatsAppIntegration.updateMany({
+        where: { organizationId },
+        data: { status: 'DISCONNECTED', updatedAt: new Date() }
+      });
+    }
 
     res.json({
       success: true,
-      message: '✅ WhatsApp Business account disconnected successfully.'
+      message: '✅ WhatsApp Business account disconnected successfully for this branch.'
     });
   } catch (err) {
     console.error('whatsapp.disconnect', err);
@@ -353,7 +466,7 @@ router.get('/webhook', (req, res) => {
   res.status(403).send('Forbidden: Webhook verification token mismatch');
 });
 
-// 8. POST /api/whatsapp/webhook - Process Incoming WhatsApp Events & Create Enquiries
+// 8. POST /api/whatsapp/webhook - Branch-Aware Incoming WhatsApp Webhook & Lead Creation
 router.post('/webhook', async (req, res) => {
   res.status(200).send('EVENT_RECEIVED'); // Always respond 200 immediately to Meta
 
@@ -369,9 +482,23 @@ router.post('/webhook', async (req, res) => {
           const messageText = messageObj.text?.body || 'WhatsApp Enquiry';
           const senderName = change.value.contacts?.[0]?.profile?.name || 'WhatsApp Lead';
           const phoneNumberId = change.value.metadata?.phone_number_id || '';
+          const wabaId = entry.id || '';
 
           if (!senderPhoneRaw) continue;
 
+          // Multi-Branch Event Routing: Find matching WhatsAppIntegration by phoneNumberId or wabaId
+          let integration = await prisma.whatsAppIntegration.findFirst({
+            where: {
+              OR: [
+                { phoneNumberId: phoneNumberId },
+                { wabaId: wabaId }
+              ],
+              status: 'CONNECTED'
+            },
+            include: { branch: true }
+          });
+
+          const resolvedBranchId = integration?.branchId || null;
           const cleanPhone = senderPhoneRaw.replace(/[^0-9]/g, '');
           const phone10 = cleanPhone.slice(-10);
 
@@ -394,12 +521,12 @@ router.post('/webhook', async (req, res) => {
                 completedAt: new Date(),
                 type: 'WHATSAPP',
                 status: 'COMPLETED',
-                notes: `Incoming WhatsApp message: ${messageText}`,
+                notes: `Incoming WhatsApp message (${integration?.branch?.name || 'General'}): ${messageText}`,
                 outcome: 'Message Received'
               }
             });
           } else {
-            // Auto-create new Enquiry/Lead
+            // Auto-create new Enquiry/Lead bound to the specific Branch!
             let whatsappSource = await prisma.enquirySource.findFirst({
               where: { name: { equals: 'WhatsApp', mode: 'insensitive' } }
             });
@@ -409,10 +536,18 @@ router.post('/webhook', async (req, res) => {
               });
             }
 
-            // Auto-assign active counsellor if configured
-            const defaultCounsellor = await prisma.user.findFirst({
-              where: { role: 'COUNSELLOR', isActive: true }
-            });
+            // Auto-assign active counsellor for this specific Branch
+            let branchCounsellor = null;
+            if (resolvedBranchId) {
+              branchCounsellor = await prisma.user.findFirst({
+                where: { role: 'COUNSELLOR', branchId: resolvedBranchId, isActive: true }
+              });
+            }
+            if (!branchCounsellor) {
+              branchCounsellor = await prisma.user.findFirst({
+                where: { role: 'COUNSELLOR', isActive: true }
+              });
+            }
 
             const leadCount = await prisma.lead.count();
             const leadNum = `LD-${String(leadCount + 1001).padStart(5, '0')}`;
@@ -424,26 +559,27 @@ router.post('/webhook', async (req, res) => {
                 phone: cleanPhone,
                 whatsappNumber: cleanPhone,
                 interestedCourse: 'Course Enquiry',
+                branchId: resolvedBranchId,
                 sourceId: whatsappSource.id,
-                assignedCounsellorId: defaultCounsellor?.id || null,
+                assignedCounsellorId: branchCounsellor?.id || null,
                 status: 'NEW',
                 followUps: {
                   create: {
                     scheduledAt: new Date(),
                     type: 'WHATSAPP',
                     status: 'PENDING',
-                    notes: `New Enquiry via WhatsApp: ${messageText}`
+                    notes: `New Enquiry via ${integration?.branch?.name || ''} WhatsApp: ${messageText}`
                   }
                 }
               }
             });
-            console.log(`✅ Auto-created new Lead ${leadNum} for incoming WhatsApp enquiry from +${cleanPhone}`);
+            console.log(`✅ Auto-created Lead ${leadNum} bound to Branch [${integration?.branch?.name || 'Default'}] for incoming WhatsApp enquiry from +${cleanPhone}`);
           }
         }
       }
     }
   } catch (err) {
-    console.error('Error handling incoming WhatsApp webhook:', err.message);
+    console.error('Error handling multi-branch WhatsApp webhook:', err.message);
   }
 });
 

@@ -118,8 +118,9 @@ model Branch {
   admissions  Admission[]
   payments    Payment[]
   batches     Batch[]
-  devices     Device[]
-  createdAt   DateTime    @default(now())
+  devices             Device[]
+  whatsAppIntegration WhatsAppIntegration?
+  createdAt           DateTime             @default(now())
   updatedAt   DateTime    @updatedAt
 }
 
@@ -483,6 +484,8 @@ model Device {
 model WhatsAppIntegration {
   id                   String   @id @default(uuid())
   organizationId       String   @default("org_default")
+  branchId             String?  @unique
+  branch               Branch?  @relation(fields: [branchId], references: [id], onDelete: Cascade)
   wabaId               String
   phoneNumberId        String
   phoneNumber          String?
@@ -496,6 +499,7 @@ model WhatsAppIntegration {
 
   @@unique([organizationId, phoneNumberId])
   @@index([organizationId])
+  @@index([branchId])
   @@index([phoneNumberId])
   @@index([wabaId])
 }

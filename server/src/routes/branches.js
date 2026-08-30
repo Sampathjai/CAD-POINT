@@ -6,6 +6,20 @@ router.get('/', async (req, res) => {
   try {
     const branches = await prisma.branch.findMany({
       where: { isActive: true },
+      include: {
+        whatsAppIntegration: {
+          select: {
+            id: true,
+            wabaId: true,
+            phoneNumberId: true,
+            phoneNumber: true,
+            displayPhoneNumber: true,
+            businessName: true,
+            status: true,
+            connectedAt: true
+          }
+        }
+      },
       orderBy: { name: 'asc' }
     });
     res.json({ success: true, data: branches });

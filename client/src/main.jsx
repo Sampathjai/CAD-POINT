@@ -2933,11 +2933,12 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
         }
     }
 
-    async function handleConnectWhatsApp() {
+    async function handleConnectWhatsApp(targetBranchId = null) {
         setWaConnecting(true);
         try {
             const appId = waConfig?.appId || '';
             const configId = waConfig?.configId || '';
+            const selectedBranch = branches.find(b => b.id === targetBranchId) || branches[0];
 
             if (window.FB && appId) {
                 window.FB.init({
@@ -2952,13 +2953,17 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
                         fetch(API_BASE + '/whatsapp/connect', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                            body: JSON.stringify({ code: response.authResponse.code })
+                            body: JSON.stringify({
+                                code: response.authResponse.code,
+                                branchId: targetBranchId || selectedBranch?.id
+                            })
                         })
                         .then(r => r.json())
                         .then(j => {
                             if (j.success) {
-                                alert('✅ WhatsApp Business Account connected successfully!');
+                                alert(`✅ WhatsApp connected successfully for ${selectedBranch?.name || 'Branch'}!`);
                                 fetchWhatsAppStatus();
+                                if (typeof fetchBranches === 'function') fetchBranches();
                             } else {
                                 alert(j.message || 'WhatsApp connection could not be completed.');
                             }
@@ -2979,7 +2984,7 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
                     scope: 'whatsapp_business_messaging,whatsapp_business_management'
                 });
             } else {
-                const codeInput = prompt('Enter your Meta Embedded Signup Authorization Code or System Token (or configure META_APP_ID on server):');
+                const codeInput = prompt(`Enter Meta Embedded Signup Authorization Code or System Token for ${selectedBranch?.name || 'Branch'}:`);
                 if (!codeInput) {
                     setWaConnecting(false);
                     return;
@@ -2987,12 +2992,17 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
                 const res = await fetch(API_BASE + '/whatsapp/connect', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                    body: JSON.stringify({ code: codeInput, accessToken: codeInput })
+                    body: JSON.stringify({
+                        code: codeInput,
+                        accessToken: codeInput,
+                        branchId: targetBranchId || selectedBranch?.id
+                    })
                 });
                 const j = await res.json();
                 if (j.success) {
-                    alert('✅ WhatsApp Business Account connected successfully!');
+                    alert(`✅ WhatsApp connected successfully for ${selectedBranch?.name || 'Branch'}!`);
                     fetchWhatsAppStatus();
+                    if (typeof fetchBranches === 'function') fetchBranches();
                 } else {
                     alert(j.message || 'WhatsApp connection failed.');
                 }
@@ -3005,20 +3015,24 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
         }
     }
 
-    async function handleDisconnectWhatsApp() {
-        if (!window.confirm('Disconnect WhatsApp?\n\nThis will stop CAD POINT from using this WhatsApp Business connection. Existing leads, students, and payments will be preserved.')) {
+    async function handleDisconnectWhatsApp(targetBranchId = null) {
+        const selectedBranch = branches.find(b => b.id === targetBranchId);
+        const branchLabel = selectedBranch ? `${selectedBranch.name} Branch` : 'this branch';
+        if (!window.confirm(`Disconnect WhatsApp for ${branchLabel}?\n\nThis will stop CAD POINT from using this WhatsApp Business connection. Existing leads, students, and payments will be preserved.`)) {
             return;
         }
         setSaving(true);
         try {
             const res = await fetch(API_BASE + '/whatsapp/disconnect', {
                 method: 'POST',
-                headers: { Authorization: 'Bearer ' + token }
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify({ branchId: targetBranchId })
             });
             const j = await res.json();
             if (j.success) {
-                alert('✅ WhatsApp Business account disconnected.');
+                alert(`✅ WhatsApp disconnected for ${branchLabel}.`);
                 fetchWhatsAppStatus();
+                if (typeof fetchBranches === 'function') fetchBranches();
             } else {
                 alert(j.message || 'Disconnect failed');
             }
@@ -3516,84 +3530,95 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
             {/* WhatsApp & API Tab */}
             {activeTab === 'WhatsApp & API' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                    {/* Primary Embedded Signup / Connection Card */}
+                    {/* Multi-Branch Embedded Signup / Connection Card */}
                     <div className="settings-card">
                         <div className="settings-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                             <div>
                                 <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <MessageCircle size={20} color="#16a34a" /> WhatsApp Business Integration
+                                    <MessageCircle size={20} color="#16a34a" /> Multi-Branch WhatsApp Business Integrations
                                 </h3>
-                                <p>Connect your Meta WhatsApp Business account directly to CAD POINT using Meta's official OAuth authorization.</p>
-                            </div>
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                {waConfig?.isConnected ? (
-                                    <span className="badge" style={{ background: '#dcfce7', color: '#15803d', padding: '6px 12px', borderRadius: 20, fontSize: 13, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                        ● Connected ✓
-                                    </span>
-                                ) : (
-                                    <span className="badge" style={{ background: '#fef3c7', color: '#b45309', padding: '6px 12px', borderRadius: 20, fontSize: 13, fontWeight: 700 }}>
-                                        Not Connected
-                                    </span>
-                                )}
+                                <p>Connect individual WhatsApp Business Accounts & phone numbers for each CAD POINT branch via Meta OAuth.</p>
                             </div>
                         </div>
 
-                        {waConfig?.isConnected ? (
-                            <div style={{ background: '#f8fafc', padding: 20, borderRadius: 12, border: '1px solid #e2e8f0', marginTop: 16 }}>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
-                                    <div>
-                                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, display: 'block' }}>Business Name</span>
-                                        <strong style={{ fontSize: 16, color: '#0f172a' }}>{waConfig.integration?.businessName || 'CADPOINT Business'}</strong>
-                                    </div>
-                                    <div>
-                                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, display: 'block' }}>WhatsApp Number</span>
-                                        <strong style={{ fontSize: 16, color: '#16a34a' }}>{waConfig.integration?.displayPhoneNumber || waConfig.integration?.phoneNumber || '+91 99945 12345'}</strong>
-                                    </div>
-                                    <div>
-                                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, display: 'block' }}>WABA ID</span>
-                                        <span style={{ fontSize: 14, fontFamily: 'monospace', color: '#475569' }}>{waConfig.integration?.wabaId}</span>
-                                    </div>
-                                </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
+                            {(branchesList || []).map((b) => {
+                                const bWa = waConfig?.branches?.find(wb => wb.branchId === b.id)?.integration || b.whatsAppIntegration;
+                                const isConnected = Boolean(bWa && bWa.status === 'CONNECTED');
+                                return (
+                                    <div key={b.id} style={{ background: '#f8fafc', padding: 20, borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+                                            <div>
+                                                <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>{b.name} Branch</h4>
+                                                <span style={{ fontSize: 12, color: '#64748b' }}>Code: {b.code}</span>
+                                            </div>
+                                            <div>
+                                                {isConnected ? (
+                                                    <span className="badge" style={{ background: '#dcfce7', color: '#15803d', padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
+                                                        🟢 Connected ✓
+                                                    </span>
+                                                ) : (
+                                                    <span className="badge" style={{ background: '#fef3c7', color: '#b45309', padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
+                                                        🔴 Not Connected
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
 
-                                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                                    <button
-                                        type="button"
-                                        className="primary"
-                                        onClick={() => setShowTestWhatsAppModal(true)}
-                                        style={{ background: '#16a34a', borderColor: '#16a34a', color: '#ffffff', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                                    >
-                                        <Send size={15} /> Test Connection
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="secondary"
-                                        onClick={handleDisconnectWhatsApp}
-                                        style={{ color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                                    >
-                                        Disconnect WhatsApp
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div style={{ background: '#f8fafc', padding: 24, borderRadius: 12, border: '1px solid #e2e8f0', marginTop: 16, textAlign: 'center' }}>
-                                <div style={{ maxWidth: 480, margin: '0 auto' }}>
-                                    <MessageCircle size={48} color="#16a34a" style={{ marginBottom: 12 }} />
-                                    <h4 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>Connect Your WhatsApp Business Account</h4>
-                                    <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px' }}>
-                                        Enable instant WhatsApp customer messaging and automatic incoming lead creation for CAD POINT.
-                                    </p>
-                                    <button
-                                        type="button"
-                                        className="primary"
-                                        disabled={waConnecting}
-                                        onClick={handleConnectWhatsApp}
-                                        style={{ background: '#16a34a', borderColor: '#16a34a', color: '#ffffff', padding: '12px 28px', fontSize: 15, fontWeight: 700, borderRadius: 10, display: 'inline-flex', alignItems: 'center', gap: 10, cursor: 'pointer', boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)' }}
-                                    >
-                                        <MessageCircle size={20} /> {waConnecting ? 'Connecting to Meta...' : '[ Connect WhatsApp ]'}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                                        {isConnected ? (
+                                            <div>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 16 }}>
+                                                    <div>
+                                                        <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, display: 'block' }}>Business Name</span>
+                                                        <strong style={{ fontSize: 14, color: '#0f172a' }}>{bWa.businessName || 'CADPOINT Business'}</strong>
+                                                    </div>
+                                                    <div>
+                                                        <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, display: 'block' }}>WhatsApp Number</span>
+                                                        <strong style={{ fontSize: 14, color: '#16a34a' }}>{bWa.displayPhoneNumber || bWa.phoneNumber}</strong>
+                                                    </div>
+                                                    <div>
+                                                        <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600, display: 'block' }}>WABA ID</span>
+                                                        <span style={{ fontSize: 12, fontFamily: 'monospace', color: '#475569' }}>{bWa.wabaId}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                                                    <button
+                                                        type="button"
+                                                        className="primary"
+                                                        onClick={() => setShowTestWhatsAppModal(true)}
+                                                        style={{ padding: '6px 14px', fontSize: 12, background: '#16a34a', borderColor: '#16a34a', color: '#ffffff', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                                                    >
+                                                        <Send size={14} /> Test {b.name} WhatsApp
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="secondary"
+                                                        onClick={() => handleDisconnectWhatsApp(b.id)}
+                                                        style={{ padding: '6px 14px', fontSize: 12, color: '#dc2626', borderColor: '#fca5a5' }}
+                                                    >
+                                                        Disconnect {b.name}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                                                <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>No WhatsApp Business account connected for {b.name} Branch.</p>
+                                                <button
+                                                    type="button"
+                                                    className="primary"
+                                                    disabled={waConnecting}
+                                                    onClick={() => handleConnectWhatsApp(b.id)}
+                                                    style={{ background: '#16a34a', borderColor: '#16a34a', color: '#ffffff', padding: '8px 18px', fontSize: 13, fontWeight: 700, borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+                                                >
+                                                    <MessageCircle size={16} /> [ Connect {b.name} WhatsApp ]
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
 
                         <details style={{ marginTop: 24, borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
                             <summary style={{ fontSize: 13, fontWeight: 600, color: '#64748b', cursor: 'pointer' }}>
