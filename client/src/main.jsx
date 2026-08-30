@@ -250,10 +250,6 @@ function App() {
     const [addPaymentForm, setAddPaymentForm] = useState({ admissionId: '', receiptNumber: '', amount: '', paymentMethod: 'UPI', transactionReference: '', remarks: '' });
     const [addUserForm, setAddUserForm] = useState({ name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true });
 
-    // Payment Filters
-    const [paymentFromDate, setPaymentFromDate] = useState('');
-    const [paymentToDate, setPaymentToDate] = useState('');
-    const [paymentMonth, setPaymentMonth] = useState('ALL');
 
     function handleStudentPhotoUpload(e) {
         const file = e.target.files && e.target.files[0];
@@ -2016,6 +2012,9 @@ function Dashboard({ leads = [], followups = [], admissions = [], payments = [],
 function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onDeleteStudent, onDeleteAdmission, onOpenEditProgress, currentUserId, token, theme, toggleTheme, refreshData }) {
     const itemSingular = page.endsWith('s') ? page.slice(0, -1) : page;
     const [filterText, setFilterText] = useState('');
+    const [paymentFromDate, setPaymentFromDate] = useState('');
+    const [paymentToDate, setPaymentToDate] = useState('');
+    const [paymentMonth, setPaymentMonth] = useState('ALL');
 
     const safeLeads = Array.isArray(leads) ? leads : [];
     const safeFollowups = Array.isArray(followups) ? followups : [];
