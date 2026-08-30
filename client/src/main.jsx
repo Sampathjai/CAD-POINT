@@ -2088,7 +2088,7 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
                                             </div>
                                         </td>
                                         <td>{l.interestedCourse || '-'}</td>
-                                        <td><span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', fontSize: 11 }}>{l.source?.name || 'Walk-in'}</span></td>
+                                        <td>{l.source?.name || 'Walk-in'}</td>
                                         <td>{l.phone}</td>
                                         <td>
                                             <span className={'status ' + ((l.status || 'NEW') + '').replaceAll(' ', '').toLowerCase()}>{l.status || 'NEW'}</span>
@@ -2328,7 +2328,7 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
                                                 </div>
                                             </td>
                                             <td>{a.course?.name || '-'}</td>
-                                            <td><span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: 11 }}>{a.branch?.name || 'Gandhipuram'}</span></td>
+                                            <td>{a.branch?.name || 'Gandhipuram'}</td>
                                             <td style={{ minWidth: 120 }}>
                                                 <ProgressBar percentage={a.completionPct || 0} />
                                             </td>
@@ -2425,9 +2425,9 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
                                                 <td><b>{p.receiptNumber}</b></td>
                                                 <td>{p.admission?.student ? `${p.admission.student.firstName} ${p.admission.student.lastName || ''}`.trim() : '-'}</td>
                                                 <td><b>₹{Number(p.amount).toLocaleString()}</b></td>
-                                                <td><span className="badge" style={{ background: '#e0e7ff', color: '#3730a3', fontSize: 11 }}>{p.paymentMethod}</span></td>
-                                                <td style={{ fontSize: 12, color: '#475569' }}>{p.remarks || p.notes || '-'}</td>
-                                                <td><span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: 11 }}>{p.branch?.name || 'Gandhipuram'}</span></td>
+                                                <td>{p.paymentMethod}</td>
+                                                <td>{p.remarks || p.notes || '-'}</td>
+                                                <td>{p.branch?.name || 'Gandhipuram'}</td>
                                                 <td>{formatDate(p.paymentDate)}</td>
                                                 <td><span className="status active">{p.status}</span></td>
                                             </tr>
@@ -2700,7 +2700,7 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
                                     <td><b>{p.studentName}</b></td>
                                     <td>{p.phone}</td>
                                     <td>{p.courseName}</td>
-                                    <td><span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: 11 }}>{p.branchName}</span></td>
+                                    <td>{p.branchName}</td>
                                     <td>₹{p.agreedFee.toLocaleString()}</td>
                                     <td style={{ color: '#16a34a', fontWeight: 600 }}>₹{p.totalPaid.toLocaleString()}</td>
                                     <td>
@@ -3287,7 +3287,7 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
                                                         </div>
                                                     </td>
                                                     <td>{dev.deviceType}</td>
-                                                    <td><span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: 11 }}>{dev.branch?.name || 'Gandhipuram'}</span></td>
+                                                    <td>{dev.branch?.name || 'Gandhipuram'}</td>
                                                     <td>
                                                         <span className={dev.status === 'ACTIVE' ? 'status active' : dev.status === 'REVOKED' ? 'status lost' : 'status follow_up'}>
                                                             ● {dev.status}
