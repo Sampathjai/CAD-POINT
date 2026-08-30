@@ -2808,6 +2808,23 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
         autoAssignLeads: true
     });
 
+    const [branches, setBranches] = useState([]);
+
+    const fetchBranches = useCallback(async () => {
+        if (!token) return;
+        try {
+            const res = await fetch(API_BASE + '/branches', {
+                headers: { Authorization: 'Bearer ' + token }
+            });
+            const j = await res.json();
+            if (j.success && Array.isArray(j.data)) {
+                setBranches(j.data);
+            }
+        } catch (e) {
+            console.error('fetchBranches error', e);
+        }
+    }, [token]);
+
     const [waConfig, setWaConfig] = useState(null);
     const [waLoading, setWaLoading] = useState(false);
     const [waConnecting, setWaConnecting] = useState(false);
@@ -2869,7 +2886,8 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
 
         fetchDevices();
         fetchWhatsAppStatus();
-    }, [token, fetchDevices, fetchWhatsAppStatus]);
+        fetchBranches();
+    }, [token, fetchDevices, fetchWhatsAppStatus, fetchBranches]);
 
     async function saveProfileSettings(e) {
         if (e) e.preventDefault();
@@ -3542,7 +3560,10 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
-                            {(branchesList || []).map((b) => {
+                            {(branches && branches.length > 0 ? branches : [
+                                { id: 'gandhipuram', name: 'Gandhipuram', code: 'gandhipuram' },
+                                { id: 'saravanampatti', name: 'Saravanampatti', code: 'saravanampatti' }
+                            ]).map((b) => {
                                 const bWa = waConfig?.branches?.find(wb => wb.branchId === b.id)?.integration || b.whatsAppIntegration;
                                 const isConnected = Boolean(bWa && bWa.status === 'CONNECTED');
                                 return (
