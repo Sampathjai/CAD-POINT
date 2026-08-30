@@ -40,13 +40,47 @@ import {
     Wifi,
     Send,
     Copy,
-    CheckCircle2
+    CheckCircle2,
+    Crown,
+    Key,
+    Ban,
+    Slash,
+    Tablet as TabletIcon
 } from 'lucide-react';
 import './styles.css';
 
 const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL && String(import.meta.env.VITE_API_URL).trim())
     ? String(import.meta.env.VITE_API_URL).trim().replace(/\/+$/, '')
     : '/api';
+
+// Persistent Device Identifier for Browser/Device Security
+function getOrGenerateDeviceId() {
+    let devId = localStorage.getItem('cadpoint_device_id');
+    if (!devId) {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            devId = 'dev_' + crypto.randomUUID();
+        } else {
+            devId = 'dev_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        }
+        localStorage.setItem('cadpoint_device_id', devId);
+    }
+    const ua = navigator.userAgent || '';
+    let suggestedType = 'LAPTOP';
+    let suggestedName = 'CADPOINT Office Laptop';
+
+    if (/iPad|Android(?!.*Mobile)|Tablet/i.test(ua)) {
+        suggestedType = 'TABLET';
+        suggestedName = 'CADPOINT Counselor Tablet';
+    } else if (/Mobile|iPhone|Android/i.test(ua)) {
+        suggestedType = 'MOBILE';
+        suggestedName = 'CADPOINT Staff Mobile Phone';
+    } else if (/Macintosh|Windows|Linux/i.test(ua)) {
+        if (/Macintosh/i.test(ua)) suggestedName = 'CADPOINT Mac Book Laptop';
+        else suggestedName = 'CADPOINT Office Desktop PC';
+    }
+
+    return { deviceId: devId, suggestedType, suggestedName, ua };
+}
 
 class ErrorBoundary extends Component {
     constructor(props) {
@@ -230,7 +264,11 @@ function App() {
     // High Performance Parallel Data Fetching
     const fetchAllData = useCallback(async () => {
         if (!token) return;
-        const headers = { Authorization: 'Bearer ' + token };
+        const deviceInfo = getOrGenerateDeviceId();
+        const headers = {
+            Authorization: 'Bearer ' + token,
+            'X-Device-Id': deviceInfo.deviceId
+        };
         const branchQuery = activeBranch ? `?branchId=${activeBranch}` : '';
 
         try {
@@ -985,7 +1023,7 @@ function App() {
                 />
             )}
 
-            {/* Add Source Modal - Layered cleanly over Add Lead Modal */}
+            {/* Add Source Modal */}
             {showAddSourceModal && (
                 <div className="modal" style={{ zIndex: 1200 }}>
                     <form className="panel" onSubmit={handleCreateSourceInline} style={{ maxWidth: 450 }}>
@@ -1008,7 +1046,7 @@ function App() {
                 </div>
             )}
 
-            {/* Course Progress & Certificate Status Modal */}
+            {/* Course Progress & Certificate Details Modal */}
             {editingAdmissionProgress && (
                 <div className="modal" style={{ zIndex: 1100 }}>
                     <form className="panel" onSubmit={(e) => { e.preventDefault(); updateAdmissionProgress(); }}>
@@ -1879,7 +1917,7 @@ function Dashboard({ leads = [], followups = [], admissions = [], payments = [],
                             <tbody>
                                 {safeLeads.slice(0, 6).map((l) => {
                                     const name = (l.firstName || '') + (l.lastName ? ' ' + l.lastName : '');
-                                    const initials = (name.match(/\w/g) || []).slice(0, 2).join('');
+                                    const initials = (name.match(/\b\w/g) || []).slice(0, 2).join('');
                                     const statusStr = (l.status || 'NEW') + '';
                                     return (
                                         <tr key={l.id || l.leadNumber}>
@@ -1975,7 +2013,7 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
                                     <tr key={l.id || l.leadNumber}>
                                         <td>
                                             <div className="lead">
-                                                <div className="mini">{((l.firstName || '').match(/\w/g) || []).slice(0, 2).join('') || 'LD'}</div>
+                                                <div className="mini">{((l.firstName || '').match(/\b\w/g) || []).slice(0, 2).join('') || 'LD'}</div>
                                                 <b>{(l.firstName || '') + (l.lastName ? ' ' + l.lastName : '') || l.leadNumber}</b>
                                             </div>
                                         </td>
@@ -2591,24 +2629,26 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
     const [showAddDeviceModal, setShowAddDeviceModal] = useState(false);
     const [showTestWhatsAppModal, setShowTestWhatsAppModal] = useState(false);
 
+    // Master Device & Authorized Devices State directly from Central Server API
+    const [primaryDevice, setPrimaryDevice] = useState(null);
+    const [authorizedDevices, setAuthorizedDevices] = useState([]);
+    const [deviceLoading, setDeviceLoading] = useState(false);
+    const [showRevokeModal, setShowRevokeModal] = useState(null);
+    const [primaryExistsWarning, setPrimaryExistsWarning] = useState(null);
+
+    const deviceInfo = getOrGenerateDeviceId();
+
+    const [newDeviceForm, setNewDeviceForm] = useState({
+        deviceName: deviceInfo.suggestedName,
+        deviceType: deviceInfo.suggestedType,
+        deviceRole: 'AUTHORIZED',
+        branchId: 'gandhipuram'
+    });
+
     const [testPhone, setTestPhone] = useState('+91 99945 12345');
     const [testMessage, setTestMessage] = useState('Hello from CADPOINT COIMBATORE CRM! WhatsApp Business API connection test successful. 🚀');
     const [testingWa, setTestingWa] = useState(false);
     const [testResult, setTestResult] = useState(null);
-
-    const [devicesList, setDevicesList] = useState([
-        { id: 'dev-1', name: 'Gandhipuram Reception Laptop', type: 'Laptop', branch: 'Gandhipuram', ipAddress: '192.168.1.42', macAddress: 'A4:C3:F0:12:88:9B', status: 'ACTIVE', lastSync: 'Just now' },
-        { id: 'dev-2', name: 'Saravanapatti Billing Desktop', type: 'Desktop PC', branch: 'Saravanapatti', ipAddress: '192.168.2.18', macAddress: 'B2:D4:E1:99:34:7C', status: 'ACTIVE', lastSync: '10 mins ago' },
-        { id: 'dev-3', name: 'Coimbatore Counselor Tablet', type: 'Tablet', branch: 'Gandhipuram', ipAddress: '192.168.1.88', macAddress: 'C8:F1:D2:44:11:00', status: 'PENDING', lastSync: '1 hour ago' }
-    ]);
-
-    const [newDeviceForm, setNewDeviceForm] = useState({
-        name: '',
-        type: 'Desktop PC',
-        branch: 'Gandhipuram',
-        ipAddress: '',
-        macAddress: ''
-    });
 
     const [profileForm, setProfileForm] = useState({
         instituteName: 'CADPOINT COIMBATORE',
@@ -2632,7 +2672,30 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
         autoAssignLeads: true
     });
 
-    // Load initial settings from server
+    // Fetch live device architecture from central API
+    const fetchDevices = useCallback(async () => {
+        if (!token) return;
+        setDeviceLoading(true);
+        try {
+            const res = await fetch(API_BASE + '/devices', {
+                headers: {
+                    Authorization: 'Bearer ' + token,
+                    'X-Device-Id': deviceInfo.deviceId
+                }
+            });
+            const j = await res.json();
+            if (j.success && j.data) {
+                setPrimaryDevice(j.data.primaryDevice || null);
+                setAuthorizedDevices(j.data.authorizedDevices || []);
+            }
+        } catch (e) {
+            console.error('fetchDevices error', e);
+        } finally {
+            setDeviceLoading(false);
+        }
+    }, [token, deviceInfo.deviceId]);
+
+    // Initial load
     useEffect(() => {
         if (!token) return;
         fetch(API_BASE + '/settings', { headers: { Authorization: 'Bearer ' + token } })
@@ -2645,7 +2708,9 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
                 }
             })
             .catch(e => console.error(e));
-    }, [token]);
+
+        fetchDevices();
+    }, [token, fetchDevices]);
 
     async function saveProfileSettings(e) {
         if (e) e.preventDefault();
@@ -2709,6 +2774,67 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
         }
     }
 
+    async function handleRegisterDeviceSubmit(e, forceReplace = false) {
+        if (e) e.preventDefault();
+        if (!newDeviceForm.deviceName.trim()) return alert('Please enter Device Name.');
+
+        try {
+            const res = await fetch(API_BASE + '/devices/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: 'Bearer ' + token,
+                    'X-Device-Id': deviceInfo.deviceId
+                },
+                body: JSON.stringify({
+                    deviceId: deviceInfo.deviceId,
+                    deviceName: newDeviceForm.deviceName.trim(),
+                    deviceType: newDeviceForm.deviceType,
+                    deviceRole: newDeviceForm.deviceRole,
+                    branchId: newDeviceForm.branchId,
+                    forceReplace
+                })
+            });
+            const j = await res.json();
+
+            if (!res.ok || !j.success) {
+                if (j.primaryExists) {
+                    setPrimaryExistsWarning(j.existingPrimary);
+                    return;
+                }
+                return alert(j.message || 'Device registration failed.');
+            }
+
+            alert(j.message || 'Device registered successfully!');
+            setShowAddDeviceModal(false);
+            setPrimaryExistsWarning(null);
+            fetchDevices();
+        } catch (err) {
+            console.error('Device registration failed', err);
+            alert('Device registration failed.');
+        }
+    }
+
+    async function revokeDeviceAccess(device) {
+        try {
+            const res = await fetch(API_BASE + `/devices/${device.id}/revoke`, {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + token }
+            });
+            const j = await res.json();
+            if (j.success) {
+                alert(`✅ Access revoked for ${device.deviceName}. This device will no longer be able to access CRM data.`);
+                setShowRevokeModal(null);
+                fetchDevices();
+            } else {
+                alert(j.message || 'Revoke failed.');
+            }
+        } catch (err) {
+            console.error('Revoke device error', err);
+            alert('Failed to revoke device access.');
+        }
+    }
+
     async function addEnquirySource(e) {
         e.preventDefault();
         if (!newSourceName.trim()) return;
@@ -2746,30 +2872,6 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
         }
     }
 
-    function handleRegisterDeviceSubmit(e) {
-        e.preventDefault();
-        if (!newDeviceForm.name.trim()) return alert('Please enter device name');
-        const newDev = {
-            id: 'dev-' + (devicesList.length + 1),
-            name: newDeviceForm.name.trim(),
-            type: newDeviceForm.type,
-            branch: newDeviceForm.branch,
-            ipAddress: newDeviceForm.ipAddress || '192.168.1.100',
-            macAddress: newDeviceForm.macAddress || 'D4:E5:F6:77:88:99',
-            status: 'ACTIVE',
-            lastSync: 'Just now'
-        };
-        setDevicesList(prev => [...prev, newDev]);
-        setNewDeviceForm({ name: '', type: 'Desktop PC', branch: 'Gandhipuram', ipAddress: '', macAddress: '' });
-        setShowAddDeviceModal(false);
-        alert('✅ Device registered successfully!');
-    }
-
-    function removeDevice(id, devName) {
-        if (!window.confirm(`Are you sure you want to remove authorized device "${devName}"?`)) return;
-        setDevicesList(prev => prev.filter(d => d.id !== id));
-    }
-
     async function triggerDatabaseBackup() {
         setSaving(true);
         try {
@@ -2799,6 +2901,14 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
         { id: 'WhatsApp & API', label: 'WhatsApp & API', icon: MessageCircle },
         { id: 'System Info', label: 'System Info', icon: Laptop }
     ];
+
+    function renderDeviceTypeIcon(type) {
+        const t = (type || '').toUpperCase();
+        if (t === 'MOBILE') return <Smartphone size={18} color="#0284c7" />;
+        if (t === 'TABLET') return <TabletIcon size={18} color="#8b5cf6" />;
+        if (t === 'DESKTOP') return <Monitor size={18} color="#16a34a" />;
+        return <Laptop size={18} color="#3b82f6" />;
+    }
 
     return (
         <div className="settings-container">
@@ -2892,119 +3002,215 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
                 </div>
             )}
 
-            {/* Storage & Database Tab */}
+            {/* Storage & Database Tab — Master Device + Central DB Architecture */}
             {activeTab === 'Storage & Database' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    {/* SECTION 1: PRIMARY / MASTER DEVICE */}
+                    <div className="settings-card" style={{ borderLeft: '4px solid #eab308', background: '#fff' }}>
+                        <div className="settings-card-header" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+                                <div>
+                                    <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0, fontSize: 18, color: '#0f172a' }}>
+                                        <Crown size={22} color="#eab308" /> PRIMARY DEVICE (MASTER / OWNER DEVICE)
+                                    </h3>
+                                    <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>
+                                        The Primary Device belongs to the CRM owner. Exactly ONE Primary Device is allowed for the CRM system.
+                                    </p>
+                                </div>
+
+                                {primaryDevice ? (
+                                    <span className="badge" style={{ background: '#dcfce7', color: '#15803d', padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <span className="pulse" style={{ background: '#16a34a', width: 8, height: 8, borderRadius: '50%' }}></span>
+                                        ✓ PRIMARY DEVICE REGISTERED & ACTIVE
+                                    </span>
+                                ) : (
+                                    <span className="badge" style={{ background: '#fef3c7', color: '#b45309', padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
+                                        ⚠️ No Primary Device Registered
+                                    </span>
+                                )}
+                            </div>
+
+                            {primaryDevice ? (
+                                <div style={{ marginTop: 16, padding: 16, background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                                        <div style={{ width: 44, height: 44, borderRadius: 10, background: '#fef9c3', display: 'grid', placeItems: 'center', border: '1px solid #fde047' }}>
+                                            {renderDeviceTypeIcon(primaryDevice.deviceType)}
+                                        </div>
+                                        <div>
+                                            <b style={{ fontSize: 16, color: '#0f172a' }}>{primaryDevice.deviceName}</b>
+                                            <div style={{ fontSize: 12, color: '#64748b', display: 'flex', gap: 10, marginTop: 2, flexWrap: 'wrap' }}>
+                                                <span>Type: <b>{primaryDevice.deviceType}</b></span>
+                                                <span>•</span>
+                                                <span>Branch: <b>{primaryDevice.branch?.name || 'Gandhipuram'}</b></span>
+                                                <span>•</span>
+                                                <span>Registered: <b>{formatDate(primaryDevice.registeredAt)}</b></span>
+                                                <span>•</span>
+                                                <span>Last Active: <b>{formatDateTime(primaryDevice.lastActiveAt)}</b></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                        <button
+                                            className="secondary"
+                                            onClick={() => {
+                                                setNewDeviceForm({
+                                                    deviceName: deviceInfo.suggestedName,
+                                                    deviceType: deviceInfo.suggestedType,
+                                                    deviceRole: 'PRIMARY',
+                                                    branchId: 'gandhipuram'
+                                                });
+                                                setShowAddDeviceModal(true);
+                                            }}
+                                            style={{ fontSize: 12, padding: '6px 12px' }}
+                                        >
+                                            Replace Primary Device
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{ marginTop: 16, padding: 20, background: '#fefce8', borderRadius: 12, border: '1px border #fef08a', textCenter: 'center' }}>
+                                    <p style={{ margin: '0 0 12px', fontSize: 13, color: '#854d0e', fontWeight: 600 }}>
+                                        Zero devices currently registered. Register this device or client device as the Master Primary Device.
+                                    </p>
+                                    <button
+                                        className="primary"
+                                        style={{ background: '#ca8a04', borderColor: '#ca8a04', color: '#ffffff', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                                        onClick={() => {
+                                            setNewDeviceForm({
+                                                deviceName: deviceInfo.suggestedName,
+                                                deviceType: deviceInfo.suggestedType,
+                                                deviceRole: 'PRIMARY',
+                                                branchId: 'gandhipuram'
+                                            });
+                                            setShowAddDeviceModal(true);
+                                        }}
+                                    >
+                                        <Crown size={16} /> + Register Primary Device
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* SECTION 2: AUTHORIZED DEVICES */}
+                    <div className="settings-card">
+                        <div className="settings-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                            <div>
+                                <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <ShieldCheck size={20} color="#16a34a" /> AUTHORIZED DEVICES
+                                </h3>
+                                <p>All authorized devices (laptops, mobile phones, desktops, tablets) share the same live central CRM database.</p>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <button
+                                    className="primary"
+                                    onClick={() => {
+                                        setNewDeviceForm({
+                                            deviceName: deviceInfo.suggestedName,
+                                            deviceType: deviceInfo.suggestedType,
+                                            deviceRole: 'AUTHORIZED',
+                                            branchId: 'gandhipuram'
+                                        });
+                                        setShowAddDeviceModal(true);
+                                    }}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#16a34a', borderColor: '#16a34a' }}
+                                >
+                                    <Plus size={16} /> + Add Device
+                                </button>
+                            </div>
+                        </div>
+
+                        {authorizedDevices.length === 0 ? (
+                            <div style={{ padding: 24, textAlign: 'center', color: '#64748b', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>No authorized devices registered yet.</p>
+                                <span style={{ fontSize: 12, color: '#94a3b8' }}>Click "+ Add Device" above to authorize additional laptops, mobile phones, or tablets.</span>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Desktop Table View */}
+                                <div className="desktop-device-table">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Device Name</th>
+                                                <th>Type</th>
+                                                <th>Branch</th>
+                                                <th>Status</th>
+                                                <th>Registered</th>
+                                                <th>Last Active</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {authorizedDevices.map((dev) => (
+                                                <tr key={dev.id}>
+                                                    <td>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                            {renderDeviceTypeIcon(dev.deviceType)}
+                                                            <b>{dev.deviceName}</b>
+                                                        </div>
+                                                    </td>
+                                                    <td>{dev.deviceType}</td>
+                                                    <td><span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: 11 }}>{dev.branch?.name || 'Gandhipuram'}</span></td>
+                                                    <td>
+                                                        <span className={dev.status === 'ACTIVE' ? 'status active' : dev.status === 'REVOKED' ? 'status lost' : 'status follow_up'}>
+                                                            ● {dev.status}
+                                                        </span>
+                                                    </td>
+                                                    <td>{formatDate(dev.registeredAt)}</td>
+                                                    <td>{formatDateTime(dev.lastActiveAt)}</td>
+                                                    <td>
+                                                        {dev.status !== 'REVOKED' ? (
+                                                            <button
+                                                                className="secondary"
+                                                                style={{ padding: '4px 10px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }}
+                                                                onClick={() => setShowRevokeModal(dev)}
+                                                            >
+                                                                Revoke Access
+                                                            </button>
+                                                        ) : (
+                                                            <span style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>Revoked</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Central DB Status Info */}
                     <div className="settings-card">
                         <div className="settings-card-header" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
                                 <div>
                                     <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <Database size={20} color="#0284c7" /> Cloud Hosted PostgreSQL Database
+                                        <Database size={20} color="#0284c7" /> Central Authoritative PostgreSQL Database
                                     </h3>
-                                    <p>Supabase Managed Postgres Cluster (`postgres.khnrcfvczwhoklkokrbl` on AWS ap-northeast-1).</p>
+                                    <p>Live central database cluster hosted on Supabase (AWS Tokyo). Real-time sync across all authorized devices.</p>
                                 </div>
                                 <span className="badge" style={{ background: '#dcfce7', color: '#15803d', padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    ● Live & Operational
+                                    ● Central DB Online
                                 </span>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginTop: 16 }}>
                                 <div style={{ padding: 14, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>ORM Provider</span>
-                                    <b style={{ display: 'block', fontSize: 14, color: '#0f172a', marginTop: 4 }}>Prisma Client v6.15</b>
+                                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>Data Architecture</span>
+                                    <b style={{ display: 'block', fontSize: 14, color: '#0f172a', marginTop: 4 }}>Single Authoritative Cloud DB</b>
                                 </div>
                                 <div style={{ padding: 14, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>Connection Pooler</span>
-                                    <b style={{ display: 'block', fontSize: 14, color: '#0284c7', marginTop: 4 }}>Transaction Pool (6543)</b>
+                                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>Device Authorization</span>
+                                    <b style={{ display: 'block', fontSize: 14, color: '#0284c7', marginTop: 4 }}>Secure Device ID Tokens</b>
                                 </div>
                                 <div style={{ padding: 14, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>Direct Migration URL</span>
-                                    <b style={{ display: 'block', fontSize: 14, color: '#16a34a', marginTop: 4 }}>Direct Session (5432)</b>
+                                    <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#64748b' }}>Cross-Device Sync</span>
+                                    <b style={{ display: 'block', fontSize: 14, color: '#16a34a', marginTop: 4 }}>Instant Live Sync</b>
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <div className="settings-card">
-                        <div className="settings-card-header">
-                            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <Cloud size={20} color="#3b82f6" /> Multi-Tenant Cloud Storage Quota & Backups
-                            </h3>
-                            <p>Allocated disk space and automated daily cloud snapshots.</p>
-                        </div>
-
-                        <div style={{ marginBottom: 20 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8, fontWeight: 600 }}>
-                                <span style={{ color: '#475569' }}>Database & Media File Usage</span>
-                                <span style={{ color: '#0f172a' }}><b>2.4 GB</b> / 10.0 GB (24% Used)</span>
-                            </div>
-                            <div style={{ height: 10, background: '#e2e8f0', borderRadius: 5, overflow: 'hidden' }}>
-                                <div style={{ width: '24%', height: '100%', background: '#3b82f6', borderRadius: 5 }} />
-                            </div>
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, borderTop: '1px solid #f1f5f9', flexWrap: 'wrap', gap: 12 }}>
-                            <div>
-                                <b style={{ fontSize: 14, color: '#0f172a' }}>Automated Daily Cloud Backups</b>
-                                <p style={{ margin: '2px 0 0', fontSize: 12, color: '#64748b' }}>Scheduled daily at 02:00 AM UTC with 30-day retention.</p>
-                            </div>
-                            <button className="primary" onClick={triggerDatabaseBackup} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <Download size={16} /> {saving ? 'Creating Backup...' : 'Trigger Backup Now'}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="settings-card">
-                        <div className="settings-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                            <div>
-                                <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <Monitor size={20} color="#8b5cf6" /> Authorized Devices & Terminal Settings
-                                </h3>
-                                <p>Manage laptops, desktops, and tablet terminals connected to CADPOINT COIMBATORE CRM.</p>
-                            </div>
-                            <button className="primary" onClick={() => setShowAddDeviceModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#8b5cf6', borderColor: '#8b5cf6' }}>
-                                <Plus size={16} /> + Add Device
-                            </button>
-                        </div>
-
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Device Name</th>
-                                    <th>Type</th>
-                                    <th>Branch</th>
-                                    <th>IP / MAC Address</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {devicesList.map((dev) => (
-                                    <tr key={dev.id}>
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                {dev.type === 'Laptop' ? <Laptop size={16} color="#64748b" /> : dev.type === 'Tablet' ? <Smartphone size={16} color="#64748b" /> : <Monitor size={16} color="#64748b" />}
-                                                <b>{dev.name}</b>
-                                            </div>
-                                        </td>
-                                        <td>{dev.type}</td>
-                                        <td><span className="badge" style={{ background: '#f1f5f9', color: '#334155', fontSize: 11 }}>{dev.branch}</span></td>
-                                        <td><code style={{ fontSize: 11, background: '#f8fafc', padding: '2px 6px', borderRadius: 4 }}>{dev.ipAddress}</code></td>
-                                        <td>
-                                            <span className={dev.status === 'ACTIVE' ? 'status active' : 'status follow_up'}>
-                                                {dev.status}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => removeDevice(dev.id, dev.name)}>
-                                                Remove
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
                     </div>
                 </div>
             )}
@@ -3051,7 +3257,7 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
                 </div>
             )}
 
-            {/* WhatsApp & API Tab — Usable WhatsApp Settings */}
+            {/* WhatsApp & API Tab */}
             {activeTab === 'WhatsApp & API' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div className="settings-card">
@@ -3229,19 +3435,49 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
                 </div>
             )}
 
-            {/* Add Device Modal */}
+            {/* REGISTER DEVICE MODAL (PRIMARY OR AUTHORIZED) */}
             {showAddDeviceModal && (
                 <div className="modal" style={{ zIndex: 1200 }}>
-                    <form className="panel" onSubmit={handleRegisterDeviceSubmit} style={{ maxWidth: 480 }}>
-                        <h3 style={{ margin: 0, fontSize: 18 }}>Register Authorized Device</h3>
-                        <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 16px' }}>Authorize a laptop, desktop, or mobile device for CADPOINT COIMBATORE CRM.</p>
+                    <form className="panel" onSubmit={(e) => handleRegisterDeviceSubmit(e, false)} style={{ maxWidth: 500 }}>
+                        <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a' }}>
+                            {newDeviceForm.deviceRole === 'PRIMARY' ? 'Register Primary Device (Master)' : 'Register Authorized Device'}
+                        </h3>
+                        <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 16px' }}>
+                            Register and authorize this device for live central CADPOINT CRM access.
+                        </p>
+
+                        <div className="form-field full-width" style={{ marginBottom: 14 }}>
+                            <label style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>Registration Type *</label>
+                            <div style={{ display: 'flex', gap: 16, marginTop: 4 }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                                    <input
+                                        type="radio"
+                                        name="deviceRole"
+                                        value="PRIMARY"
+                                        checked={newDeviceForm.deviceRole === 'PRIMARY'}
+                                        onChange={() => setNewDeviceForm({ ...newDeviceForm, deviceRole: 'PRIMARY' })}
+                                    />
+                                    👑 Primary Device (Master Owner Device)
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                                    <input
+                                        type="radio"
+                                        name="deviceRole"
+                                        value="AUTHORIZED"
+                                        checked={newDeviceForm.deviceRole === 'AUTHORIZED'}
+                                        onChange={() => setNewDeviceForm({ ...newDeviceForm, deviceRole: 'AUTHORIZED' })}
+                                    />
+                                    💻 Authorized Device
+                                </label>
+                            </div>
+                        </div>
 
                         <div className="form-field full-width" style={{ marginBottom: 12 }}>
                             <label>Device Name *</label>
                             <input
-                                value={newDeviceForm.name}
-                                onChange={(e) => setNewDeviceForm({ ...newDeviceForm, name: e.target.value })}
-                                placeholder="e.g. Reception Desk PC 1"
+                                value={newDeviceForm.deviceName}
+                                onChange={(e) => setNewDeviceForm({ ...newDeviceForm, deviceName: e.target.value })}
+                                placeholder="e.g. CADPOINT Main Office Laptop"
                                 required
                                 autoFocus
                             />
@@ -3249,36 +3485,97 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
 
                         <div className="form-field full-width" style={{ marginBottom: 12 }}>
                             <label>Device Type</label>
-                            <select value={newDeviceForm.type} onChange={(e) => setNewDeviceForm({ ...newDeviceForm, type: e.target.value })}>
-                                <option value="Desktop PC">Desktop PC</option>
-                                <option value="Laptop">Laptop</option>
-                                <option value="Tablet">Tablet / Mobile</option>
-                                <option value="POS Terminal">POS / Receipt Printer</option>
+                            <select
+                                value={newDeviceForm.deviceType}
+                                onChange={(e) => setNewDeviceForm({ ...newDeviceForm, deviceType: e.target.value })}
+                            >
+                                <option value="LAPTOP">Laptop Computer</option>
+                                <option value="DESKTOP">Desktop PC</option>
+                                <option value="MOBILE">Mobile Phone</option>
+                                <option value="TABLET">Tablet Device</option>
                             </select>
                         </div>
 
                         <div className="form-field full-width" style={{ marginBottom: 12 }}>
                             <label>Branch Assignment</label>
-                            <select value={newDeviceForm.branch} onChange={(e) => setNewDeviceForm({ ...newDeviceForm, branch: e.target.value })}>
-                                <option value="Gandhipuram">Gandhipuram</option>
-                                <option value="Saravanapatti">Saravanapatti</option>
+                            <select
+                                value={newDeviceForm.branchId}
+                                onChange={(e) => setNewDeviceForm({ ...newDeviceForm, branchId: e.target.value })}
+                            >
+                                <option value="gandhipuram">Gandhipuram Branch</option>
+                                <option value="saravanapatti">Saravanapatti Branch</option>
                             </select>
                         </div>
 
-                        <div className="form-field full-width" style={{ marginBottom: 12 }}>
-                            <label>IP / MAC Address (Optional)</label>
-                            <input
-                                value={newDeviceForm.ipAddress}
-                                onChange={(e) => setNewDeviceForm({ ...newDeviceForm, ipAddress: e.target.value })}
-                                placeholder="192.168.1.50"
-                            />
-                        </div>
-
                         <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                            <button className="primary" type="submit">Authorize Device</button>
-                            <button type="button" onClick={() => setShowAddDeviceModal(false)}>Cancel</button>
+                            <button className="primary" type="submit">
+                                Continue & Register Device
+                            </button>
+                            <button type="button" onClick={() => setShowAddDeviceModal(false)}>
+                                Cancel
+                            </button>
                         </div>
                     </form>
+                </div>
+            )}
+
+            {/* PRIMARY DEVICE EXISTS WARNING MODAL */}
+            {primaryExistsWarning && (
+                <div className="modal" style={{ zIndex: 1300 }}>
+                    <div className="panel" style={{ maxWidth: 480 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#b45309', marginBottom: 12 }}>
+                            <AlertCircle size={24} />
+                            <h3 style={{ margin: 0, fontSize: 17 }}>Primary Device Already Exists</h3>
+                        </div>
+                        <p style={{ fontSize: 13, color: '#475569', margin: '0 0 12px' }}>
+                            A Primary Device is already registered in the system: <b>"{primaryExistsWarning.deviceName}"</b>.
+                        </p>
+                        <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 16px' }}>
+                            Only ONE Primary Device is permitted at a time. Would you like to replace the existing Primary Device or cancel?
+                        </p>
+                        <div style={{ display: 'flex', gap: 10 }}>
+                            <button
+                                className="primary"
+                                style={{ background: '#ca8a04', borderColor: '#ca8a04' }}
+                                onClick={() => handleRegisterDeviceSubmit(null, true)}
+                            >
+                                Replace Primary Device
+                            </button>
+                            <button className="secondary" onClick={() => setPrimaryExistsWarning(null)}>
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* REVOKE ACCESS CONFIRMATION MODAL */}
+            {showRevokeModal && (
+                <div className="modal" style={{ zIndex: 1300 }}>
+                    <div className="panel" style={{ maxWidth: 460 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#dc2626', marginBottom: 12 }}>
+                            <Slash size={24} />
+                            <h3 style={{ margin: 0, fontSize: 17 }}>Revoke Device Access?</h3>
+                        </div>
+                        <p style={{ fontSize: 13, color: '#334155', margin: '0 0 8px' }}>
+                            Are you sure you want to revoke access for <b>"{showRevokeModal.deviceName}"</b>?
+                        </p>
+                        <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 16px' }}>
+                            This device will immediately lose access to CADPOINT COIMBATORE CRM.
+                        </p>
+                        <div style={{ display: 'flex', gap: 10 }}>
+                            <button
+                                className="primary"
+                                style={{ background: '#dc2626', borderColor: '#dc2626' }}
+                                onClick={() => revokeDeviceAccess(showRevokeModal)}
+                            >
+                                Yes, Revoke Access
+                            </button>
+                            <button className="secondary" onClick={() => setShowRevokeModal(null)}>
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 

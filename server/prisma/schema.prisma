@@ -118,6 +118,7 @@ model Branch {
   admissions  Admission[]
   payments    Payment[]
   batches     Batch[]
+  devices     Device[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 }
@@ -140,6 +141,7 @@ model User {
   notifications Notification[]
   files         FileMetadata[]
   desktopAgents DesktopAgent[]
+  devices       Device[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -434,3 +436,46 @@ model DesktopAgent {
   @@index([organizationId, status])
   @@index([userId])
 }
+
+enum DeviceRole {
+  PRIMARY
+  AUTHORIZED
+}
+
+enum DeviceStatus {
+  PENDING
+  ACTIVE
+  REVOKED
+  BLOCKED
+}
+
+enum DeviceType {
+  LAPTOP
+  DESKTOP
+  MOBILE
+  TABLET
+}
+
+model Device {
+  id           String       @id @default(uuid())
+  deviceId     String       @unique
+  deviceName   String
+  deviceType   DeviceType   @default(LAPTOP)
+  deviceRole   DeviceRole   @default(AUTHORIZED)
+  branchId     String?
+  branch       Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  userId       String?
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  status       DeviceStatus @default(ACTIVE)
+  registeredAt DateTime     @default(now())
+  lastActiveAt DateTime     @default(now())
+  revokedAt    DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([status])
+  @@index([deviceRole])
+  @@index([branchId])
+  @@index([userId])
+}
+
