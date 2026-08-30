@@ -2808,6 +2808,28 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
         autoAssignLeads: true
     });
 
+    const [waConfig, setWaConfig] = useState(null);
+    const [waLoading, setWaLoading] = useState(false);
+    const [waConnecting, setWaConnecting] = useState(false);
+
+    const fetchWhatsAppStatus = useCallback(async () => {
+        if (!token) return;
+        setWaLoading(true);
+        try {
+            const res = await fetch(API_BASE + '/whatsapp/config', {
+                headers: { Authorization: 'Bearer ' + token }
+            });
+            const j = await res.json();
+            if (j.success && j.data) {
+                setWaConfig(j.data);
+            }
+        } catch (e) {
+            console.error('fetchWhatsAppStatus error', e);
+        } finally {
+            setWaLoading(false);
+        }
+    }, [token]);
+
     // Fetch live device architecture from central API
     const fetchDevices = useCallback(async () => {
         if (!token) return;
@@ -2846,7 +2868,8 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
             .catch(e => console.error(e));
 
         fetchDevices();
-    }, [token, fetchDevices]);
+        fetchWhatsAppStatus();
+    }, [token, fetchDevices, fetchWhatsAppStatus]);
 
     async function saveProfileSettings(e) {
         if (e) e.preventDefault();
@@ -2907,6 +2930,103 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
             setTestResult({ success: false, message: 'Failed to connect to test server' });
         } finally {
             setTestingWa(false);
+        }
+    }
+
+    async function handleConnectWhatsApp() {
+        setWaConnecting(true);
+        try {
+            const appId = waConfig?.appId || '';
+            const configId = waConfig?.configId || '';
+
+            if (window.FB && appId) {
+                window.FB.init({
+                    appId: appId,
+                    autoLogAppEvents: true,
+                    xfbml: true,
+                    version: waConfig?.apiVersion || 'v21.0'
+                });
+
+                window.FB.login((response) => {
+                    if (response.authResponse && response.authResponse.code) {
+                        fetch(API_BASE + '/whatsapp/connect', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                            body: JSON.stringify({ code: response.authResponse.code })
+                        })
+                        .then(r => r.json())
+                        .then(j => {
+                            if (j.success) {
+                                alert('✅ WhatsApp Business Account connected successfully!');
+                                fetchWhatsAppStatus();
+                            } else {
+                                alert(j.message || 'WhatsApp connection could not be completed.');
+                            }
+                        })
+                        .catch(err => {
+                            console.error(err);
+                            alert('WhatsApp connection error.');
+                        })
+                        .finally(() => setWaConnecting(false));
+                    } else {
+                        setWaConnecting(false);
+                        alert('WhatsApp connection was cancelled or not authorized.');
+                    }
+                }, {
+                    config_id: configId,
+                    response_type: 'code',
+                    override_default_response_type: true,
+                    scope: 'whatsapp_business_messaging,whatsapp_business_management'
+                });
+            } else {
+                const codeInput = prompt('Enter your Meta Embedded Signup Authorization Code or System Token (or configure META_APP_ID on server):');
+                if (!codeInput) {
+                    setWaConnecting(false);
+                    return;
+                }
+                const res = await fetch(API_BASE + '/whatsapp/connect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                    body: JSON.stringify({ code: codeInput, accessToken: codeInput })
+                });
+                const j = await res.json();
+                if (j.success) {
+                    alert('✅ WhatsApp Business Account connected successfully!');
+                    fetchWhatsAppStatus();
+                } else {
+                    alert(j.message || 'WhatsApp connection failed.');
+                }
+                setWaConnecting(false);
+            }
+        } catch (e) {
+            console.error(e);
+            alert('WhatsApp connection error.');
+            setWaConnecting(false);
+        }
+    }
+
+    async function handleDisconnectWhatsApp() {
+        if (!window.confirm('Disconnect WhatsApp?\n\nThis will stop CAD POINT from using this WhatsApp Business connection. Existing leads, students, and payments will be preserved.')) {
+            return;
+        }
+        setSaving(true);
+        try {
+            const res = await fetch(API_BASE + '/whatsapp/disconnect', {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + token }
+            });
+            const j = await res.json();
+            if (j.success) {
+                alert('✅ WhatsApp Business account disconnected.');
+                fetchWhatsAppStatus();
+            } else {
+                alert(j.message || 'Disconnect failed');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Disconnect failed');
+        } finally {
+            setSaving(false);
         }
     }
 
@@ -3396,99 +3516,131 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
             {/* WhatsApp & API Tab */}
             {activeTab === 'WhatsApp & API' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    {/* Primary Embedded Signup / Connection Card */}
                     <div className="settings-card">
                         <div className="settings-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                             <div>
                                 <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <MessageCircle size={20} color="#16a34a" /> WhatsApp Business API Integration
+                                    <MessageCircle size={20} color="#16a34a" /> WhatsApp Business Integration
                                 </h3>
-                                <p>Configure Meta Cloud API credentials or Direct WhatsApp messaging for CADPOINT COIMBATORE.</p>
+                                <p>Connect your Meta WhatsApp Business account directly to CAD POINT using Meta's official OAuth authorization.</p>
                             </div>
-                            <button
-                                type="button"
-                                className="secondary"
-                                onClick={() => setShowTestWhatsAppModal(true)}
-                                style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#16a34a', borderColor: '#86efac' }}
-                            >
-                                <Send size={15} /> Test WhatsApp Connection
-                            </button>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                {waConfig?.isConnected ? (
+                                    <span className="badge" style={{ background: '#dcfce7', color: '#15803d', padding: '6px 12px', borderRadius: 20, fontSize: 13, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                        ● Connected ✓
+                                    </span>
+                                ) : (
+                                    <span className="badge" style={{ background: '#fef3c7', color: '#b45309', padding: '6px 12px', borderRadius: 20, fontSize: 13, fontWeight: 700 }}>
+                                        Not Connected
+                                    </span>
+                                )}
+                            </div>
                         </div>
 
-                        <form className="form-grid" onSubmit={saveWhatsAppSettings}>
-                            <div className="form-field full-width">
-                                <label>WhatsApp Cloud API Endpoint URL</label>
-                                <input
-                                    value={whatsappForm.whatsappApiUrl}
-                                    onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappApiUrl: e.target.value })}
-                                    placeholder="https://graph.facebook.com/v18.0/"
-                                    required
-                                />
-                            </div>
+                        {waConfig?.isConnected ? (
+                            <div style={{ background: '#f8fafc', padding: 20, borderRadius: 12, border: '1px solid #e2e8f0', marginTop: 16 }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
+                                    <div>
+                                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, display: 'block' }}>Business Name</span>
+                                        <strong style={{ fontSize: 16, color: '#0f172a' }}>{waConfig.integration?.businessName || 'CADPOINT Business'}</strong>
+                                    </div>
+                                    <div>
+                                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, display: 'block' }}>WhatsApp Number</span>
+                                        <strong style={{ fontSize: 16, color: '#16a34a' }}>{waConfig.integration?.displayPhoneNumber || waConfig.integration?.phoneNumber || '+91 99945 12345'}</strong>
+                                    </div>
+                                    <div>
+                                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, display: 'block' }}>WABA ID</span>
+                                        <span style={{ fontSize: 14, fontFamily: 'monospace', color: '#475569' }}>{waConfig.integration?.wabaId}</span>
+                                    </div>
+                                </div>
 
-                            <div className="form-field">
-                                <label>WhatsApp Business Phone Number ID</label>
-                                <input
-                                    value={whatsappForm.whatsappPhoneNumberId}
-                                    onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappPhoneNumberId: e.target.value })}
-                                    placeholder="1092837465"
-                                    required
-                                />
+                                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                                    <button
+                                        type="button"
+                                        className="primary"
+                                        onClick={() => setShowTestWhatsAppModal(true)}
+                                        style={{ background: '#16a34a', borderColor: '#16a34a', color: '#ffffff', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                                    >
+                                        <Send size={15} /> Test Connection
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="secondary"
+                                        onClick={handleDisconnectWhatsApp}
+                                        style={{ color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                                    >
+                                        Disconnect WhatsApp
+                                    </button>
+                                </div>
                             </div>
-
-                            <div className="form-field">
-                                <label>WhatsApp Business Account ID (WABA ID)</label>
-                                <input
-                                    value={whatsappForm.whatsappBusinessAccountId || ''}
-                                    onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappBusinessAccountId: e.target.value })}
-                                    placeholder="WABA-CADPOINT-CBE-9081"
-                                />
+                        ) : (
+                            <div style={{ background: '#f8fafc', padding: 24, borderRadius: 12, border: '1px solid #e2e8f0', marginTop: 16, textAlign: 'center' }}>
+                                <div style={{ maxWidth: 480, margin: '0 auto' }}>
+                                    <MessageCircle size={48} color="#16a34a" style={{ marginBottom: 12 }} />
+                                    <h4 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>Connect Your WhatsApp Business Account</h4>
+                                    <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px' }}>
+                                        Enable instant WhatsApp customer messaging and automatic incoming lead creation for CAD POINT.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        className="primary"
+                                        disabled={waConnecting}
+                                        onClick={handleConnectWhatsApp}
+                                        style={{ background: '#16a34a', borderColor: '#16a34a', color: '#ffffff', padding: '12px 28px', fontSize: 15, fontWeight: 700, borderRadius: 10, display: 'inline-flex', alignItems: 'center', gap: 10, cursor: 'pointer', boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)' }}
+                                    >
+                                        <MessageCircle size={20} /> {waConnecting ? 'Connecting to Meta...' : '[ Connect WhatsApp ]'}
+                                    </button>
+                                </div>
                             </div>
+                        )}
 
-                            <div className="form-field full-width">
-                                <label>Meta Permanent Access Token</label>
-                                <input
-                                    type="password"
-                                    value={whatsappForm.whatsappAccessToken}
-                                    onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappAccessToken: e.target.value })}
-                                    placeholder="EAAG... (Paste permanent Meta access token)"
-                                />
-                                <small>Generate permanent token in Meta Developer Portal under WhatsApp Setup.</small>
-                            </div>
-
-                            <div className="form-field">
-                                <label>Default Country Code</label>
-                                <input
-                                    value={whatsappForm.defaultCountryCode || '+91'}
-                                    onChange={(e) => setWhatsappForm({ ...whatsappForm, defaultCountryCode: e.target.value })}
-                                    placeholder="+91"
-                                />
-                            </div>
-
-                            <div className="form-field full-width" style={{ marginTop: 8 }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
+                        <details style={{ marginTop: 24, borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
+                            <summary style={{ fontSize: 13, fontWeight: 600, color: '#64748b', cursor: 'pointer' }}>
+                                Advanced / Developer Fallback Credentials
+                            </summary>
+                            <form className="form-grid" onSubmit={saveWhatsAppSettings} style={{ marginTop: 16 }}>
+                                <div className="form-field full-width">
+                                    <label>WhatsApp Cloud API Endpoint URL</label>
                                     <input
-                                        type="checkbox"
-                                        checked={whatsappForm.autoAssignLeads}
-                                        onChange={(e) => setWhatsappForm({ ...whatsappForm, autoAssignLeads: e.target.checked })}
-                                        style={{ width: 18, height: 18, margin: 0, cursor: 'pointer' }}
+                                        value={whatsappForm.whatsappApiUrl}
+                                        onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappApiUrl: e.target.value })}
+                                        placeholder="https://graph.facebook.com/v21.0/"
+                                        required
                                     />
-                                    Auto-assign incoming WhatsApp enquiries to active counsellors
-                                </label>
-                            </div>
-
-                            <div className="form-field full-width" style={{ marginTop: 12, display: 'flex', gap: 10 }}>
-                                <button className="primary" type="submit" disabled={saving} style={{ background: '#16a34a', borderColor: '#16a34a', color: '#ffffff' }}>
-                                    {saving ? 'Saving...' : 'Save WhatsApp Settings'}
-                                </button>
-                                <button
-                                    type="button"
-                                    className="secondary"
-                                    onClick={() => setShowTestWhatsAppModal(true)}
-                                >
-                                    Send Test WhatsApp Message
-                                </button>
-                            </div>
-                        </form>
+                                </div>
+                                <div className="form-field">
+                                    <label>WhatsApp Business Phone Number ID</label>
+                                    <input
+                                        value={whatsappForm.whatsappPhoneNumberId}
+                                        onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappPhoneNumberId: e.target.value })}
+                                        placeholder="1092837465"
+                                    />
+                                </div>
+                                <div className="form-field">
+                                    <label>WhatsApp Business Account ID (WABA ID)</label>
+                                    <input
+                                        value={whatsappForm.whatsappBusinessAccountId || ''}
+                                        onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappBusinessAccountId: e.target.value })}
+                                        placeholder="WABA-CADPOINT-CBE-9081"
+                                    />
+                                </div>
+                                <div className="form-field full-width">
+                                    <label>Meta Permanent Access Token</label>
+                                    <input
+                                        type="password"
+                                        value={whatsappForm.whatsappAccessToken}
+                                        onChange={(e) => setWhatsappForm({ ...whatsappForm, whatsappAccessToken: e.target.value })}
+                                        placeholder="•••••••• (Encrypted on Render server)"
+                                    />
+                                </div>
+                                <div className="form-field full-width">
+                                    <button className="secondary" type="submit" disabled={saving} style={{ padding: '6px 14px', fontSize: 12 }}>
+                                        {saving ? 'Saving...' : 'Save Manual Fallback Credentials'}
+                                    </button>
+                                </div>
+                            </form>
+                        </details>
                     </div>
 
                     {/* Meta Webhook Card */}

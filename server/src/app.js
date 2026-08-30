@@ -55,6 +55,7 @@ app.use(['/api/branches', '/branches'], require('./routes/branches'));
 app.use(['/api/reports', '/reports'], require('./routes/reports'));
 app.use(['/api/settings', '/settings'], require('./routes/settings'));
 app.use(['/api/devices', '/devices'], require('./routes/devices'));
+app.use(['/api/whatsapp', '/whatsapp'], require('./routes/whatsapp'));
 app.use((req,res)=>res.status(404).json({success:false,message:'API endpoint not found'}));
 app.use((err,_req,res,_next)=>res.status(err.status||500).json({success:false,message:process.env.NODE_ENV==='production'?'Internal server error':err.message}));
 module.exports={app,prisma,port};

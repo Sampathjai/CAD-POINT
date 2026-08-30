@@ -480,3 +480,23 @@ model Device {
   @@index([userId])
 }
 
+model WhatsAppIntegration {
+  id                   String   @id @default(uuid())
+  organizationId       String   @default("org_default")
+  wabaId               String
+  phoneNumberId        String
+  phoneNumber          String?
+  displayPhoneNumber   String?
+  businessName         String?
+  accessTokenEncrypted String
+  tokenMetadata        String?
+  status               String   @default("CONNECTED")
+  connectedAt          DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([organizationId, phoneNumberId])
+  @@index([organizationId])
+  @@index([phoneNumberId])
+  @@index([wabaId])
+}
+
