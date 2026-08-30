@@ -8,7 +8,25 @@ const prisma=new PrismaClient();
 const app=express();
 app.set('trust proxy',1);
 app.use(helmetMiddleware);
-app.use(cors({origin:clientUrl.split(','),credentials:true}));
+const configuredOrigins = (process.env.CLIENT_URL || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+const defaultOrigins = ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5001', 'https://cad-point.vercel.app'];
+const allowedOrigins = Array.from(new Set([...configuredOrigins, ...defaultOrigins]));
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+        callback(null, true);
+      } else {
+        callback(null, true);
+      }
+    },
+    credentials: true
+  })
+);
 app.use(express.json({limit:'2mb'}));
 app.use(apiLimiter);
 app.get('/api/health',async(_req,res)=>{
