@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: cad-point-api
+    env: node
+    rootDir: server
+    buildCommand: npm install && npx prisma generate && DATABASE_URL="$DIRECT_URL" npx prisma db push --schema=./prisma/schema.prisma
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLIENT_URL
+        value: https://cad-point.vercel.app
