@@ -650,8 +650,10 @@ function App() {
         const lead = f?.lead;
         if (!lead) return alert('Lead information not available for this follow-up.');
 
+        const safeStudentList = Array.isArray(students) ? students : [];
+
         // Check if a student already exists for this lead or phone number
-        const existingStudent = students.find(s => s.leadId === lead.id || (s.phone && lead.phone && s.phone === lead.phone));
+        const existingStudent = safeStudentList.find(s => s.leadId === lead.id || (s.phone && lead.phone && s.phone === lead.phone));
         if (existingStudent) {
             if (window.confirm(`An existing student was found for this lead:\n\nStudent: ${existingStudent.firstName} (ID: ${existingStudent.studentCode})\nPhone: ${existingStudent.phone}\n\nWould you like to view this student in the Students tab?`)) {
                 setPage('Students');
@@ -662,7 +664,7 @@ function App() {
 
         // Pre-fill Add Student form with lead information
         setAddStudentForm({
-            studentCode: getNextCode('STU', students, 'studentCode'),
+            studentCode: getNextCode('STU', safeStudentList, 'studentCode'),
             leadId: lead.id,
             firstName: `${lead.firstName || ''} ${lead.lastName || ''}`.trim(),
             parentName: '',
@@ -1128,6 +1130,7 @@ function App() {
                             onOpenAddModal={() => openAddModalForPage(page)}
                             onCompleteFollowup={completeFollowup}
                             onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
+                            onAdmitFromFollowup={openAdmitFromFollowup}
                             onEditUser={openEditUser}
                             onDeleteUser={deleteUser}
                             onEditCourse={openEditCourse}
@@ -2991,7 +2994,7 @@ function Dashboard({ user, token, leads = [], followups = [], admissions = [], p
     );
 }
 
-function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onEditStudent, onDeleteStudent, onDeleteAdmission, onOpenEditProgress, currentUserId, userRole, user, token, theme, toggleTheme, refreshData }) {
+function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onAdmitFromFollowup, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onEditStudent, onDeleteStudent, onDeleteAdmission, onOpenEditProgress, currentUserId, userRole, user, token, theme, toggleTheme, refreshData }) {
     const itemSingular = page === 'Batches' ? 'Batch' : (page.endsWith('es') ? page.slice(0, -2) : (page.endsWith('s') ? page.slice(0, -1) : page));
     const [filterText, setFilterText] = useState('');
     const [paymentFromDate, setPaymentFromDate] = useState('');
@@ -3394,7 +3397,10 @@ ${instituteName}`;
                                                             <button
                                                                 className="primary"
                                                                 style={{ padding: '4px 8px', fontSize: 11, background: '#16a34a', borderColor: '#16a34a', color: '#ffffff', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                                onClick={() => openAdmitFromFollowup(f)}
+                                                                onClick={() => {
+                                                                    const fn = onAdmitFromFollowup || openAdmitFromFollowup;
+                                                                    if (typeof fn === 'function') fn(f);
+                                                                }}
                                                                 title="Admit student from follow-up"
                                                             >
                                                                 <GraduationCap size={13} /> Admit
