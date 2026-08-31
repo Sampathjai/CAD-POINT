@@ -35,3 +35,4 @@ allowedModules.forEach(mod => {
 });
 
 console.log('\n🎉 ALL COUNSELLOR STUDENTS ACCESS TESTS PASSED 100%!');
+

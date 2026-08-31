@@ -2423,8 +2423,10 @@ function App() {
                             Admission Number
                             <input value={addAdmissionForm.admissionNumber} onChange={(e) => setAddAdmissionForm({ ...addAdmissionForm, admissionNumber: e.target.value })} placeholder="ADM-1001" required />
                         </label>
-                        <label style={{ display: 'block', marginBottom: 12 }}>
-                            Student <span style={{ color: '#dc2626' }}>*</span>
+                        <div style={{ display: 'block', marginBottom: 12 }}>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: '#334155', marginBottom: 4 }}>
+                                Student <span style={{ color: '#dc2626' }}>*</span>
+                            </div>
                             {(() => {
                                 const selectedStudent = students.find(s => s.id === addAdmissionForm.studentId);
                                 
@@ -2511,7 +2513,16 @@ function App() {
                                                     filteredStudentOptions.map((s) => (
                                                         <div
                                                             key={s.id}
-                                                            onClick={() => {
+                                                            onMouseDown={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                setAddAdmissionForm(prev => ({ ...prev, studentId: s.id }));
+                                                                setShowStudentDropdown(false);
+                                                                setStudentSearchQuery('');
+                                                            }}
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
                                                                 setAddAdmissionForm(prev => ({ ...prev, studentId: s.id }));
                                                                 setShowStudentDropdown(false);
                                                                 setStudentSearchQuery('');
@@ -2542,7 +2553,7 @@ function App() {
                                     </div>
                                 );
                             })()}
-                        </label>
+                        </div>
                         <label>
                             Course
                             <select value={addAdmissionForm.courseId} onChange={(e) => setAddAdmissionForm({ ...addAdmissionForm, courseId: e.target.value })} required>
