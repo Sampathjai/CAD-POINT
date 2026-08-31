@@ -3075,7 +3075,11 @@ ${instituteName}`;
                                                                                 type="button"
                                                                                 className="primary"
                                                                                 style={{ background: '#25D366', borderColor: '#25D366', color: '#ffffff', padding: '6px 14px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                                                                                onClick={() => generateWhatsAppReminder(a, details.pendingAmount, details.totalPaid)}
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    e.preventDefault();
+                                                                                    generateWhatsAppReminder(a, details.pendingAmount, details.totalPaid);
+                                                                                }}
                                                                             >
                                                                                 <MessageCircle size={15} /> WhatsApp Reminder
                                                                             </button>
@@ -3141,12 +3145,15 @@ ${instituteName}`;
                                                                                 type="button"
                                                                                 className="secondary"
                                                                                 style={{ padding: '3px 10px', fontSize: 11 }}
-                                                                                onClick={() => {
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    e.preventDefault();
                                                                                     setConfigureInstallmentData(a);
+                                                                                    setInstallmentsError('');
                                                                                     setInstallmentsForm({
-                                                                                        inst1: details.installments[0]?.planned || '',
-                                                                                        inst2: details.installments[1]?.planned || '',
-                                                                                        inst3: details.installments[2]?.planned || ''
+                                                                                        inst1: details.installments[0]?.planned ?? Math.round(details.finalFee / 3),
+                                                                                        inst2: details.installments[1]?.planned ?? Math.round(details.finalFee / 3),
+                                                                                        inst3: details.installments[2]?.planned ?? (details.finalFee - 2 * Math.round(details.finalFee / 3))
                                                                                     });
                                                                                 }}
                                                                             >
@@ -3191,7 +3198,9 @@ ${instituteName}`;
                                                                                                     type="button"
                                                                                                     className="primary"
                                                                                                     style={{ padding: '3px 8px', fontSize: 11 }}
-                                                                                                    onClick={() => {
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        e.preventDefault();
                                                                                                         setPaymentModalData({
                                                                                                             admission: a,
                                                                                                             installmentNumber: inst.number,
@@ -3451,6 +3460,22 @@ ${instituteName}`;
                                     {installmentsError}
                                 </div>
                             )}
+                            <div style={{ marginBottom: 12 }}>
+                                <button
+                                    type="button"
+                                    className="secondary"
+                                    style={{ padding: '4px 12px', fontSize: 12, color: '#0284c7', borderColor: '#bae6fd' }}
+                                    onClick={() => {
+                                        const finalFee = Number(configureInstallmentData.finalFee) || 0;
+                                        const i1 = Math.round(finalFee / 3);
+                                        const i2 = Math.round(finalFee / 3);
+                                        const i3 = Math.max(0, finalFee - (i1 + i2));
+                                        setInstallmentsForm({ inst1: i1, inst2: i2, inst3: i3 });
+                                    }}
+                                >
+                                    ⚡ Auto Split Evenly (1/3 Each)
+                                </button>
+                            </div>
                             <label>
                                 Installment 1 Target (₹)
                                 <input
