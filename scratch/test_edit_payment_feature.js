@@ -49,3 +49,4 @@ if (!res2.success && res2.message.includes('exceeds max allowed fee')) {
 }
 
 console.log('\n🎉 ALL EDIT PAYMENT FEATURE TESTS PASSED 100%!');
+

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, Component } from 'react';
 import { createRoot } from 'react-dom/client';
+import * as XLSX from 'xlsx';
 import { hasPermission, getDefaultPageForRole } from './permissions';
 import {
     LayoutDashboard,
@@ -4684,30 +4685,60 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
     const safeAdmissions = Array.isArray(admissions) ? admissions : [];
     const safePayments = Array.isArray(payments) ? payments : [];
 
-    const [selectedMonth, setSelectedMonth] = useState('ALL');
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
     const [selectedCourseId, setSelectedCourseId] = useState('ALL');
 
-    const availableMonths = Array.from(new Set(
-        safeAdmissions.map(a => {
-            const dateStr = a.createdAt || a.startDate;
-            if (!dateStr) return null;
-            const d = new Date(dateStr);
-            return isNaN(d.getTime()) ? null : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        }).filter(Boolean)
-    )).sort().reverse();
+    // Quick date range setters
+    const setQuickRange = (type) => {
+        const now = new Date();
+        const todayStr = now.toISOString().slice(0, 10);
+        if (type === 'TODAY') {
+            setFromDate(todayStr);
+            setToDate(todayStr);
+        } else if (type === 'THIS_WEEK') {
+            const temp = new Date(now);
+            const firstDay = new Date(temp.setDate(temp.getDate() - temp.getDay()));
+            setFromDate(firstDay.toISOString().slice(0, 10));
+            setToDate(todayStr);
+        } else if (type === 'THIS_MONTH') {
+            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+            setFromDate(firstDay.toISOString().slice(0, 10));
+            setToDate(todayStr);
+        } else if (type === 'LAST_30') {
+            const temp = new Date(now);
+            const past30 = new Date(temp.setDate(temp.getDate() - 30));
+            setFromDate(past30.toISOString().slice(0, 10));
+            setToDate(todayStr);
+        } else if (type === 'ALL') {
+            setFromDate('');
+            setToDate('');
+            setSelectedCourseId('ALL');
+        }
+    };
 
+    // Helper date comparison
+    const isWithinRange = (dateInput) => {
+        if (!dateInput) return true;
+        const dStr = new Date(dateInput).toISOString().slice(0, 10);
+        if (fromDate && dStr < fromDate) return false;
+        if (toDate && dStr > toDate) return false;
+        return true;
+    };
+
+    // Filtered data sets based on custom date range
+    const filteredStudents = safeStudents.filter(s => isWithinRange(s.createdAt));
+    const filteredLeads = safeLeads.filter(l => isWithinRange(l.createdAt || l.leadDate));
+    const filteredPayments = safePayments.filter(p => isWithinRange(p.paymentDate || p.createdAt));
     const filteredAdmissions = safeAdmissions.filter(a => {
         if (selectedCourseId !== 'ALL' && a.courseId !== selectedCourseId) return false;
-        if (selectedMonth !== 'ALL') {
-            const dateStr = a.createdAt || a.startDate;
-            if (!dateStr) return false;
-            const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return false;
-            const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            if (monthStr !== selectedMonth) return false;
-        }
-        return true;
+        return isWithinRange(a.createdAt || a.startDate);
     });
+
+    const totalFilteredRevenue = filteredPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const totalFilteredAgreed = filteredAdmissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
+    const totalFilteredPending = Math.max(0, totalFilteredAgreed - totalFilteredRevenue);
+    const conversionRate = filteredLeads.length > 0 ? ((filteredAdmissions.length / filteredLeads.length) * 100).toFixed(1) : '0.0';
 
     const pendingStudentsList = filteredAdmissions.map(a => {
         const agreedFee = Number(a.finalFee) || 0;
@@ -4729,76 +4760,132 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
         };
     }).filter(item => item.pendingBalance > 0);
 
-    const totalFilteredRevenue = filteredAdmissions.reduce((sum, a) => {
-        const admissionPayments = safePayments.filter(p => p.admissionId === a.id);
-        return sum + admissionPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
-    }, 0);
-
-    const totalFilteredAgreed = filteredAdmissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
-    const totalFilteredPending = Math.max(0, totalFilteredAgreed - totalFilteredRevenue);
-    const conversionRate = safeLeads.length > 0 ? ((safeAdmissions.length / safeLeads.length) * 100).toFixed(1) : '0.0';
-
     const courseStats = safeCourses.map((c) => {
         const courseAdmissions = filteredAdmissions.filter((a) => a.courseId === c.id || a.course?.name === c.name);
         const revenue = courseAdmissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
         return { name: c.name, code: c.courseCode, count: courseAdmissions.length, revenue };
     });
 
-    function exportPendingReportToCSV() {
-        let csvContent = '\uFEFF';
-        csvContent += 'CADPOINT COIMBATORE - MONTHLY PENDING FEE REPORT\n';
-        csvContent += 'Generated Date,' + new Date().toLocaleString() + '\n';
-        csvContent += 'Month Filter,' + (selectedMonth === 'ALL' ? 'All Months' : selectedMonth) + '\n\n';
+    // --- EXCEL EXPORT HANDLERS USING SHEETJS (XLSX) ---
+    const exportStudentsToExcel = () => {
+        const dataToExport = filteredStudents.map((s, idx) => ({
+            'S.No': idx + 1,
+            'Student ID': s.studentCode || '',
+            'Name with Initial': s.firstName || '',
+            'Parent Name': s.parentName || '-',
+            'Date of Birth': s.dateOfBirth ? new Date(s.dateOfBirth).toISOString().slice(0, 10) : '-',
+            'Phone Number': s.phone || '',
+            'Email': s.email || '-',
+            'Address': s.address || s.lastName || '-',
+            'Passport Number': s.passportNumber || '-',
+            'Branch': s.branch?.name || 'Gandhipuram',
+            'Registered Date': s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '-'
+        }));
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Students');
+        XLSX.writeFile(wb, `CADPOINT_Students_Data_${fromDate || 'Start'}_to_${toDate || 'Today'}.xlsx`);
+    };
 
-        csvContent += 'Admission #,Student Name,Phone,Course,Branch,Admission Date,Agreed Fee (₹),Total Paid (₹),Pending Balance (₹)\n';
-        pendingStudentsList.forEach((p) => {
-            csvContent += '"' + p.admissionNumber + '","' + p.studentName.replace(/"/g, '""') + '","' + p.phone + '","' + p.courseName.replace(/"/g, '""') + '","' + p.branchName + '",' + formatDate(p.admissionDate) + ',' + p.agreedFee + ',' + p.totalPaid + ',' + p.pendingBalance + '\n';
-        });
+    const exportLeadsToExcel = () => {
+        const dataToExport = filteredLeads.map((l, idx) => ({
+            'S.No': idx + 1,
+            'Lead Date': l.createdAt ? new Date(l.createdAt).toLocaleDateString() : '-',
+            'Lead Name': `${l.firstName || ''} ${l.lastName || ''}`.trim() || l.leadNumber,
+            'Phone Number': l.phone || '',
+            'Email': l.email || '-',
+            'Interested Course': l.interestedCourse || '-',
+            'Source': l.source?.name || 'Walk-in',
+            'Status': l.status || 'NEW',
+            'Estimated Value (₹)': l.estimatedValue ? Number(l.estimatedValue) : 0,
+            'Assigned Counsellor': l.assignedCounsellor?.name || '-'
+        }));
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Leads');
+        XLSX.writeFile(wb, `CADPOINT_Leads_Data_${fromDate || 'Start'}_to_${toDate || 'Today'}.xlsx`);
+    };
 
-        csvContent += '\nTOTAL OUTSTANDING PENDING BALANCE,₹' + totalFilteredPending + '\n';
+    const exportAdmissionsToExcel = () => {
+        const dataToExport = filteredAdmissions.map((a, idx) => ({
+            'S.No': idx + 1,
+            'Admission #': a.admissionNumber,
+            'Student ID': a.student?.studentCode || '-',
+            'Student Name': a.student ? `${a.student.firstName} ${a.student.lastName || ''}`.trim() : '-',
+            'Phone': a.student?.phone || '',
+            'Course': a.course?.name || '-',
+            'Batch': a.batch?.name || '-',
+            'Admission Date': a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '-',
+            'Total Fee (₹)': Number(a.finalFee) || 0
+        }));
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Admissions');
+        XLSX.writeFile(wb, `CADPOINT_Admissions_Data_${fromDate || 'Start'}_to_${toDate || 'Today'}.xlsx`);
+    };
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute('download', 'CADPOINT_Coimbatore_Pending_Fees_' + selectedMonth + '_' + new Date().toISOString().slice(0, 10) + '.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
+    const exportPaymentsToExcel = () => {
+        const dataToExport = filteredPayments.map((p, idx) => ({
+            'S.No': idx + 1,
+            'Receipt #': p.receiptNumber,
+            'Student Name': p.admission?.student ? `${p.admission.student.firstName} ${p.admission.student.lastName || ''}`.trim() : '-',
+            'Admission #': p.admission?.admissionNumber || '-',
+            'Amount Paid (₹)': Number(p.amount) || 0,
+            'Payment Method': p.paymentMethod || 'UPI',
+            'Transaction Ref': p.transactionReference || '-',
+            'Payment Date': p.paymentDate ? new Date(p.paymentDate).toLocaleDateString() : '-',
+            'Remarks': p.remarks || p.notes || '-'
+        }));
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Payments');
+        XLSX.writeFile(wb, `CADPOINT_Payments_Data_${fromDate || 'Start'}_to_${toDate || 'Today'}.xlsx`);
+    };
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '18px 24px', borderRadius: 12, border: '1px solid #e2e8f0', flexWrap: 'wrap', gap: 12 }}>
-                <div>
-                    <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800 }}>CADPOINT COIMBATORE — Monthly Reports & Pending Analytics</h3>
-                    <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Filter student fee collection and pending balances by Month & Course.</p>
-                </div>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', padding: '6px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13 }}>
-                        <Filter size={15} color="#64748b" />
-                        <span style={{ fontWeight: 600, color: '#475569' }}>Month:</span>
-                        <select
-                            value={selectedMonth}
-                            onChange={(e) => setSelectedMonth(e.target.value)}
-                            style={{ border: 'none', background: 'transparent', fontWeight: 700, cursor: 'pointer', outline: 'none' }}
-                        >
-                            <option value="ALL">All Months</option>
-                            {availableMonths.map(m => {
-                                const [y, mon] = m.split('-');
-                                const dateObj = new Date(parseInt(y), parseInt(mon) - 1, 1);
-                                const monthName = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
-                                return <option key={m} value={m}>{monthName}</option>;
-                            })}
-                        </select>
+            {/* TOP BAR: DATE FILTERS AND EXCEL EXPORT CENTER */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, background: '#ffffff', padding: '20px 24px', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                    <div>
+                        <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800 }}>CADPOINT COIMBATORE — Custom Date Reports & Excel Data Center</h3>
+                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Filter metrics by custom date range and download full Excel exports for Students, Leads, Admissions & Payments.</p>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', padding: '6px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13 }}>
-                        <span style={{ fontWeight: 600, color: '#475569' }}>Course:</span>
+                    {/* EXCEL EXPORT BUTTONS */}
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button className="primary" onClick={exportStudentsToExcel} style={{ background: '#15803d', borderColor: '#15803d', fontSize: 12, padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: 6 }} title="Download Students Excel">
+                            <Download size={15} /> Export Students (Excel)
+                        </button>
+                        <button className="primary" onClick={exportLeadsToExcel} style={{ background: '#0284c7', borderColor: '#0284c7', fontSize: 12, padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: 6 }} title="Download Leads Excel">
+                            <Download size={15} /> Export Leads (Excel)
+                        </button>
+                        <button className="primary" onClick={exportAdmissionsToExcel} style={{ background: '#7c3aed', borderColor: '#7c3aed', fontSize: 12, padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: 6 }} title="Download Admissions Excel">
+                            <Download size={15} /> Export Admissions (Excel)
+                        </button>
+                        <button className="primary" onClick={exportPaymentsToExcel} style={{ background: '#d97706', borderColor: '#d97706', fontSize: 12, padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: 6 }} title="Download Payments Excel">
+                            <Download size={15} /> Export Payments (Excel)
+                        </button>
+                    </div>
+                </div>
+
+                {/* CUSTOM DATE-WISE CONTROLS */}
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', background: '#f8fafc', padding: '12px 16px', borderRadius: 10, border: '1px solid #cbd5e1' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <CalendarDays size={16} color="#64748b" />
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>From Date:</span>
+                        <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #cbd5e1' }} />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>To Date:</span>
+                        <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #cbd5e1' }} />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>Course:</span>
                         <select
                             value={selectedCourseId}
                             onChange={(e) => setSelectedCourseId(e.target.value)}
-                            style={{ border: 'none', background: 'transparent', fontWeight: 700, cursor: 'pointer', outline: 'none' }}
+                            style={{ padding: '6px 10px', fontSize: 13, borderRadius: 8, border: '1px solid #cbd5e1', fontWeight: 600 }}
                         >
                             <option value="ALL">All Courses</option>
                             {safeCourses.map(c => (
@@ -4807,9 +4894,16 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
                         </select>
                     </div>
 
-                    <button className="primary" onClick={exportPendingReportToCSV} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#dc2626', borderColor: '#dc2626' }}>
-                        <Download size={16} /> Export Pending CSV
-                    </button>
+                    {/* QUICK DATE PRESETS */}
+                    <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
+                        <button type="button" className="secondary" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => setQuickRange('TODAY')}>Today</button>
+                        <button type="button" className="secondary" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => setQuickRange('THIS_WEEK')}>This Week</button>
+                        <button type="button" className="secondary" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => setQuickRange('THIS_MONTH')}>This Month</button>
+                        <button type="button" className="secondary" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => setQuickRange('LAST_30')}>Last 30 Days</button>
+                        {(fromDate || toDate || selectedCourseId !== 'ALL') && (
+                            <button type="button" className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#ef4444', borderColor: '#fca5a5' }} onClick={() => setQuickRange('ALL')}>Reset Filters</button>
+                        )}
+                    </div>
                 </div>
             </div>
 
