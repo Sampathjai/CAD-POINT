@@ -48,3 +48,4 @@ if (simulatedDbBatch.trainer?.name === 'M. Anand (Trainer)') {
 }
 
 console.log('\n🎉 ALL BATCH FACULTY PERSON NAME FEATURE TESTS PASSED 100%!');
+

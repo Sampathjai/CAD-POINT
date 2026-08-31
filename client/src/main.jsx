@@ -5072,6 +5072,13 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
             </div>
 
             <div className="cards">
+                <div className="card" style={{ borderColor: '#3b82f6' }}>
+                    <span style={{ color: '#1e40af', fontWeight: 700 }}>Business Value (Selected Period)</span>
+                    <strong style={{ color: '#1d4ed8' }}>₹{totalFilteredAgreed.toLocaleString()}</strong>
+                    <small className="good" style={{ fontWeight: 700 }}>
+                        {filteredAdmissions.length} new admission{filteredAdmissions.length === 1 ? '' : 's'}
+                    </small>
+                </div>
                 <div className="card">
                     <span>Total Revenue (Selected Period)</span>
                     <strong>₹{totalFilteredRevenue.toLocaleString()}</strong>
@@ -5081,13 +5088,13 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
                     <span style={{ color: totalFilteredPending > 0 ? '#b91c1c' : '#64748b' }}>Outstanding Pending Fees</span>
                     <strong style={{ color: totalFilteredPending > 0 ? '#dc2626' : '#0f172a' }}>₹{totalFilteredPending.toLocaleString()}</strong>
                     <small style={{ color: totalFilteredPending > 0 ? '#dc2626' : '#238558', fontWeight: 700 }}>
-                        {pendingStudentsList.length} students pending
+                        {pendingStudentsList.length} student{pendingStudentsList.length === 1 ? '' : 's'} pending
                     </small>
                 </div>
                 <div className="card">
                     <span>Lead Conversion Rate</span>
                     <strong>{conversionRate}%</strong>
-                    <small className="good">{safeAdmissions.length} admissions / {safeLeads.length} leads</small>
+                    <small className="good">{filteredAdmissions.length} admissions / {filteredLeads.length} leads</small>
                 </div>
                 <div className="card">
                     <span>Enrolled Students</span>
@@ -5102,7 +5109,7 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
                         <b style={{ fontSize: 16, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 8 }}>
                             <AlertCircle size={18} /> Monthly Outstanding Fee Breakdown
                         </b>
-                        <span style={{ fontSize: 12, color: '#64748b' }}>Students with pending fee balances for {selectedMonth === 'ALL' ? 'all months' : selectedMonth}</span>
+                        <span style={{ fontSize: 12, color: '#64748b' }}>Students with pending fee balances for the selected date range ({fromDate || 'Start'} to {toDate || 'Today'})</span>
                     </div>
                     <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c', padding: '4px 10px', fontSize: 12, fontWeight: 700 }}>
                         Total Pending: ₹{totalFilteredPending.toLocaleString()}
