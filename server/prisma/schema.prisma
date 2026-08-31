@@ -287,7 +287,10 @@ model Batch {
   capacity   Int          @default(25)
   room       String?
   mode       String?
-  status     BatchStatus  @default(UPCOMING)
+  status            BatchStatus  @default(UPCOMING)
+  progress          String       @default("IN_PROGRESS")
+  syllabusProgress  Int          @default(0)
+  certificateStatus String       @default("IN_PROGRESS")
   admissions Admission[]
   attendance Attendance[]
   createdAt  DateTime     @default(now())

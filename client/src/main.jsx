@@ -261,11 +261,16 @@ function App() {
     const [editingCourse, setEditingCourse] = useState(null);
     const [editCourseForm, setEditCourseForm] = useState({ id: '', courseCode: '', name: '', description: '', standardFee: '', isActive: true });
     const [editingBatch, setEditingBatch] = useState(null);
-    const [editBatchForm, setEditBatchForm] = useState({ id: '', batchCode: '', name: '', courseId: '', trainerId: '', startDate: '', endDate: '', capacity: 25 });
+    const [editBatchForm, setEditBatchForm] = useState({ id: '', batchCode: '', name: '', courseId: '', trainerId: '', startDate: '', endDate: '', capacity: 25, progress: 'In Progress', syllabusProgress: 0, certificateStatus: 'IN_PROGRESS' });
     const [editingStudent, setEditingStudent] = useState(null);
     const [editStudentForm, setEditStudentForm] = useState({ id: '', studentCode: '', firstName: '', parentName: '', dateOfBirth: '', address: '', phone: '', email: '', passportNumber: '', photoUrl: '' });
     const [editingPayment, setEditingPayment] = useState(null);
     const [editPaymentForm, setEditPaymentForm] = useState({ id: '', receiptNumber: '', amount: '', paymentMethod: 'UPI', transactionReference: '', remarks: '' });
+
+    // Assign Batch Modal State
+    const [showAssignBatchModal, setShowAssignBatchModal] = useState(false);
+    const [assignBatchForm, setAssignBatchForm] = useState({ batchId: '', selectedStudentIds: [] });
+    const [assignBatchSearchQuery, setAssignBatchSearchQuery] = useState('');
 
     const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -280,7 +285,7 @@ function App() {
     const [addLeadForm, setAddLeadForm] = useState({ firstName: '', lastName: '', phone: '', email: '', interestedCourse: '', estimatedValue: '', sourceId: '', leadType: 'STANDARD', assignedCounsellorId: '', branchId: '', leadDate: new Date().toISOString().slice(0, 10) });
     const [scheduleForm, setScheduleForm] = useState({ leadId: '', scheduledAt: '', type: 'CALL', notes: '' });
     const [addCourseForm, setAddCourseForm] = useState({ courseCode: '', name: '', description: '', standardFee: '' });
-    const [addBatchForm, setAddBatchForm] = useState({ batchCode: '', name: '', courseId: '', trainerId: '', startDate: '', endDate: '', capacity: 25 });
+    const [addBatchForm, setAddBatchForm] = useState({ batchCode: '', name: '', courseId: '', trainerId: '', startDate: '', endDate: '', capacity: 25, progress: 'In Progress', syllabusProgress: 0, certificateStatus: 'IN_PROGRESS' });
     const [addStudentForm, setAddStudentForm] = useState({ studentCode: '', firstName: '', parentName: '', dateOfBirth: '', address: '', phone: '', email: '', passportNumber: '', photoUrl: '' });
     const [addAdmissionForm, setAddAdmissionForm] = useState({ admissionNumber: '', leadId: '', studentId: '', studentName: '', studentPhone: '', studentEmail: '', studentAddress: '', courseId: '', batchId: '', startDate: '', endDate: '', agreedFee: '', finalFee: '' });
     const [studentSearchQuery, setStudentSearchQuery] = useState('');
@@ -609,13 +614,19 @@ function App() {
             const res = await fetch(API_BASE + '/batches', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify({ ...addBatchForm, capacity: Number(addBatchForm.capacity) || 25, branchId: activeBranch })
+                body: JSON.stringify({
+                    ...addBatchForm,
+                    capacity: Number(addBatchForm.capacity) || 25,
+                    syllabusProgress: Number(addBatchForm.syllabusProgress) || 0,
+                    branchId: activeBranch
+                })
             });
             const j = await res.json();
             if (!j.success) return alert(j.message || 'Create batch failed');
             fetchAllData();
             setShowAddBatch(false);
-            setAddBatchForm({ batchCode: '', name: '', courseId: '', trainerId: '', startDate: '', endDate: '', capacity: 25 });
+            setAddBatchForm({ batchCode: '', name: '', courseId: '', trainerId: '', startDate: '', endDate: '', capacity: 25, progress: 'In Progress', syllabusProgress: 0, certificateStatus: 'IN_PROGRESS' });
+            alert('✓ Batch created successfully.');
         } catch (e) {
             console.error(e);
             alert('Create batch failed');
@@ -627,15 +638,63 @@ function App() {
             const res = await fetch(API_BASE + '/batches/' + editBatchForm.id, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify({ ...editBatchForm, capacity: Number(editBatchForm.capacity) || 25 })
+                body: JSON.stringify({
+                    ...editBatchForm,
+                    capacity: Number(editBatchForm.capacity) || 25,
+                    syllabusProgress: Number(editBatchForm.syllabusProgress) || 0
+                })
             });
             const j = await res.json();
             if (!j.success) return alert(j.message || 'Update batch failed');
             fetchAllData();
             setEditingBatch(null);
+            alert('✓ Batch updated and synchronized successfully.');
         } catch (e) {
             console.error(e);
             alert('Update batch failed');
+        }
+    }
+
+    async function assignStudentsToBatchSubmit() {
+        if (!assignBatchForm.batchId) return alert('Please select a target batch.');
+        if (!assignBatchForm.selectedStudentIds || assignBatchForm.selectedStudentIds.length === 0) {
+            return alert('Please select at least one student to assign.');
+        }
+
+        try {
+            const res = await fetch(API_BASE + '/batches/' + assignBatchForm.batchId + '/assign', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify({ studentIds: assignBatchForm.selectedStudentIds })
+            });
+            const j = await res.json();
+            if (!j.success) return alert(j.message || 'Assign batch failed');
+            fetchAllData();
+            setShowAssignBatchModal(false);
+            setAssignBatchForm({ batchId: '', selectedStudentIds: [] });
+            setAssignBatchSearchQuery('');
+            alert('✓ Students assigned to batch successfully.');
+        } catch (e) {
+            console.error(e);
+            alert('Assign batch failed');
+        }
+    }
+
+    async function unassignStudentFromBatch(batchId, studentId, studentName) {
+        if (!window.confirm(`Are you sure you want to remove "${studentName}" from this batch?`)) return;
+        try {
+            const res = await fetch(API_BASE + '/batches/' + batchId + '/unassign', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify({ studentId })
+            });
+            const j = await res.json();
+            if (!j.success) return alert(j.message || 'Remove student failed');
+            fetchAllData();
+            alert('✓ Student removed from batch successfully.');
+        } catch (e) {
+            console.error(e);
+            alert('Remove student from batch failed');
         }
     }
 
@@ -907,7 +966,19 @@ function App() {
 
     function openEditBatch(b) {
         setEditingBatch(b);
-        setEditBatchForm({ id: b.id, batchCode: b.batchCode, name: b.name, courseId: b.courseId, trainerId: b.trainerId || b.trainer?.id || '', startDate: b.startDate ? b.startDate.slice(0, 10) : '', endDate: b.endDate ? b.endDate.slice(0, 10) : '', capacity: b.capacity });
+        setEditBatchForm({
+            id: b.id,
+            batchCode: b.batchCode || '',
+            name: b.name || '',
+            courseId: b.courseId || '',
+            trainerId: b.trainerId || b.trainer?.id || '',
+            startDate: b.startDate ? b.startDate.slice(0, 10) : '',
+            endDate: b.endDate ? b.endDate.slice(0, 10) : '',
+            capacity: b.capacity || 25,
+            progress: b.progress || 'In Progress',
+            syllabusProgress: typeof b.syllabusProgress === 'number' ? b.syllabusProgress : 0,
+            certificateStatus: b.certificateStatus || 'IN_PROGRESS'
+        });
     }
 
     function openEditStudent(s) {
@@ -1209,6 +1280,8 @@ function App() {
                             usersList={usersList}
                             sourcesList={sourcesList}
                             onOpenAddModal={() => openAddModalForPage(page)}
+                            onOpenAssignBatchModal={() => setShowAssignBatchModal(true)}
+                            onUnassignStudentFromBatch={unassignStudentFromBatch}
                             onCompleteFollowup={completeFollowup}
                             onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
                             onAdmitFromFollowup={openAdmitFromFollowup}
@@ -1407,6 +1480,26 @@ function App() {
                         <label>
                             Capacity
                             <input type="number" value={editBatchForm.capacity} onChange={(e) => setEditBatchForm({ ...editBatchForm, capacity: e.target.value })} required />
+                        </label>
+                        <label>
+                            Progress Status
+                            <select value={editBatchForm.progress} onChange={(e) => setEditBatchForm({ ...editBatchForm, progress: e.target.value })}>
+                                <option value="Not Started">Not Started</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Completed">Completed</option>
+                            </select>
+                        </label>
+                        <label>
+                            Syllabus Progress (%)
+                            <input type="number" min="0" max="100" value={editBatchForm.syllabusProgress} onChange={(e) => setEditBatchForm({ ...editBatchForm, syllabusProgress: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} placeholder="0 - 100" />
+                        </label>
+                        <label>
+                            Certificate Status
+                            <select value={editBatchForm.certificateStatus} onChange={(e) => setEditBatchForm({ ...editBatchForm, certificateStatus: e.target.value })}>
+                                <option value="NOT_STARTED">Not Started / In Progress</option>
+                                <option value="IN_PROGRESS">In Progress</option>
+                                <option value="ISSUED">Issued</option>
+                            </select>
                         </label>
                         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                             <button className="primary" type="submit">Save Changes</button>
@@ -1719,6 +1812,26 @@ function App() {
                             Capacity
                             <input type="number" value={addBatchForm.capacity} onChange={(e) => setAddBatchForm({ ...addBatchForm, capacity: e.target.value })} required />
                         </label>
+                        <label>
+                            Progress Status
+                            <select value={addBatchForm.progress} onChange={(e) => setAddBatchForm({ ...addBatchForm, progress: e.target.value })}>
+                                <option value="Not Started">Not Started</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Completed">Completed</option>
+                            </select>
+                        </label>
+                        <label>
+                            Syllabus Progress (%)
+                            <input type="number" min="0" max="100" value={addBatchForm.syllabusProgress} onChange={(e) => setAddBatchForm({ ...addBatchForm, syllabusProgress: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} placeholder="0 - 100" />
+                        </label>
+                        <label>
+                            Certificate Status
+                            <select value={addBatchForm.certificateStatus} onChange={(e) => setAddBatchForm({ ...addBatchForm, certificateStatus: e.target.value })}>
+                                <option value="NOT_STARTED">Not Started / In Progress</option>
+                                <option value="IN_PROGRESS">In Progress</option>
+                                <option value="ISSUED">Issued</option>
+                            </select>
+                        </label>
                         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                             <button className="primary" type="submit">
                                 Create Batch
@@ -1728,6 +1841,189 @@ function App() {
                             </button>
                         </div>
                     </form>
+                </div>
+            )}
+
+            {showAssignBatchModal && (
+                <div className="modal" style={{ backdropFilter: 'blur(4px)', background: 'rgba(15, 23, 42, 0.65)' }}>
+                    <div className="panel" style={{ maxWidth: 640, width: '92vw', borderRadius: 12, padding: 24, background: '#ffffff' }}>
+                        <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 700, color: '#0f172a', borderBottom: '1px solid #e2e8f0', paddingBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span>Assign Students to Batch</span>
+                            <button type="button" className="secondary" style={{ padding: '4px 8px', border: 'none', background: 'transparent', cursor: 'pointer' }} onClick={() => setShowAssignBatchModal(false)}>✕</button>
+                        </h3>
+
+                        {/* SELECT BATCH DROPDOWN */}
+                        <div style={{ marginBottom: 16 }}>
+                            <label style={{ fontWeight: 600, fontSize: 13, marginBottom: 6, display: 'block' }}>Select Target Batch</label>
+                            <select
+                                value={assignBatchForm.batchId}
+                                onChange={(e) => setAssignBatchForm({ ...assignBatchForm, batchId: e.target.value })}
+                                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14, background: '#f8fafc' }}
+                                required
+                            >
+                                <option value="">Select Batch ▼</option>
+                                {batches.map((b) => (
+                                    <option key={b.id} value={b.id}>
+                                        {b.batchCode} — {b.name} ({b.course?.name || 'No Course'})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* BATCH CAPACITY & SEAT SUMMARY */}
+                        {(() => {
+                            const selectedBatch = batches.find((b) => b.id === assignBatchForm.batchId);
+                            if (!selectedBatch) return null;
+                            const assignedCount = selectedBatch.admissions?.length || 0;
+                            const capacity = selectedBatch.capacity || 25;
+                            const available = Math.max(0, capacity - assignedCount);
+
+                            return (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, padding: 12, background: '#f1f5f9', borderRadius: 8, marginBottom: 16, textAlign: 'center' }}>
+                                    <div>
+                                        <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Batch Capacity</div>
+                                        <div style={{ fontSize: 18, fontWeight: 700, color: '#0f172a' }}>{capacity}</div>
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Currently Assigned</div>
+                                        <div style={{ fontSize: 18, fontWeight: 700, color: '#2563eb' }}>{assignedCount}</div>
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Available Seats</div>
+                                        <div style={{ fontSize: 18, fontWeight: 700, color: available > 0 ? '#16a34a' : '#dc2626' }}>{available}</div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* SEARCH STUDENTS INPUT */}
+                        <div style={{ marginBottom: 12 }}>
+                            <label style={{ fontWeight: 600, fontSize: 13, marginBottom: 6, display: 'block' }}>Search Students</label>
+                            <input
+                                type="text"
+                                placeholder="🔍 Search by Student ID, Name, or Phone..."
+                                value={assignBatchSearchQuery}
+                                onChange={(e) => setAssignBatchSearchQuery(e.target.value)}
+                                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14 }}
+                            />
+                        </div>
+
+                        {/* STUDENT CHECKBOX SELECTION LIST */}
+                        <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, background: '#fafafa', padding: 8, marginBottom: 16 }}>
+                            {(() => {
+                                const selectedBatch = batches.find((b) => b.id === assignBatchForm.batchId);
+                                const q = assignBatchSearchQuery.toLowerCase().trim();
+
+                                const filteredStudentsList = students.filter((s) => {
+                                    if (!q) return true;
+                                    const code = (s.studentCode || '').toLowerCase();
+                                    const name = (s.firstName || s.name || '').toLowerCase();
+                                    const phone = (s.phone || '').toLowerCase();
+                                    return code.includes(q) || name.includes(q) || phone.includes(q);
+                                });
+
+                                if (filteredStudentsList.length === 0) {
+                                    return <div style={{ padding: 20, textAlign: 'center', color: '#64748b', fontSize: 13 }}>No matching students found.</div>;
+                                }
+
+                                return filteredStudentsList.map((s) => {
+                                    const isChecked = assignBatchForm.selectedStudentIds.includes(s.id);
+                                    const studentAdmission = admissions.find((a) => a.studentId === s.id);
+                                    const currentBatchId = studentAdmission?.batchId;
+                                    const currentBatch = batches.find((b) => b.id === currentBatchId);
+
+                                    return (
+                                        <div
+                                            key={s.id}
+                                            onClick={() => {
+                                                if (!selectedBatch) return alert('Please select a target batch first.');
+
+                                                if (currentBatch && currentBatch.id !== selectedBatch.id && !isChecked) {
+                                                    const confirmMove = window.confirm(
+                                                        `${s.firstName || s.name} is currently assigned to "${currentBatch.name}". Do you want to move this student to "${selectedBatch.name}"?`
+                                                    );
+                                                    if (!confirmMove) return;
+                                                }
+
+                                                const updatedSelected = isChecked
+                                                    ? assignBatchForm.selectedStudentIds.filter((id) => id !== s.id)
+                                                    : [...assignBatchForm.selectedStudentIds, s.id];
+
+                                                setAssignBatchForm({ ...assignBatchForm, selectedStudentIds: updatedSelected });
+                                            }}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justify: 'space-between',
+                                                padding: '10px 12px',
+                                                borderBottom: '1px solid #f1f5f9',
+                                                cursor: 'pointer',
+                                                background: isChecked ? 'rgba(59, 130, 246, 0.08)' : '#ffffff',
+                                                borderRadius: 6,
+                                                marginBottom: 4
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={() => {}}
+                                                    style={{ width: 16, height: 16, cursor: 'pointer' }}
+                                                />
+                                                <div>
+                                                    <div style={{ fontWeight: 600, fontSize: 14, color: '#0f172a' }}>
+                                                        <span style={{ color: '#2563eb', fontFamily: 'monospace', marginRight: 6 }}>{s.studentCode || 'STU'}</span>
+                                                        {s.firstName || s.name}
+                                                    </div>
+                                                    <div style={{ fontSize: 12, color: '#64748b' }}>📞 {s.phone || 'No phone'}</div>
+                                                </div>
+                                            </div>
+
+                                            {currentBatch ? (
+                                                <span className="badge" style={{ background: currentBatch.id === selectedBatch?.id ? '#dcfce7' : '#fef3c7', color: currentBatch.id === selectedBatch?.id ? '#15803d' : '#b45309', fontSize: 11 }}>
+                                                    {currentBatch.id === selectedBatch?.id ? 'Current Batch ✓' : `Current: ${currentBatch.name}`}
+                                                </span>
+                                            ) : (
+                                                <span style={{ fontSize: 11, color: '#94a3b8' }}>Unassigned</span>
+                                            )}
+                                        </div>
+                                    );
+                                });
+                            })()}
+                        </div>
+
+                        {/* MODAL ACTION BUTTONS */}
+                        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                            <button type="button" className="secondary" onClick={() => setShowAssignBatchModal(false)}>
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="primary"
+                                onClick={() => {
+                                    const selectedBatch = batches.find((b) => b.id === assignBatchForm.batchId);
+                                    if (!selectedBatch) return alert('Please select a target batch.');
+
+                                    const assignedCount = selectedBatch.admissions?.length || 0;
+                                    const capacity = selectedBatch.capacity || 25;
+                                    const available = Math.max(0, capacity - assignedCount);
+
+                                    const newStudentsToAssign = assignBatchForm.selectedStudentIds.filter((sid) => {
+                                        const adm = admissions.find((a) => a.studentId === sid);
+                                        return adm?.batchId !== selectedBatch.id;
+                                    });
+
+                                    if (newStudentsToAssign.length > available) {
+                                        return alert(`Only ${available} seat${available === 1 ? '' : 's'} available in this batch (${selectedBatch.name}). Cannot assign ${newStudentsToAssign.length} student(s).`);
+                                    }
+
+                                    assignStudentsToBatchSubmit();
+                                }}
+                            >
+                                Assign {assignBatchForm.selectedStudentIds.length} Student{assignBatchForm.selectedStudentIds.length === 1 ? '' : 's'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -3257,7 +3553,7 @@ function Dashboard({ user, token, leads = [], followups = [], admissions = [], p
     );
 }
 
-function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onAdmitFromFollowup, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onEditStudent, onDeleteStudent, onDeleteAdmission, onEditPayment, onDeletePayment, onPreviewPhoto, onOpenEditProgress, currentUserId, userRole, user, token, theme, toggleTheme, refreshData }) {
+function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onOpenAssignBatchModal, onUnassignStudentFromBatch, onCompleteFollowup, onOpenWhatsApp, onAdmitFromFollowup, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onEditStudent, onDeleteStudent, onDeleteAdmission, onEditPayment, onDeletePayment, onPreviewPhoto, onOpenEditProgress, currentUserId, userRole, user, token, theme, toggleTheme, refreshData }) {
     const itemSingular = page === 'Batches' ? 'Batch' : (page.endsWith('es') ? page.slice(0, -2) : (page.endsWith('s') ? page.slice(0, -1) : page));
     const [filterText, setFilterText] = useState('');
     const [paymentFromDate, setPaymentFromDate] = useState('');
@@ -3265,6 +3561,8 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
     const [paymentMonth, setPaymentMonth] = useState('ALL');
 
     const [expandedAdmissionId, setExpandedAdmissionId] = useState(null);
+    const [expandedBatchId, setExpandedBatchId] = useState(null);
+    const [batchStudentFilter, setBatchStudentFilter] = useState('');
     const [paymentModalData, setPaymentModalData] = useState(null);
     const [paymentForm, setPaymentForm] = useState({ amount: '', paymentMethod: 'UPI', transactionReference: '', notes: '' });
     const [paymentSubmitting, setPaymentSubmitting] = useState(false);
@@ -3501,9 +3799,20 @@ ${instituteName}`;
                     <p>Manage your {page.toLowerCase()} in one place.</p>
                 </div>
                 {page !== 'Settings' && page !== 'Reports' && (
-                    <button className="primary" onClick={onOpenAddModal}>
-                        <Plus size={17} /> Add {itemSingular}
-                    </button>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <button className="primary" onClick={onOpenAddModal}>
+                            <Plus size={17} /> Add {itemSingular}
+                        </button>
+                        {page === 'Batches' && (
+                            <button
+                                className="secondary"
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, background: '#f1f5f9', color: '#0f172a', borderColor: '#cbd5e1' }}
+                                onClick={() => onOpenAssignBatchModal && onOpenAssignBatchModal()}
+                            >
+                                <Users size={16} /> Assign Batch
+                            </button>
+                        )}
+                    </div>
                 )}
             </div>
 
@@ -3740,50 +4049,206 @@ ${instituteName}`;
                                 <th>Batch Name</th>
                                 <th>Course</th>
                                 <th>Faculty Person</th>
-                                <th>Start Date</th>
-                                <th>End Date</th>
-                                <th>Capacity</th>
-                                <th>Status</th>
+                                <th>Progress</th>
+                                <th>Syllabus (%)</th>
+                                <th>Certificate</th>
+                                <th>Capacity / Seats</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {safeBatches
                                 .filter((b) => !lowerFilter || (b.name + ' ' + b.batchCode + ' ' + (b.trainer?.name || '')).toLowerCase().includes(lowerFilter))
-                                .map((b) => (
-                                    <tr key={b.id}>
-                                        <td><b>{b.batchCode}</b></td>
-                                        <td>{b.name}</td>
-                                        <td>{b.course?.name || '-'}</td>
-                                        <td><b>{b.trainer?.name || '-'}</b></td>
-                                        <td>{formatDate(b.startDate)}</td>
-                                        <td>{b.endDate ? formatDate(b.endDate) : '-'}</td>
-                                        <td>{b.capacity} students</td>
-                                        <td><span className="status active">{b.status}</span></td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: 6 }}>
-                                                <button
-                                                    type="button"
-                                                    className="secondary"
-                                                    style={{ padding: '4px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                    onClick={() => onEditBatch(b)}
-                                                    title="Edit Batch Details"
-                                                >
-                                                    <Edit size={13} /> Edit
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="secondary"
-                                                    style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                    onClick={() => onDeleteBatch(b.id, b.name)}
-                                                    title="Delete Batch"
-                                                >
-                                                    <Trash2 size={13} /> Delete
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                            ))}
+                                .map((b) => {
+                                    const assignedCount = b.admissions?.length || 0;
+                                    const capacity = b.capacity || 25;
+                                    const available = Math.max(0, capacity - assignedCount);
+                                    const isExpanded = expandedBatchId === b.id;
+                                    const sylPct = typeof b.syllabusProgress === 'number' ? b.syllabusProgress : 0;
+
+                                    return (
+                                        <React.Fragment key={b.id}>
+                                            <tr style={{ background: isExpanded ? 'rgba(59, 130, 246, 0.05)' : 'transparent' }}>
+                                                <td><b>{b.batchCode}</b></td>
+                                                <td>{b.name}</td>
+                                                <td>{b.course?.name || '-'}</td>
+                                                <td><b>{b.trainer?.name || '-'}</b></td>
+                                                <td>
+                                                    <span className="badge" style={{ background: b.progress === 'Completed' ? '#dcfce7' : '#dbeafe', color: b.progress === 'Completed' ? '#15803d' : '#1d4ed8', fontSize: 11 }}>
+                                                        {b.progress === 'Completed' ? '🟢 Completed' : b.progress || 'In Progress'}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        <div style={{ width: 60, height: 6, borderRadius: 3, background: '#e2e8f0', overflow: 'hidden' }}>
+                                                            <div style={{ width: `${sylPct}%`, height: '100%', background: sylPct === 100 ? '#16a34a' : '#2563eb' }} />
+                                                        </div>
+                                                        <span style={{ fontSize: 12, fontWeight: 700 }}>{sylPct}%</span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span className="badge" style={{ background: b.certificateStatus === 'ISSUED' ? '#dcfce7' : '#fef3c7', color: b.certificateStatus === 'ISSUED' ? '#15803d' : '#b45309', fontSize: 11 }}>
+                                                        {b.certificateStatus === 'ISSUED' ? '✓ Issued' : 'In Progress'}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span style={{ fontSize: 12, fontWeight: 600 }}>{assignedCount} / {capacity}</span>
+                                                    <span style={{ fontSize: 11, color: available > 0 ? '#16a34a' : '#dc2626', marginLeft: 4 }}>({available} left)</span>
+                                                </td>
+                                                <td>
+                                                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                                        <button
+                                                            type="button"
+                                                            className="secondary"
+                                                            style={{ padding: '4px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                            onClick={() => setExpandedBatchId(isExpanded ? null : b.id)}
+                                                            title="Toggle Batch Details & Assigned Students"
+                                                        >
+                                                            <Eye size={13} /> {isExpanded ? 'Hide' : 'View'}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="secondary"
+                                                            style={{ padding: '4px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                            onClick={() => onEditBatch(b)}
+                                                            title="Edit Batch Details"
+                                                        >
+                                                            <Edit size={13} /> Edit
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="secondary"
+                                                            style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                            onClick={() => onDeleteBatch(b.id, b.name)}
+                                                            title="Delete Batch"
+                                                        >
+                                                            <Trash2 size={13} /> Delete
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+
+                                            {/* EXPANDED BATCH DETAILS & ASSIGNED STUDENTS */}
+                                            {isExpanded && (
+                                                <tr>
+                                                    <td colSpan={9} style={{ padding: 16, background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                                                        <div style={{ background: '#ffffff', borderRadius: 10, padding: 20, border: '1px solid #e2e8f0' }}>
+                                                            {/* HEADER & SUMMARY */}
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+                                                                <div>
+                                                                    <h4 style={{ margin: '0 0 4px', fontSize: 18, color: '#0f172a' }}>{b.name} ({b.batchCode})</h4>
+                                                                    <span style={{ fontSize: 13, color: '#64748b' }}>Course: <b>{b.course?.name || 'Unassigned'}</b> | Faculty: <b>{b.trainer?.name || 'Unassigned'}</b></span>
+                                                                </div>
+                                                                <div style={{ display: 'flex', gap: 8 }}>
+                                                                    <button className="primary" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => onOpenAssignBatchModal && onOpenAssignBatchModal()}>
+                                                                        <Users size={14} /> Assign Students
+                                                                    </button>
+                                                                    <button className="secondary" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => onEditBatch(b)}>
+                                                                        <Edit size={14} /> Edit Batch
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* PROGRESS METRICS */}
+                                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
+                                                                <div style={{ padding: 12, background: '#f1f5f9', borderRadius: 8 }}>
+                                                                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>PROGRESS</div>
+                                                                    <div style={{ fontSize: 14, fontWeight: 700, color: '#1d4ed8', marginTop: 4 }}>{b.progress || 'In Progress'}</div>
+                                                                </div>
+                                                                <div style={{ padding: 12, background: '#f1f5f9', borderRadius: 8 }}>
+                                                                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>SYLLABUS PROGRESS</div>
+                                                                    <div style={{ fontSize: 14, fontWeight: 700, color: '#16a34a', marginTop: 4 }}>{sylPct}%</div>
+                                                                </div>
+                                                                <div style={{ padding: 12, background: '#f1f5f9', borderRadius: 8 }}>
+                                                                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>CERTIFICATE STATUS</div>
+                                                                    <div style={{ fontSize: 14, fontWeight: 700, color: '#b45309', marginTop: 4 }}>{b.certificateStatus === 'ISSUED' ? 'Issued' : 'In Progress'}</div>
+                                                                </div>
+                                                                <div style={{ padding: 12, background: '#f1f5f9', borderRadius: 8 }}>
+                                                                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>SEAT CAPACITY</div>
+                                                                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginTop: 4 }}>{assignedCount} / {capacity} ({available} available)</div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* ASSIGNED STUDENTS SECTION */}
+                                                            <div>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                                                    <h5 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
+                                                                        Assigned Students ({assignedCount}/{capacity})
+                                                                    </h5>
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="🔍 Filter assigned students..."
+                                                                        value={batchStudentFilter}
+                                                                        onChange={(e) => setBatchStudentFilter(e.target.value)}
+                                                                        style={{ padding: '6px 10px', fontSize: 12, borderRadius: 6, border: '1px solid #cbd5e1', width: 220 }}
+                                                                    />
+                                                                </div>
+
+                                                                {!b.admissions || b.admissions.length === 0 ? (
+                                                                    <div style={{ padding: 20, textAlign: 'center', color: '#64748b', background: '#fafafa', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }}>
+                                                                        No students currently assigned to this batch. Click <b>[ Assign Students ]</b> to add students.
+                                                                    </div>
+                                                                ) : (
+                                                                    <table style={{ width: '100%', fontSize: 13 }}>
+                                                                        <thead>
+                                                                            <tr style={{ background: '#f1f5f9' }}>
+                                                                                <th>Student ID</th>
+                                                                                <th>Student Name</th>
+                                                                                <th>Phone</th>
+                                                                                <th>Admission #</th>
+                                                                                <th>Action</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                            {b.admissions
+                                                                                .filter((adm) => {
+                                                                                    if (!batchStudentFilter.trim()) return true;
+                                                                                    const bf = batchStudentFilter.toLowerCase();
+                                                                                    const st = adm.student;
+                                                                                    return (st?.studentCode || '').toLowerCase().includes(bf) || (st?.firstName || '').toLowerCase().includes(bf) || (st?.phone || '').includes(bf) || (adm.admissionNumber || '').toLowerCase().includes(bf);
+                                                                                })
+                                                                                .map((adm) => (
+                                                                                    <tr key={adm.id}>
+                                                                                        <td><b style={{ color: '#2563eb' }}>{adm.student?.studentCode || 'STU'}</b></td>
+                                                                                        <td>{adm.student?.firstName || adm.student?.name || 'Student'}</td>
+                                                                                        <td>{adm.student?.phone || '-'}</td>
+                                                                                        <td><b>{adm.admissionNumber}</b></td>
+                                                                                        <td>
+                                                                                            <div style={{ display: 'flex', gap: 6 }}>
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    className="secondary"
+                                                                                                    style={{ padding: '3px 6px', fontSize: 11 }}
+                                                                                                    onClick={() => {
+                                                                                                        setPage('Students');
+                                                                                                        setFilterText(adm.student?.studentCode || '');
+                                                                                                    }}
+                                                                                                >
+                                                                                                    View
+                                                                                                </button>
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    className="secondary"
+                                                                                                    style={{ padding: '3px 6px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }}
+                                                                                                    onClick={() => onUnassignStudentFromBatch && onUnassignStudentFromBatch(b.id, adm.studentId, adm.student?.firstName || 'Student')}
+                                                                                                >
+                                                                                                    Remove
+                                                                                                </button>
+                                                                                            </div>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </React.Fragment>
+                                    );
+                                })}
                         </tbody>
                     </table>
                 )}
@@ -4078,7 +4543,23 @@ ${instituteName}`;
                                                                     <div style={{ background: '#ffffff', padding: 14, borderRadius: 8, border: '1px solid #e2e8f0' }}>
                                                                         <h5 style={{ margin: '0 0 8px', fontSize: 13, color: '#16a34a', fontWeight: 700 }}>Course & Batch Information</h5>
                                                                         <p style={{ margin: '3px 0', fontSize: 13 }}><b>Course:</b> {a.course?.name || '-'}</p>
-                                                                        <p style={{ margin: '3px 0', fontSize: 13 }}><b>Batch:</b> {a.batch?.name || 'Standard Batch'}</p>
+                                                                        <p style={{ margin: '3px 0', fontSize: 13 }}><b>Batch:</b> {a.batch?.name || 'Standard Batch'} {a.batch?.batchCode ? `(${a.batch.batchCode})` : ''}</p>
+                                                                        {a.batch?.trainer?.name && <p style={{ margin: '3px 0', fontSize: 13 }}><b>Faculty:</b> {a.batch.trainer.name}</p>}
+                                                                        <p style={{ margin: '3px 0', fontSize: 13 }}>
+                                                                            <b>Progress:</b>{' '}
+                                                                            <span className="badge" style={{ background: (a.batch?.progress || 'In Progress') === 'Completed' ? '#dcfce7' : '#dbeafe', color: (a.batch?.progress || 'In Progress') === 'Completed' ? '#15803d' : '#1d4ed8', fontSize: 11 }}>
+                                                                                {(a.batch?.progress || 'In Progress') === 'Completed' ? '🟢 Completed' : a.batch?.progress || 'In Progress'}
+                                                                            </span>
+                                                                        </p>
+                                                                        <p style={{ margin: '3px 0', fontSize: 13 }}>
+                                                                            <b>Syllabus Progress:</b> <b>{typeof a.batch?.syllabusProgress === 'number' ? a.batch.syllabusProgress : a.completionPct || 0}%</b>
+                                                                        </p>
+                                                                        <p style={{ margin: '3px 0', fontSize: 13 }}>
+                                                                            <b>Certificate:</b>{' '}
+                                                                            <span className="badge" style={{ background: (a.batch?.certificateStatus || a.certificate?.status) === 'ISSUED' ? '#dcfce7' : '#fef3c7', color: (a.batch?.certificateStatus || a.certificate?.status) === 'ISSUED' ? '#15803d' : '#b45309', fontSize: 11 }}>
+                                                                                {(a.batch?.certificateStatus || a.certificate?.status) === 'ISSUED' ? '✓ Issued' : 'In Progress'}
+                                                                            </span>
+                                                                        </p>
                                                                         <p style={{ margin: '3px 0', fontSize: 13 }}><b>Start Date:</b> {formatDate(a.startDate)}</p>
                                                                         <p style={{ margin: '3px 0', fontSize: 13 }}><b>End Date:</b> {formatDate(a.endDate)}</p>
                                                                     </div>
