@@ -1554,8 +1554,8 @@ function App() {
                             <input value={addStudentForm.firstName} onChange={(e) => setAddStudentForm({ ...addStudentForm, firstName: e.target.value })} required />
                         </label>
                         <label>
-                            Last Name
-                            <input value={addStudentForm.lastName} onChange={(e) => setAddStudentForm({ ...addStudentForm, lastName: e.target.value })} />
+                            Address
+                            <input value={addStudentForm.lastName} onChange={(e) => setAddStudentForm({ ...addStudentForm, lastName: e.target.value })} placeholder="Enter Address" />
                         </label>
                         <label>
                             Phone
