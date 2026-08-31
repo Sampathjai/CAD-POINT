@@ -17,7 +17,8 @@ const createLeadSchema = z.object({
   estimatedValue: z.string().optional(),
   branchId: z.string().optional(),
   leadType: z.string().optional(),
-  assignedCounsellorId: z.string().optional()
+  assignedCounsellorId: z.string().optional(),
+  leadDate: z.string().optional()
 });
 
 // Create lead
@@ -54,9 +55,10 @@ router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR','REC
         branchId: finalBranchId,
         leadType: data.leadType || 'STANDARD',
         assignedCounsellorId: data.assignedCounsellorId || null,
-        estimatedValue: data.estimatedValue ? data.estimatedValue : null
+        estimatedValue: data.estimatedValue ? data.estimatedValue : null,
+        ...(data.leadDate ? { createdAt: new Date(data.leadDate) } : {})
       },
-      include: { source: true, branch: true, assignedCounsellor: { select: { id: true, name: true, email: true } } }
+      include: { source: true, branch: true, assignedCounsellor: { select: { id: true, name: true, email: true } }, admission: true }
     });
     res.status(201).json({ success: true, data: lead });
   } catch (err) {
@@ -88,7 +90,7 @@ router.get('/', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR','RECE
     skip: (page - 1) * take,
     take,
     orderBy: { createdAt: 'desc' },
-    include: { source: true, branch: true, assignedCounsellor: { select: { id: true, name: true, email: true } } }
+    include: { source: true, branch: true, assignedCounsellor: { select: { id: true, name: true, email: true } }, admission: true }
   });
   res.json({ success: true, data: leads });
 });

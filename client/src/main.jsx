@@ -243,12 +243,12 @@ function App() {
     const [showSearchModal, setShowSearchModal] = useState(false);
 
     // Forms & Filters
-    const [addLeadForm, setAddLeadForm] = useState({ firstName: '', lastName: '', phone: '', email: '', interestedCourse: '', estimatedValue: '', sourceId: '', leadType: 'STANDARD', assignedCounsellorId: '', branchId: '' });
+    const [addLeadForm, setAddLeadForm] = useState({ firstName: '', lastName: '', phone: '', email: '', interestedCourse: '', estimatedValue: '', sourceId: '', leadType: 'STANDARD', assignedCounsellorId: '', branchId: '', leadDate: new Date().toISOString().slice(0, 10) });
     const [scheduleForm, setScheduleForm] = useState({ leadId: '', scheduledAt: '', type: 'CALL', notes: '' });
     const [addCourseForm, setAddCourseForm] = useState({ courseCode: '', name: '', description: '', standardFee: '' });
     const [addBatchForm, setAddBatchForm] = useState({ batchCode: '', name: '', courseId: '', startDate: '', endDate: '', capacity: 25 });
     const [addStudentForm, setAddStudentForm] = useState({ studentCode: '', firstName: '', lastName: '', phone: '', email: '', photoUrl: '' });
-    const [addAdmissionForm, setAddAdmissionForm] = useState({ admissionNumber: '', studentId: '', courseId: '', batchId: '', startDate: '', endDate: '', agreedFee: '', finalFee: '' });
+    const [addAdmissionForm, setAddAdmissionForm] = useState({ admissionNumber: '', leadId: '', studentId: '', studentName: '', studentPhone: '', studentEmail: '', studentAddress: '', courseId: '', batchId: '', startDate: '', endDate: '', agreedFee: '', finalFee: '' });
     const [addPaymentForm, setAddPaymentForm] = useState({ admissionId: '', receiptNumber: '', amount: '', paymentMethod: 'UPI', transactionReference: '', remarks: '' });
     const [addUserForm, setAddUserForm] = useState({ name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true });
 
@@ -477,7 +477,7 @@ function App() {
             if (!j.success) return alert(formatErrorMessage(j.message) || 'Create lead failed');
             fetchAllData();
             setShowAddLead(false);
-            setAddLeadForm({ firstName: '', lastName: '', phone: '', email: '', interestedCourse: '', estimatedValue: '', sourceId: '', leadType: 'STANDARD', assignedCounsellorId: '', branchId: '' });
+            setAddLeadForm({ firstName: '', lastName: '', phone: '', email: '', interestedCourse: '', estimatedValue: '', sourceId: '', leadType: 'STANDARD', assignedCounsellorId: '', branchId: '', leadDate: new Date().toISOString().slice(0, 10) });
         } catch (e) {
             console.error(e);
             alert('Create lead failed');
@@ -664,11 +664,43 @@ function App() {
             if (!j.success) return alert(formatErrorMessage(j.message) || 'Create admission failed');
             fetchAllData();
             setShowAddAdmission(false);
-            setAddAdmissionForm({ admissionNumber: '', studentId: '', courseId: '', batchId: '', startDate: '', endDate: '', agreedFee: '', finalFee: '' });
+            setAddAdmissionForm({ admissionNumber: '', leadId: '', studentId: '', studentName: '', studentPhone: '', studentEmail: '', studentAddress: '', courseId: '', batchId: '', startDate: '', endDate: '', agreedFee: '', finalFee: '' });
         } catch (e) {
             console.error(e);
             alert('Create admission failed');
         }
+    }
+
+    function openAdmitFromFollowup(f) {
+        const lead = f?.lead;
+        if (!lead) return alert('Lead information not available for this follow-up.');
+
+        const existingAdm = lead.admission || admissions.find(a => a.leadId === lead.id);
+        if (existingAdm) {
+            alert(`This lead is already converted to Admission #${existingAdm.admissionNumber}.`);
+            setExpandedAdmissionId(existingAdm.id);
+            return;
+        }
+
+        const matchedCourse = courses.find(c => (c.name || '').toLowerCase() === (lead.interestedCourse || '').toLowerCase());
+        const existingStudent = students.find(s => s.phone && lead.phone && s.phone === lead.phone);
+
+        setAddAdmissionForm({
+            admissionNumber: '',
+            leadId: lead.id,
+            studentId: existingStudent ? existingStudent.id : '',
+            studentName: `${lead.firstName || ''} ${lead.lastName || ''}`.trim(),
+            studentPhone: lead.phone || '',
+            studentEmail: lead.email || '',
+            studentAddress: lead.city || '',
+            courseId: matchedCourse ? matchedCourse.id : '',
+            batchId: '',
+            startDate: new Date().toISOString().slice(0, 10),
+            endDate: '',
+            agreedFee: matchedCourse ? matchedCourse.standardFee : '',
+            finalFee: matchedCourse ? matchedCourse.standardFee : ''
+        });
+        setShowAddAdmission(true);
     }
 
     async function deleteAdmission(id, admissionNumber) {
@@ -1390,6 +1422,15 @@ function App() {
                             Estimated Value (₹)
                             <input type="number" value={addLeadForm.estimatedValue} onChange={(e) => setAddLeadForm({ ...addLeadForm, estimatedValue: e.target.value })} placeholder="30000" />
                         </label>
+                        <label>
+                            Lead Date <span style={{ color: '#dc2626' }}>*</span>
+                            <input
+                                type="date"
+                                value={addLeadForm.leadDate || new Date().toISOString().slice(0, 10)}
+                                onChange={(e) => setAddLeadForm({ ...addLeadForm, leadDate: e.target.value })}
+                                required
+                            />
+                        </label>
                         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                             <button className="primary" type="submit">
                                 Create Lead
@@ -1615,14 +1656,19 @@ function App() {
                         }}
                     >
                         <h3>Add Admission</h3>
+                        {addAdmissionForm.leadId && (
+                            <div style={{ background: '#e0f2fe', color: '#0369a1', padding: '10px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, marginBottom: 12 }}>
+                                🎓 Converting Lead to Admission: <b>{addAdmissionForm.studentName || 'Lead Student'}</b> ({addAdmissionForm.studentPhone})
+                            </div>
+                        )}
                         <label>
                             Admission Number
                             <input value={addAdmissionForm.admissionNumber} onChange={(e) => setAddAdmissionForm({ ...addAdmissionForm, admissionNumber: e.target.value })} placeholder="ADM-1001" required />
                         </label>
                         <label>
                             Student
-                            <select value={addAdmissionForm.studentId} onChange={(e) => setAddAdmissionForm({ ...addAdmissionForm, studentId: e.target.value })} required>
-                                <option value="">Select student</option>
+                            <select value={addAdmissionForm.studentId} onChange={(e) => setAddAdmissionForm({ ...addAdmissionForm, studentId: e.target.value })} required={!addAdmissionForm.studentName}>
+                                <option value="">{addAdmissionForm.studentName ? `Auto-create / Link Student: ${addAdmissionForm.studentName} (${addAdmissionForm.studentPhone})` : 'Select student'}</option>
                                 {students.map((s) => (
                                     <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.studentCode})</option>
                                 ))}
@@ -2793,6 +2839,7 @@ ${instituteName}`;
                         <thead>
                             <tr>
                                 <th>Lead</th>
+                                <th>Lead Date</th>
                                 <th>Course</th>
                                 <th>Source</th>
                                 <th>Phone</th>
@@ -2809,9 +2856,17 @@ ${instituteName}`;
                                         <td>
                                             <div className="lead">
                                                 <div className="mini">{((l.firstName || '').match(/\b\w/g) || []).slice(0, 2).join('') || 'LD'}</div>
-                                                <b>{(l.firstName || '') + (l.lastName ? ' ' + l.lastName : '') || l.leadNumber}</b>
+                                                <div>
+                                                    <b>{(l.firstName || '') + (l.lastName ? ' ' + l.lastName : '') || l.leadNumber}</b>
+                                                    {l.admission && (
+                                                        <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>
+                                                            ✓ Admission #{l.admission.admissionNumber}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </td>
+                                        <td>{formatDate(l.createdAt || l.leadDate)}</td>
                                         <td>{l.interestedCourse || '-'}</td>
                                         <td>{l.source?.name || 'Walk-in'}</td>
                                         <td>{l.phone}</td>
@@ -2847,27 +2902,74 @@ ${instituteName}`;
                         <tbody>
                             {safeFollowups
                                 .filter((f) => !lowerFilter || (f.notes || '' + f.type).toLowerCase().includes(lowerFilter))
-                                .map((f) => (
-                                    <tr key={f.id}>
-                                        <td>{formatDateTime(f.scheduledAt)}</td>
-                                        <td><b>{f.lead ? `${f.lead.firstName} ${f.lead.lastName || ''}`.trim() : f.leadId}</b></td>
-                                        <td>{f.type}</td>
-                                        <td>{f.notes || '-'}</td>
-                                        <td><span className={'status ' + (f.status || 'PENDING').toLowerCase()}>{f.status || 'PENDING'}</span></td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                                {f.status === 'PENDING' && (
-                                                    <button className="primary" style={{ padding: '4px 8px', fontSize: 12 }} onClick={() => onCompleteFollowup(f.id)}>
-                                                        Complete
-                                                    </button>
+                                .map((f) => {
+                                    const linkedAdmission = f.lead?.admission || safeAdmissions.find(a => a.leadId === f.leadId);
+                                    const isConverted = !!linkedAdmission || (f.lead?.status || '').toUpperCase() === 'CONVERTED' || (f.lead?.status || '').toUpperCase() === 'ADMISSION';
+
+                                    return (
+                                        <tr key={f.id}>
+                                            <td>{formatDateTime(f.scheduledAt)}</td>
+                                            <td>
+                                                <b>{f.lead ? `${f.lead.firstName} ${f.lead.lastName || ''}`.trim() : f.leadId}</b>
+                                                {linkedAdmission && (
+                                                    <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>
+                                                        Adm: #{linkedAdmission.admissionNumber}
+                                                    </div>
                                                 )}
-                                                <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#16a34a', borderColor: '#86efac' }} onClick={() => onOpenWhatsApp(f.lead, f)}>
-                                                    <MessageCircle size={13} /> WhatsApp
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                            ))}
+                                            </td>
+                                            <td>{f.type}</td>
+                                            <td>{f.notes || '-'}</td>
+                                            <td>
+                                                {isConverted ? (
+                                                    <span className="badge" style={{ background: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700 }}>
+                                                        🟢 Converted
+                                                    </span>
+                                                ) : f.status === 'COMPLETED' ? (
+                                                    <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', padding: '3px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700 }}>
+                                                        🔵 Completed
+                                                    </span>
+                                                ) : (
+                                                    <span className="badge" style={{ background: '#fef3c7', color: '#b45309', padding: '3px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700 }}>
+                                                        🟠 Pending
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                                    {isConverted ? (
+                                                        <button
+                                                            className="secondary"
+                                                            style={{ padding: '4px 8px', fontSize: 11, color: '#16a34a', borderColor: '#86efac', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                            onClick={() => linkedAdmission && setExpandedAdmissionId(linkedAdmission.id)}
+                                                            title={linkedAdmission ? `View Admission #${linkedAdmission.admissionNumber}` : 'View Admission'}
+                                                        >
+                                                            <Eye size={12} /> {linkedAdmission ? `#${linkedAdmission.admissionNumber}` : 'View Admission'}
+                                                        </button>
+                                                    ) : (
+                                                        <>
+                                                            {f.status === 'PENDING' && (
+                                                                <button className="primary" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => onCompleteFollowup(f.id)}>
+                                                                    Complete
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                className="primary"
+                                                                style={{ padding: '4px 8px', fontSize: 11, background: '#16a34a', borderColor: '#16a34a', color: '#ffffff', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                                onClick={() => openAdmitFromFollowup(f)}
+                                                                title="Convert lead to admission"
+                                                            >
+                                                                <GraduationCap size={13} /> Convert & Admit
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#16a34a', borderColor: '#86efac' }} onClick={() => onOpenWhatsApp(f.lead, f)}>
+                                                        <MessageCircle size={13} /> WhatsApp
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                         </tbody>
                     </table>
                 )}

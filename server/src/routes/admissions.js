@@ -44,7 +44,12 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
   try {
     const schema = z.object({
       admissionNumber: z.string().optional().or(z.literal('')),
-      studentId: z.string().uuid('Please select a valid student'),
+      leadId: z.string().optional().or(z.literal('')).nullable(),
+      studentId: z.string().optional().or(z.literal('')).nullable(),
+      studentName: z.string().optional(),
+      studentPhone: z.string().optional(),
+      studentEmail: z.string().optional(),
+      studentAddress: z.string().optional(),
       courseId: z.string().uuid('Please select a valid course'),
       batchId: z.string().uuid().optional().or(z.literal('')).nullable(),
       agreedFee: z.number().optional().or(z.literal(0)),
@@ -62,7 +67,54 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
       return res.status(400).json({ success: false, message: `${issue.path.join('.')}: ${issue.message}` });
     }
 
-    let { admissionNumber, studentId, courseId, batchId, agreedFee, finalFee, counsellorId, branchId, startDate, endDate, installmentPlan } = parsed.data;
+    let { admissionNumber, leadId, studentId, studentName, studentPhone, studentEmail, studentAddress, courseId, batchId, agreedFee, finalFee, counsellorId, branchId, startDate, endDate, installmentPlan } = parsed.data;
+
+    // Prevent duplicate admission for the same lead
+    if (leadId) {
+      const existingLeadAdmission = await prisma.admission.findFirst({ where: { leadId } });
+      if (existingLeadAdmission) {
+        return res.status(400).json({ success: false, message: `An admission already exists for this lead (Admission #${existingLeadAdmission.admissionNumber}). Duplicate admissions are not allowed.` });
+      }
+    }
+
+    // Resolve branch ID if code is passed
+    let finalBranchId = branchId;
+    if (finalBranchId) {
+      const b = await prisma.branch.findFirst({
+        where: { OR: [{ id: finalBranchId }, { code: finalBranchId.toLowerCase() }] }
+      });
+      if (b) finalBranchId = b.id;
+    }
+    if (!finalBranchId) {
+      const defaultBranch = await prisma.branch.findFirst({ where: { code: 'gandhipuram' } });
+      if (defaultBranch) finalBranchId = defaultBranch.id;
+    }
+
+    // Auto-create or link student if studentId is missing
+    if (!studentId || !studentId.trim()) {
+      if (studentPhone) {
+        const existingStudent = await prisma.student.findFirst({ where: { phone: studentPhone.trim() } });
+        if (existingStudent) {
+          studentId = existingStudent.id;
+        }
+      }
+      if (!studentId || !studentId.trim()) {
+        const sCount = await prisma.student.count();
+        const studentCode = `STU-${1001 + sCount}`;
+        const newStudent = await prisma.student.create({
+          data: {
+            studentCode,
+            firstName: studentName ? studentName.split(' ')[0] : 'Student',
+            lastName: studentName && studentName.split(' ').length > 1 ? studentName.split(' ').slice(1).join(' ') : '',
+            phone: studentPhone || '0000000000',
+            email: studentEmail || null,
+            address: studentAddress || null,
+            branchId: finalBranchId
+          }
+        });
+        studentId = newStudent.id;
+      }
+    }
 
     // Inherit start and end dates from selected batch if not explicitly set
     if (batchId) {
@@ -76,19 +128,6 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
     if (!admissionNumber || !admissionNumber.trim()) {
       const count = await prisma.admission.count();
       admissionNumber = `ADM-${1001 + count}`;
-    }
-
-    let finalBranchId = branchId;
-    if (finalBranchId) {
-      const b = await prisma.branch.findFirst({
-        where: { OR: [{ id: finalBranchId }, { code: finalBranchId.toLowerCase() }] }
-      });
-      if (b) finalBranchId = b.id;
-    }
-
-    if (!finalBranchId) {
-      const defaultBranch = await prisma.branch.findFirst({ where: { code: 'gandhipuram' } });
-      if (defaultBranch) finalBranchId = defaultBranch.id;
     }
 
     let planJson = null;
@@ -106,6 +145,7 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
     const admission = await prisma.admission.create({
       data: {
         admissionNumber,
+        leadId: leadId || null,
         studentId,
         courseId,
         batchId: batchId || null,
@@ -126,6 +166,19 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
         branch: true
       }
     });
+
+    // Mark Lead as CONVERTED and complete all related followups
+    if (leadId) {
+      await prisma.lead.update({
+        where: { id: leadId },
+        data: { status: 'CONVERTED' }
+      }).catch(e => console.error('Error updating lead status to CONVERTED', e));
+
+      await prisma.followUp.updateMany({
+        where: { leadId, status: 'PENDING' },
+        data: { status: 'COMPLETED', completedAt: new Date(), outcome: `Converted to Admission #${admission.admissionNumber}` }
+      }).catch(e => console.error('Error completing followups on conversion', e));
+    }
 
     res.status(201).json({ success: true, data: admission });
   } catch (err) {
