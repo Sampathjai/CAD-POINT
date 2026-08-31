@@ -1546,7 +1546,7 @@ function App() {
                     >
                         <h3>Add Student</h3>
                         <label>
-                            Student Code
+                            Student ID
                             <input value={addStudentForm.studentCode} onChange={(e) => setAddStudentForm({ ...addStudentForm, studentCode: e.target.value })} placeholder="STU-1001" required />
                         </label>
                         <label>
