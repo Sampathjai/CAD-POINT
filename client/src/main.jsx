@@ -846,7 +846,14 @@ function App() {
             const res = await fetch(API_BASE + '/admissions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify({ ...addAdmissionForm, finalFee: Number(addAdmissionForm.finalFee) || 0, branchId: activeBranch })
+                body: JSON.stringify({
+                    ...addAdmissionForm,
+                    finalFee: Number(addAdmissionForm.finalFee) || 0,
+                    agreedFee: (addAdmissionForm.agreedFee !== '' && addAdmissionForm.agreedFee !== null && addAdmissionForm.agreedFee !== undefined)
+                        ? Number(addAdmissionForm.agreedFee)
+                        : (Number(addAdmissionForm.finalFee) || 0),
+                    branchId: activeBranch
+                })
             });
             const j = await res.json();
             if (!j.success) return alert(formatErrorMessage(j.message) || 'Create admission failed');

@@ -52,8 +52,14 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
       studentAddress: z.string().optional(),
       courseId: z.string().uuid('Please select a valid course'),
       batchId: z.string().uuid().optional().or(z.literal('')).nullable(),
-      agreedFee: z.number().optional().or(z.literal(0)),
-      finalFee: z.number().min(0, 'Fee cannot be negative'),
+      agreedFee: z.preprocess(
+        (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+        z.number().optional()
+      ),
+      finalFee: z.preprocess(
+        (val) => (val === '' || val === null || val === undefined ? 0 : Number(val)),
+        z.number().min(0, 'Fee cannot be negative')
+      ),
       counsellorId: z.string().uuid().optional().or(z.literal('')).nullable(),
       branchId: z.string().optional(),
       startDate: z.string().optional().or(z.literal('')).nullable(),
@@ -149,7 +155,7 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
         studentId,
         courseId,
         batchId: batchId || null,
-        agreedFee: agreedFee || finalFee,
+        agreedFee: (typeof agreedFee === 'number' && !isNaN(agreedFee)) ? agreedFee : finalFee,
         finalFee,
         counsellorId: counsellorId || req.user?.id || null,
         branchId: finalBranchId,
