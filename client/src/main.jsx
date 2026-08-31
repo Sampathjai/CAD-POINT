@@ -3511,6 +3511,7 @@ ${instituteName}`;
                     const instDetails = getAdmissionInstallmentDetails(configureInstallmentData);
                     const finalFee = instDetails.finalFee;
                     const totalPaid = instDetails.totalPaid;
+                    const pendingAmount = instDetails.pendingAmount;
 
                     const inst1 = Number(installmentsForm.inst1) || 0;
                     const inst2 = Number(installmentsForm.inst2) || 0;
@@ -3550,140 +3551,210 @@ ${instituteName}`;
                         });
                     };
 
+                    const handleCloseModal = () => {
+                        setConfigureInstallmentData(null);
+                    };
+
+                    const studentName = configureInstallmentData.student
+                        ? `${configureInstallmentData.student.firstName} ${configureInstallmentData.student.lastName || ''}`.trim()
+                        : '-';
+                    const courseName = configureInstallmentData.course?.name || '-';
+
                     return (
-                        <div className="modal-backdrop">
-                            <form className="panel" onSubmit={handleConfigureInstallmentsSubmit} style={{ maxWidth: 540, width: '100%' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderBottom: '1px solid #e2e8f0', paddingBottom: 12 }}>
+                        <div
+                            className="modal"
+                            style={{
+                                position: 'fixed',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                width: '100vw',
+                                height: '100vh',
+                                background: 'rgba(15, 23, 42, 0.75)',
+                                backdropFilter: 'blur(6px)',
+                                WebkitBackdropFilter: 'blur(6px)',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                zIndex: 2500,
+                                padding: 16,
+                                boxSizing: 'border-box'
+                            }}
+                            onClick={(e) => {
+                                if (e.target === e.currentTarget) handleCloseModal();
+                            }}
+                        >
+                            <form
+                                className="panel"
+                                onSubmit={handleConfigureInstallmentsSubmit}
+                                style={{
+                                    maxWidth: 680,
+                                    width: '100%',
+                                    maxHeight: '90vh',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    padding: 0,
+                                    overflow: 'hidden',
+                                    borderRadius: 12,
+                                    boxShadow: '0 25px 60px rgba(0, 0, 0, 0.35)',
+                                    background: '#ffffff',
+                                    boxSizing: 'border-box'
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {/* Sticky Header */}
+                                <div style={{ background: '#ffffff', padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
                                     <div>
-                                        <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
                                             ⚙ {instDetails.hasCustomPlan ? 'Edit Planned Amounts' : 'Configure Planned Amounts'}
                                         </h3>
-                                        <p style={{ margin: '3px 0 0', fontSize: 12, color: '#64748b' }}>
-                                            Set how the total admission fee will be divided into 3 installments.
-                                        </p>
-                                    </div>
-                                    <button type="button" className="round" onClick={() => setConfigureInstallmentData(null)}>
-                                        <X size={16} />
-                                    </button>
-                                </div>
-
-                                {/* Admission Fee & Payment Progress Card */}
-                                <div style={{ background: '#f8fafc', padding: 14, borderRadius: 10, border: '1px solid #e2e8f0', marginBottom: 16 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                        <div>
-                                            <span style={{ fontSize: 12, color: '#64748b' }}>Total Course Fee</span>
-                                            <strong style={{ fontSize: 18, color: '#0f172a', display: 'block' }}>₹{finalFee.toLocaleString()}</strong>
-                                        </div>
-                                        <div style={{ textAlign: 'right' }}>
-                                            <span style={{ fontSize: 12, color: '#64748b' }}>Already Paid</span>
-                                            <strong style={{ fontSize: 18, color: '#16a34a', display: 'block' }}>₹{totalPaid.toLocaleString()}</strong>
+                                        <div style={{ margin: '4px 0 0', fontSize: 12, color: '#475569', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                                            <span><b>Admission #:</b> {configureInstallmentData.admissionNumber || configureInstallmentData.id}</span>
+                                            <span>• <b>Student:</b> {studentName}</span>
+                                            <span>• <b>Course:</b> {courseName}</span>
                                         </div>
                                     </div>
-
-                                    <div style={{ marginTop: 8 }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
-                                            <span>Payment Progress</span>
-                                            <span>{instDetails.progressPct}% Paid</span>
-                                        </div>
-                                        <div style={{ width: '100%', height: 8, background: '#cbd5e1', borderRadius: 4, overflow: 'hidden' }}>
-                                            <div style={{ width: `${instDetails.progressPct}%`, height: '100%', background: '#16a34a', borderRadius: 4 }}></div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Validation Error Alert */}
-                                {(installmentsError || localError) && (
-                                    <div style={{ background: '#fee2e2', color: '#991b1b', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 16, fontWeight: 600 }}>
-                                        {installmentsError || localError}
-                                    </div>
-                                )}
-
-                                {/* Auto Balance Action Bar */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                                    <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>3 Installment Slots</span>
                                     <button
                                         type="button"
-                                        className="secondary"
-                                        style={{ padding: '4px 12px', fontSize: 12, color: '#0284c7', borderColor: '#bae6fd', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                        onClick={handleAutoBalance}
+                                        className="round"
+                                        onClick={handleCloseModal}
+                                        style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', padding: 6, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                        title="Close"
                                     >
-                                        ⚡ Auto Balance
+                                        <X size={18} />
                                     </button>
                                 </div>
 
-                                {/* 3 Installment Configuration Cards */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 360, overflowY: 'auto', paddingRight: 4 }}>
-                                    {[1, 2, 3].map((num) => {
-                                        const instVal = num === 1 ? installmentsForm.inst1 : num === 2 ? installmentsForm.inst2 : installmentsForm.inst3;
-                                        const dateVal = num === 1 ? installmentsForm.date1 : num === 2 ? installmentsForm.date2 : installmentsForm.date3;
-                                        const paidVal = num === 1 ? paid1 : num === 2 ? paid2 : paid3;
-
-                                        return (
-                                            <div key={num} style={{ background: '#ffffff', padding: 14, borderRadius: 10, border: '1px solid #cbd5e1' }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                                                    <strong style={{ fontSize: 14, color: '#0f172a' }}>Installment {num}</strong>
-                                                    {paidVal > 0 ? (
-                                                        <span className="badge" style={{ background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700 }}>
-                                                            Already Paid: ₹{paidVal.toLocaleString()}
-                                                        </span>
-                                                    ) : (
-                                                        <span style={{ fontSize: 11, color: '#64748b' }}>Pending Payment</span>
-                                                    )}
-                                                </div>
-
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                                                    <label style={{ margin: 0 }}>
-                                                        <span style={{ fontSize: 12, fontWeight: 600 }}>Planned Amount (₹)</span>
-                                                        <input
-                                                            type="number"
-                                                            value={instVal}
-                                                            onChange={(e) => setInstallmentsForm({
-                                                                ...installmentsForm,
-                                                                [`inst${num}`]: e.target.value
-                                                            })}
-                                                            min={paidVal}
-                                                            required
-                                                            style={{ marginTop: 4 }}
-                                                        />
-                                                        {paidVal > 0 && (
-                                                            <span style={{ fontSize: 10, color: '#16a34a' }}>Min required: ₹{paidVal.toLocaleString()}</span>
-                                                        )}
-                                                    </label>
-
-                                                    <label style={{ margin: 0 }}>
-                                                        <span style={{ fontSize: 12, fontWeight: 600 }}>Due Date</span>
-                                                        <input
-                                                            type="date"
-                                                            value={dateVal}
-                                                            onChange={(e) => setInstallmentsForm({
-                                                                ...installmentsForm,
-                                                                [`date${num}`]: e.target.value
-                                                            })}
-                                                            style={{ marginTop: 4 }}
-                                                        />
-                                                    </label>
-                                                </div>
+                                {/* Scrollable Modal Content */}
+                                <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+                                    {/* Admission Fee & Payment Progress Card */}
+                                    <div style={{ background: '#f8fafc', padding: 14, borderRadius: 10, border: '1px solid #e2e8f0', marginBottom: 16 }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 12 }}>
+                                            <div>
+                                                <span style={{ fontSize: 11, color: '#64748b', display: 'block' }}>Total Course Fee</span>
+                                                <strong style={{ fontSize: 16, color: '#0f172a' }}>₹{finalFee.toLocaleString()}</strong>
                                             </div>
-                                        );
-                                    })}
-                                </div>
+                                            <div>
+                                                <span style={{ fontSize: 11, color: '#64748b', display: 'block' }}>Already Paid</span>
+                                                <strong style={{ fontSize: 16, color: '#16a34a' }}>₹{totalPaid.toLocaleString()}</strong>
+                                            </div>
+                                            <div>
+                                                <span style={{ fontSize: 11, color: '#64748b', display: 'block' }}>Pending Fee</span>
+                                                <strong style={{ fontSize: 16, color: pendingAmount > 0 ? '#dc2626' : '#16a34a' }}>₹{pendingAmount.toLocaleString()}</strong>
+                                            </div>
+                                        </div>
 
-                                {/* Real-time Allocation Summary Banner */}
-                                <div style={{ background: remainingToAllocate === 0 ? '#f0fdf4' : remainingToAllocate > 0 ? '#fefce8' : '#fef2f2', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', marginTop: 16 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700 }}>
-                                        <span>Planned Total: <b style={{ color: plannedTotal > finalFee ? '#dc2626' : '#16a34a' }}>₹{plannedTotal.toLocaleString()}</b></span>
-                                        <span>Remaining to Allocate: <b style={{ color: remainingToAllocate < 0 ? '#dc2626' : remainingToAllocate > 0 ? '#d97706' : '#16a34a' }}>₹{remainingToAllocate.toLocaleString()}</b></span>
+                                        <div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                                                <span>Payment Progress</span>
+                                                <span>{instDetails.progressPct}% Paid</span>
+                                            </div>
+                                            <div style={{ width: '100%', height: 8, background: '#cbd5e1', borderRadius: 4, overflow: 'hidden' }}>
+                                                <div style={{ width: `${instDetails.progressPct}%`, height: '100%', background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 100%)', borderRadius: 4 }}></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Validation Error Alert */}
+                                    {(installmentsError || localError) && (
+                                        <div style={{ background: '#fee2e2', color: '#991b1b', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 16, fontWeight: 600 }}>
+                                            {installmentsError || localError}
+                                        </div>
+                                    )}
+
+                                    {/* 3 Installment Configuration Cards */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                        {[1, 2, 3].map((num) => {
+                                            const instVal = num === 1 ? installmentsForm.inst1 : num === 2 ? installmentsForm.inst2 : installmentsForm.inst3;
+                                            const dateVal = num === 1 ? installmentsForm.date1 : num === 2 ? installmentsForm.date2 : installmentsForm.date3;
+                                            const paidVal = num === 1 ? paid1 : num === 2 ? paid2 : paid3;
+                                            const plannedVal = Number(instVal) || 0;
+                                            const remainingVal = Math.max(0, plannedVal - paidVal);
+
+                                            let instStatus = 'PENDING';
+                                            if (paidVal >= plannedVal && plannedVal > 0) instStatus = 'PAID';
+                                            else if (paidVal > 0) instStatus = 'PARTIAL';
+
+                                            return (
+                                                <div key={num} style={{ background: '#ffffff', padding: 14, borderRadius: 10, border: '1px solid #cbd5e1' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                                        <strong style={{ fontSize: 14, color: '#0f172a' }}>Installment {num}</strong>
+                                                        <span className="badge" style={{
+                                                            background: instStatus === 'PAID' ? '#dcfce7' : instStatus === 'PARTIAL' ? '#fef3c7' : '#fee2e2',
+                                                            color: instStatus === 'PAID' ? '#15803d' : instStatus === 'PARTIAL' ? '#b45309' : '#991b1b',
+                                                            padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700
+                                                        }}>
+                                                            {instStatus === 'PAID' ? '✓ Paid' : instStatus === 'PARTIAL' ? '◐ Partially Paid' : '○ Pending'}
+                                                        </span>
+                                                    </div>
+
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                                        <label style={{ margin: 0 }}>
+                                                            <span style={{ fontSize: 12, fontWeight: 600 }}>Planned Amount (₹)</span>
+                                                            <input
+                                                                type="number"
+                                                                value={instVal}
+                                                                onChange={(e) => setInstallmentsForm({
+                                                                    ...installmentsForm,
+                                                                    [`inst${num}`]: e.target.value
+                                                                })}
+                                                                min={paidVal}
+                                                                required
+                                                                style={{ marginTop: 4 }}
+                                                            />
+                                                        </label>
+
+                                                        <label style={{ margin: 0 }}>
+                                                            <span style={{ fontSize: 12, fontWeight: 600 }}>Due Date</span>
+                                                            <input
+                                                                type="date"
+                                                                value={dateVal}
+                                                                onChange={(e) => setInstallmentsForm({
+                                                                    ...installmentsForm,
+                                                                    [`date${num}`]: e.target.value
+                                                                })}
+                                                                style={{ marginTop: 4 }}
+                                                            />
+                                                        </label>
+                                                    </div>
+
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#475569', marginTop: 8, paddingTop: 6, borderTop: '1px stroke #f1f5f9' }}>
+                                                        <span>Paid: <b style={{ color: '#16a34a' }}>₹{paidVal.toLocaleString()}</b></span>
+                                                        <span>Remaining: <b style={{ color: remainingVal > 0 ? '#dc2626' : '#16a34a' }}>₹{remainingVal.toLocaleString()}</b></span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Real-time Allocation Summary Banner */}
+                                    <div style={{ background: remainingToAllocate === 0 ? '#f0fdf4' : remainingToAllocate > 0 ? '#fefce8' : '#fef2f2', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', marginTop: 16 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700 }}>
+                                            <span>Planned Total: <b style={{ color: plannedTotal > finalFee ? '#dc2626' : '#16a34a' }}>₹{plannedTotal.toLocaleString()}</b></span>
+                                            <span>Remaining to Allocate: <b style={{ color: remainingToAllocate < 0 ? '#dc2626' : remainingToAllocate > 0 ? '#d97706' : '#16a34a' }}>₹{remainingToAllocate.toLocaleString()}</b></span>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Actions */}
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-                                    <button type="button" className="secondary" onClick={() => setConfigureInstallmentData(null)} disabled={installmentsSubmitting}>
+                                {/* Sticky Footer */}
+                                <div style={{ background: '#ffffff', padding: '14px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
+                                    <button type="button" className="secondary" onClick={handleCloseModal} disabled={installmentsSubmitting}>
                                         Cancel
                                     </button>
-                                    <button type="submit" className="primary" disabled={installmentsSubmitting || !isValid}>
-                                        {installmentsSubmitting ? 'Saving...' : 'Save Amounts'}
-                                    </button>
+                                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                                        <button
+                                            type="button"
+                                            className="secondary"
+                                            style={{ padding: '6px 14px', fontSize: 12, color: '#0284c7', borderColor: '#bae6fd', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                            onClick={handleAutoBalance}
+                                        >
+                                            ⚡ Auto Balance
+                                        </button>
+                                        <button type="submit" className="primary" disabled={installmentsSubmitting || !isValid}>
+                                            {installmentsSubmitting ? 'Saving...' : 'Save Amounts'}
+                                        </button>
+                                    </div>
                                 </div>
                             </form>
                         </div>

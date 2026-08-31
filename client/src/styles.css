@@ -612,27 +612,33 @@ td {
 }
 
 /* Modal styling */
-.modal {
+.modal, .modal-backdrop {
     position: fixed;
     top: 0;
     left: 0;
+    right: 0;
+    bottom: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(15, 23, 42, 0.5);
-    backdrop-filter: blur(4px);
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1000;
+    z-index: 2000;
+    padding: 16px;
+    box-sizing: border-box;
 }
 
-.modal .panel {
+.modal .panel, .modal-backdrop .panel {
     width: 100%;
     max-width: 480px;
     background: #ffffff;
     border-radius: 12px;
     padding: 24px;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+    box-sizing: border-box;
 }
 
 .modal form label {
@@ -1200,17 +1206,17 @@ td {
 }
 
 /* Modals & Popups */
-[data-theme="dark"] .modal {
+[data-theme="dark"] .modal, [data-theme="dark"] .modal-backdrop {
     background: rgba(0, 0, 0, 0.8) !important;
 }
 
-[data-theme="dark"] .modal .panel {
+[data-theme="dark"] .modal .panel, [data-theme="dark"] .modal-backdrop .panel {
     background: #0f172a !important;
     border: 1px solid #1e293b !important;
     color: #f8fafc !important;
 }
 
-[data-theme="dark"] .modal form label {
+[data-theme="dark"] .modal form label, [data-theme="dark"] .modal-backdrop form label {
     color: #cbd5e1 !important;
 }
 
