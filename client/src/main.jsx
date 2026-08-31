@@ -1064,6 +1064,7 @@ function App() {
                             onOpenEditProgress={openEditProgress}
                             currentUserId={user?.id}
                             userRole={user?.role}
+                            user={user}
                             token={token}
                             theme={theme}
                             toggleTheme={toggleTheme}
@@ -2225,7 +2226,7 @@ function Dashboard({ leads = [], followups = [], admissions = [], payments = [],
     );
 }
 
-function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onDeleteStudent, onDeleteAdmission, onOpenEditProgress, currentUserId, token, theme, toggleTheme, refreshData }) {
+function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onDeleteStudent, onDeleteAdmission, onOpenEditProgress, currentUserId, userRole, user, token, theme, toggleTheme, refreshData }) {
     const itemSingular = page.endsWith('s') ? page.slice(0, -1) : page;
     const [filterText, setFilterText] = useState('');
     const [paymentFromDate, setPaymentFromDate] = useState('');
@@ -2688,7 +2689,7 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
 
                 {page === 'Settings' && (
                     <ErrorBoundary>
-                        <SettingsView userRole={userRole} token={token} theme={theme} toggleTheme={toggleTheme} sourcesList={sourcesList} refreshSources={refreshData} usersList={usersList} currentUserId={currentUserId} onOpenAddModal={onOpenAddModal} onEditUser={onEditUser} onDeleteUser={onDeleteUser} />
+                        <SettingsView userRole={userRole || user?.role} user={user} token={token} theme={theme} toggleTheme={toggleTheme} sourcesList={sourcesList} refreshSources={refreshData} usersList={usersList} currentUserId={currentUserId} onOpenAddModal={onOpenAddModal} onEditUser={onEditUser} onDeleteUser={onDeleteUser} />
                     </ErrorBoundary>
                 )}
 
@@ -2968,7 +2969,7 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
     );
 }
 
-function SettingsView({ userRole, token, theme, toggleTheme, sourcesList = [], refreshSources, usersList = [], currentUserId, onOpenAddModal, onEditUser, onDeleteUser }) {
+function SettingsView({ userRole, user, token, theme, toggleTheme, sourcesList = [], refreshSources, usersList = [], currentUserId, onOpenAddModal, onEditUser, onDeleteUser }) {
     const [activeTab, setActiveTab] = useState('Profile');
     const [saving, setSaving] = useState(false);
     const [newSourceName, setNewSourceName] = useState('');
@@ -3397,7 +3398,7 @@ function SettingsView({ userRole, token, theme, toggleTheme, sourcesList = [], r
         }
     }
 
-    const safeUserRole = userRole || 'RECEPTIONIST';
+    const safeUserRole = userRole || user?.role || 'RECEPTIONIST';
 
     const allTabs = [
         { id: 'Profile', label: 'Institute Profile', icon: ShieldCheck, perm: 'settings.profile' },
