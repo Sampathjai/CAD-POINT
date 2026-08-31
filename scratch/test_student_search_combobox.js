@@ -65,3 +65,4 @@ if (res4.length === 2) {
 }
 
 console.log('\n🎉 ALL SEARCHABLE STUDENT COMBOBOX TESTS PASSED 100%!');
+

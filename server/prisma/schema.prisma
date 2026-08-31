@@ -230,6 +230,8 @@ model Student {
   whatsappNumber        String?
   email                 String?
   dateOfBirth           DateTime?
+  parentName            String?
+  passportNumber        String?
   gender                String?
   address               String?
   city                  String?

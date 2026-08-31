@@ -233,7 +233,7 @@ function App() {
     const [editingBatch, setEditingBatch] = useState(null);
     const [editBatchForm, setEditBatchForm] = useState({ id: '', batchCode: '', name: '', courseId: '', startDate: '', endDate: '', capacity: 25 });
     const [editingStudent, setEditingStudent] = useState(null);
-    const [editStudentForm, setEditStudentForm] = useState({ id: '', studentCode: '', firstName: '', lastName: '', phone: '', email: '', photoUrl: '' });
+    const [editStudentForm, setEditStudentForm] = useState({ id: '', studentCode: '', firstName: '', parentName: '', dateOfBirth: '', address: '', phone: '', email: '', passportNumber: '', photoUrl: '' });
 
     const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -249,7 +249,7 @@ function App() {
     const [scheduleForm, setScheduleForm] = useState({ leadId: '', scheduledAt: '', type: 'CALL', notes: '' });
     const [addCourseForm, setAddCourseForm] = useState({ courseCode: '', name: '', description: '', standardFee: '' });
     const [addBatchForm, setAddBatchForm] = useState({ batchCode: '', name: '', courseId: '', startDate: '', endDate: '', capacity: 25 });
-    const [addStudentForm, setAddStudentForm] = useState({ studentCode: '', firstName: '', lastName: '', phone: '', email: '', photoUrl: '' });
+    const [addStudentForm, setAddStudentForm] = useState({ studentCode: '', firstName: '', parentName: '', dateOfBirth: '', address: '', phone: '', email: '', passportNumber: '', photoUrl: '' });
     const [addAdmissionForm, setAddAdmissionForm] = useState({ admissionNumber: '', leadId: '', studentId: '', studentName: '', studentPhone: '', studentEmail: '', studentAddress: '', courseId: '', batchId: '', startDate: '', endDate: '', agreedFee: '', finalFee: '' });
     const [studentSearchQuery, setStudentSearchQuery] = useState('');
     const [showStudentDropdown, setShowStudentDropdown] = useState(false);
@@ -830,9 +830,12 @@ function App() {
             id: s.id,
             studentCode: s.studentCode || '',
             firstName: s.firstName || '',
-            lastName: s.lastName || '',
+            parentName: s.parentName || '',
+            dateOfBirth: s.dateOfBirth ? s.dateOfBirth.slice(0, 10) : '',
+            address: s.address || s.lastName || '',
             phone: s.phone || '',
             email: s.email || '',
+            passportNumber: s.passportNumber || '',
             photoUrl: s.photoUrl || ''
         });
     }
@@ -1624,58 +1627,155 @@ function App() {
                 <div className="modal">
                     <form
                         className="panel"
+                        style={{ maxWidth: 640, width: '90vw' }}
                         onSubmit={(e) => {
                             e.preventDefault();
                             createStudent();
                         }}
                     >
-                        <h3>Add Student</h3>
-                        <label>
-                            Student ID
-                            <input value={addStudentForm.studentCode} onChange={(e) => setAddStudentForm({ ...addStudentForm, studentCode: e.target.value })} placeholder="STU-1001" required />
-                        </label>
-                        <label>
-                            First Name
-                            <input value={addStudentForm.firstName} onChange={(e) => setAddStudentForm({ ...addStudentForm, firstName: e.target.value })} required />
-                        </label>
-                        <label>
-                            Address
-                            <input value={addStudentForm.lastName} onChange={(e) => setAddStudentForm({ ...addStudentForm, lastName: e.target.value })} placeholder="Enter Address" />
-                        </label>
-                        <label>
-                            Phone
-                            <input value={addStudentForm.phone} onChange={(e) => setAddStudentForm({ ...addStudentForm, phone: e.target.value })} required />
-                        </label>
-                        <label>
-                            Email
-                            <input type="email" value={addStudentForm.email} onChange={(e) => setAddStudentForm({ ...addStudentForm, email: e.target.value })} />
-                        </label>
-                        <label>
-                            Student Photo <span style={{ fontSize: 11, color: '#64748b', fontWeight: 400 }}>(Photo image only: JPG, PNG, WebP)</span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
+                        <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 700, borderBottom: '1px solid var(--border-color, #e2e8f0)', paddingBottom: 10 }}>Add Student</h3>
+
+                        {/* SECTION 1: STUDENT INFORMATION */}
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+                            STUDENT INFORMATION
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginBottom: 16 }}>
+                            <label style={{ margin: 0 }}>
+                                Student ID
+                                <input
+                                    value={addStudentForm.studentCode}
+                                    readOnly
+                                    disabled
+                                    style={{ background: 'var(--bg-muted, #f1f5f9)', color: 'var(--text-muted, #64748b)', cursor: 'not-allowed', fontWeight: 600 }}
+                                />
+                            </label>
+                            <label style={{ margin: 0 }}>
+                                Name with Initial <span style={{ color: '#dc2626' }}>*</span>
+                                <input
+                                    value={addStudentForm.firstName}
+                                    onChange={(e) => setAddStudentForm({ ...addStudentForm, firstName: e.target.value })}
+                                    placeholder="e.g. S. Kumar"
+                                    required
+                                />
+                            </label>
+                            <label style={{ margin: 0 }}>
+                                Date of Birth
+                                <input
+                                    type="date"
+                                    value={addStudentForm.dateOfBirth}
+                                    onChange={(e) => setAddStudentForm({ ...addStudentForm, dateOfBirth: e.target.value })}
+                                />
+                            </label>
+                        </div>
+
+                        {/* SECTION 2: PARENT / CONTACT INFORMATION */}
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+                            PARENT / CONTACT INFORMATION
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginBottom: 16 }}>
+                            <label style={{ margin: 0 }}>
+                                Parent Name
+                                <input
+                                    value={addStudentForm.parentName}
+                                    onChange={(e) => setAddStudentForm({ ...addStudentForm, parentName: e.target.value })}
+                                    placeholder="e.g. Raj Kumar"
+                                />
+                            </label>
+                            <label style={{ margin: 0 }}>
+                                Phone Number <span style={{ color: '#dc2626' }}>*</span>
+                                <input
+                                    value={addStudentForm.phone}
+                                    onChange={(e) => setAddStudentForm({ ...addStudentForm, phone: e.target.value })}
+                                    placeholder="e.g. 9876543210"
+                                    required
+                                />
+                            </label>
+                            <label style={{ margin: 0 }}>
+                                Email
+                                <input
+                                    type="email"
+                                    value={addStudentForm.email}
+                                    onChange={(e) => setAddStudentForm({ ...addStudentForm, email: e.target.value })}
+                                    placeholder="example@email.com"
+                                />
+                            </label>
+                            <label style={{ gridColumn: '1 / -1', margin: 0 }}>
+                                Address
+                                <textarea
+                                    rows={3}
+                                    value={addStudentForm.address || addStudentForm.lastName || ''}
+                                    onChange={(e) => setAddStudentForm({ ...addStudentForm, address: e.target.value, lastName: e.target.value })}
+                                    placeholder="Enter full address"
+                                    style={{ width: '100%', resize: 'vertical' }}
+                                />
+                            </label>
+                        </div>
+
+                        {/* SECTION 3: ADDITIONAL INFORMATION */}
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+                            ADDITIONAL INFORMATION
+                        </div>
+                        <div style={{ marginBottom: 16 }}>
+                            <label style={{ margin: 0 }}>
+                                Passport Number (If Available)
+                                <input
+                                    value={addStudentForm.passportNumber}
+                                    onChange={(e) => setAddStudentForm({ ...addStudentForm, passportNumber: e.target.value })}
+                                    placeholder="Enter passport number (optional)"
+                                />
+                            </label>
+                        </div>
+
+                        {/* SECTION 4: STUDENT PHOTO */}
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+                            STUDENT PHOTO
+                        </div>
+                        <div style={{ background: 'var(--bg-surface, #f8fafc)', border: '1px dashed var(--border-color, #cbd5e1)', borderRadius: 8, padding: 14, marginBottom: 16 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                                 {addStudentForm.photoUrl ? (
-                                    <img src={addStudentForm.photoUrl} alt="Student Preview" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: '2px solid #3b82f6' }} />
+                                    <div style={{ textAlign: 'center' }}>
+                                        <img src={addStudentForm.photoUrl} alt="Student Preview" style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '3px solid #0284c7', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }} />
+                                        <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, marginTop: 4 }}>Photo Selected</div>
+                                    </div>
                                 ) : (
-                                    <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#e2e8f0', display: 'grid', placeItems: 'center', color: '#64748b', fontSize: 18, fontWeight: 700 }}>
+                                    <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#e2e8f0', display: 'grid', placeItems: 'center', color: '#64748b', fontSize: 24, fontWeight: 700 }}>
                                         📷
                                     </div>
                                 )}
-                                <input
-                                    type="file"
-                                    accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-                                    onChange={handleStudentPhotoUpload}
-                                    style={{ fontSize: 12, flex: 1 }}
-                                />
-                                {addStudentForm.photoUrl && (
-                                    <button type="button" className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => setAddStudentForm(prev => ({ ...prev, photoUrl: '' }))}>
-                                        Remove Photo
-                                    </button>
-                                )}
+                                <div style={{ flex: 1, minWidth: 200 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary, #1e293b)' }}>
+                                        {addStudentForm.photoUrl ? 'Change or remove student photo' : 'Upload student photo'}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: 'var(--text-muted, #64748b)', marginTop: 2 }}>
+                                        Supported formats: JPG, JPEG, PNG, WebP (Max 5MB)
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                                        <label className="secondary" style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                            {addStudentForm.photoUrl ? 'Change Photo' : 'Choose Photo'}
+                                            <input
+                                                type="file"
+                                                accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                                                onChange={handleStudentPhotoUpload}
+                                                style={{ display: 'none' }}
+                                            />
+                                        </label>
+                                        {addStudentForm.photoUrl && (
+                                            <button type="button" className="secondary" style={{ padding: '4px 10px', fontSize: 12, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => setAddStudentForm(prev => ({ ...prev, photoUrl: '' }))}>
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                        </label>
-                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                            <button className="primary" type="submit">Create Student</button>
-                            <button type="button" onClick={() => setShowAddStudent(false)}>Cancel</button>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+                            <button className="primary" type="submit" style={{ minWidth: 120 }}>
+                                Create Student
+                            </button>
+                            <button type="button" className="secondary" onClick={() => setShowAddStudent(false)}>
+                                Cancel
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -1685,67 +1785,172 @@ function App() {
                 <div className="modal">
                     <form
                         className="panel"
+                        style={{ maxWidth: 640, width: '90vw' }}
                         onSubmit={(e) => {
                             e.preventDefault();
                             updateStudentSubmit();
                         }}
                     >
-                        <h3>Edit Student</h3>
-                        <label>
-                            ID
-                            <input value={editStudentForm.studentCode} onChange={(e) => setEditStudentForm({ ...editStudentForm, studentCode: e.target.value })} placeholder="STU-1001" required />
-                        </label>
-                        <label>
-                            First Name
-                            <input value={editStudentForm.firstName} onChange={(e) => setEditStudentForm({ ...editStudentForm, firstName: e.target.value })} required />
-                        </label>
-                        <label>
-                            Address
-                            <input value={editStudentForm.lastName} onChange={(e) => setEditStudentForm({ ...editStudentForm, lastName: e.target.value })} placeholder="Address" />
-                        </label>
-                        <label>
-                            Phone
-                            <input value={editStudentForm.phone} onChange={(e) => setEditStudentForm({ ...editStudentForm, phone: e.target.value })} required />
-                        </label>
-                        <label>
-                            Email
-                            <input type="email" value={editStudentForm.email} onChange={(e) => setEditStudentForm({ ...editStudentForm, email: e.target.value })} />
-                        </label>
-                        <label>
-                            Student Photo <span style={{ fontSize: 11, color: '#64748b', fontWeight: 400 }}>(Photo image only: JPG, PNG, WebP)</span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
+                        <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 700, borderBottom: '1px solid var(--border-color, #e2e8f0)', paddingBottom: 10 }}>Edit Student</h3>
+
+                        {/* SECTION 1: STUDENT INFORMATION */}
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+                            STUDENT INFORMATION
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginBottom: 16 }}>
+                            <label style={{ margin: 0 }}>
+                                Student ID
+                                <input
+                                    value={editStudentForm.studentCode}
+                                    readOnly
+                                    disabled
+                                    style={{ background: 'var(--bg-muted, #f1f5f9)', color: 'var(--text-muted, #64748b)', cursor: 'not-allowed', fontWeight: 600 }}
+                                />
+                            </label>
+                            <label style={{ margin: 0 }}>
+                                Name with Initial <span style={{ color: '#dc2626' }}>*</span>
+                                <input
+                                    value={editStudentForm.firstName}
+                                    onChange={(e) => setEditStudentForm({ ...editStudentForm, firstName: e.target.value })}
+                                    placeholder="e.g. S. Kumar"
+                                    required
+                                />
+                            </label>
+                            <label style={{ margin: 0 }}>
+                                Date of Birth
+                                <input
+                                    type="date"
+                                    value={editStudentForm.dateOfBirth}
+                                    onChange={(e) => setEditStudentForm({ ...editStudentForm, dateOfBirth: e.target.value })}
+                                />
+                            </label>
+                        </div>
+
+                        {/* SECTION 2: PARENT / CONTACT INFORMATION */}
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+                            PARENT / CONTACT INFORMATION
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginBottom: 16 }}>
+                            <label style={{ margin: 0 }}>
+                                Parent Name
+                                <input
+                                    value={editStudentForm.parentName}
+                                    onChange={(e) => setEditStudentForm({ ...editStudentForm, parentName: e.target.value })}
+                                    placeholder="e.g. Raj Kumar"
+                                />
+                            </label>
+                            <label style={{ margin: 0 }}>
+                                Phone Number <span style={{ color: '#dc2626' }}>*</span>
+                                <input
+                                    value={editStudentForm.phone}
+                                    onChange={(e) => setEditStudentForm({ ...editStudentForm, phone: e.target.value })}
+                                    placeholder="e.g. 9876543210"
+                                    required
+                                />
+                            </label>
+                            <label style={{ margin: 0 }}>
+                                Email
+                                <input
+                                    type="email"
+                                    value={editStudentForm.email}
+                                    onChange={(e) => setEditStudentForm({ ...editStudentForm, email: e.target.value })}
+                                    placeholder="example@email.com"
+                                />
+                            </label>
+                            <label style={{ gridColumn: '1 / -1', margin: 0 }}>
+                                Address
+                                <textarea
+                                    rows={3}
+                                    value={editStudentForm.address || editStudentForm.lastName || ''}
+                                    onChange={(e) => setEditStudentForm({ ...editStudentForm, address: e.target.value, lastName: e.target.value })}
+                                    placeholder="Enter full address"
+                                    style={{ width: '100%', resize: 'vertical' }}
+                                />
+                            </label>
+                        </div>
+
+                        {/* SECTION 3: ADDITIONAL INFORMATION */}
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+                            ADDITIONAL INFORMATION
+                        </div>
+                        <div style={{ marginBottom: 16 }}>
+                            <label style={{ margin: 0 }}>
+                                Passport Number (If Available)
+                                <input
+                                    value={editStudentForm.passportNumber}
+                                    onChange={(e) => setEditStudentForm({ ...editStudentForm, passportNumber: e.target.value })}
+                                    placeholder="Enter passport number (optional)"
+                                />
+                            </label>
+                        </div>
+
+                        {/* SECTION 4: STUDENT PHOTO */}
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+                            STUDENT PHOTO
+                        </div>
+                        <div style={{ background: 'var(--bg-surface, #f8fafc)', border: '1px dashed var(--border-color, #cbd5e1)', borderRadius: 8, padding: 14, marginBottom: 16 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                                 {editStudentForm.photoUrl ? (
-                                    <img src={editStudentForm.photoUrl} alt="Student Preview" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: '2px solid #3b82f6' }} />
+                                    <div style={{ textAlign: 'center' }}>
+                                        <img src={editStudentForm.photoUrl} alt="Student Preview" style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '3px solid #0284c7', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }} />
+                                        <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, marginTop: 4 }}>Photo Selected</div>
+                                    </div>
                                 ) : (
-                                    <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#e2e8f0', display: 'grid', placeItems: 'center', color: '#64748b', fontSize: 18, fontWeight: 700 }}>
+                                    <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#e2e8f0', display: 'grid', placeItems: 'center', color: '#64748b', fontSize: 24, fontWeight: 700 }}>
                                         📷
                                     </div>
                                 )}
-                                <input
-                                    type="file"
-                                    accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-                                    onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) {
-                                            const reader = new FileReader();
-                                            reader.onload = (evt) => {
-                                                setEditStudentForm(prev => ({ ...prev, photoUrl: evt.target.result }));
-                                            };
-                                            reader.readAsDataURL(file);
-                                        }
-                                    }}
-                                    style={{ fontSize: 12, flex: 1 }}
-                                />
-                                {editStudentForm.photoUrl && (
-                                    <button type="button" className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => setEditStudentForm(prev => ({ ...prev, photoUrl: '' }))}>
-                                        Remove Photo
-                                    </button>
-                                )}
+                                <div style={{ flex: 1, minWidth: 200 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary, #1e293b)' }}>
+                                        {editStudentForm.photoUrl ? 'Change or remove student photo' : 'Upload student photo'}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: 'var(--text-muted, #64748b)', marginTop: 2 }}>
+                                        Supported formats: JPG, JPEG, PNG, WebP (Max 5MB)
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                                        <label className="secondary" style={{ padding: '4px 10px', fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                            {editStudentForm.photoUrl ? 'Change Photo' : 'Choose Photo'}
+                                            <input
+                                                type="file"
+                                                accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) {
+                                                        const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+                                                        const ext = (file.name || '').split('.').pop().toLowerCase();
+                                                        if (!validTypes.includes((file.type || '').toLowerCase()) && !['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
+                                                            return alert('Please upload a JPG, PNG, or WebP image.');
+                                                        }
+                                                        if (file.size > 5 * 1024 * 1024) {
+                                                            return alert('Student photo file size must be less than 5MB.');
+                                                        }
+                                                        const reader = new FileReader();
+                                                        reader.onload = (evt) => {
+                                                            setEditStudentForm(prev => ({ ...prev, photoUrl: evt.target.result }));
+                                                        };
+                                                        reader.readAsDataURL(file);
+                                                    }
+                                                }}
+                                                style={{ display: 'none' }}
+                                            />
+                                        </label>
+                                        {editStudentForm.photoUrl && (
+                                            <button type="button" className="secondary" style={{ padding: '4px 10px', fontSize: 12, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => setEditStudentForm(prev => ({ ...prev, photoUrl: '' }))}>
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                        </label>
-                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                            <button className="primary" type="submit">Save Changes</button>
-                            <button type="button" onClick={() => setEditingStudent(null)}>Cancel</button>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+                            <button className="primary" type="submit" style={{ minWidth: 120 }}>
+                                Save Changes
+                            </button>
+                            <button type="button" className="secondary" onClick={() => setEditingStudent(null)}>
+                                Cancel
+                            </button>
                         </div>
                     </form>
                 </div>

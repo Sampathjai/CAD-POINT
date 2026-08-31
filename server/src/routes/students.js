@@ -52,10 +52,14 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
   try {
     const schema = z.object({
       studentCode: z.string().optional().or(z.literal('')),
-      firstName: z.string().min(1, 'First name is required'),
+      firstName: z.string().min(1, 'Name with initial is required'),
+      parentName: z.string().optional().or(z.literal('')).nullable(),
+      dateOfBirth: z.string().optional().or(z.literal('')).nullable(),
+      address: z.string().optional().or(z.literal('')).nullable(),
       lastName: z.string().optional().or(z.literal('')).nullable(),
       phone: z.string().min(6, 'Valid phone number is required'),
       email: z.string().email('Invalid email address').optional().or(z.literal('')).nullable(),
+      passportNumber: z.string().optional().or(z.literal('')).nullable(),
       photoUrl: z.string().optional().or(z.literal('')).nullable(),
       branchId: z.string().optional()
     });
@@ -66,7 +70,7 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
       return res.status(400).json({ success: false, message: `${issue.path.join('.')}: ${issue.message}` });
     }
 
-    let { studentCode, firstName, lastName, phone, email, photoUrl, branchId } = parsed.data;
+    let { studentCode, firstName, parentName, dateOfBirth, address, lastName, phone, email, passportNumber, photoUrl, branchId } = parsed.data;
 
     if (!studentCode || !studentCode.trim()) {
       const count = await prisma.student.count();
@@ -90,9 +94,13 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
       data: {
         studentCode,
         firstName,
-        lastName: lastName || null,
+        parentName: parentName || null,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+        address: address || lastName || null,
+        lastName: lastName || address || null,
         phone,
         email: email || null,
+        passportNumber: passportNumber || null,
         photoUrl: photoUrl || null,
         branchId: finalBranchId
       },
@@ -112,7 +120,7 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
 router.put('/:id', authenticate, authorize(...ADMISSION_ROLES), async (req, res) => {
   try {
     const { id } = req.params;
-    const { studentCode, firstName, lastName, phone, email, photoUrl, branchId } = req.body;
+    const { studentCode, firstName, parentName, dateOfBirth, address, lastName, phone, email, passportNumber, photoUrl, branchId } = req.body;
 
     let finalBranchId = branchId;
     if (finalBranchId) {
@@ -127,9 +135,13 @@ router.put('/:id', authenticate, authorize(...ADMISSION_ROLES), async (req, res)
       data: {
         ...(studentCode ? { studentCode: studentCode.trim() } : {}),
         firstName,
-        lastName: lastName || null,
+        parentName: parentName || null,
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+        address: address || lastName || null,
+        lastName: lastName || address || null,
         phone,
         email: email || null,
+        passportNumber: passportNumber || null,
         photoUrl: photoUrl || null,
         ...(finalBranchId ? { branchId: finalBranchId } : {})
       },
