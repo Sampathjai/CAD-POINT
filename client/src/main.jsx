@@ -234,6 +234,8 @@ function App() {
     const [editBatchForm, setEditBatchForm] = useState({ id: '', batchCode: '', name: '', courseId: '', startDate: '', endDate: '', capacity: 25 });
     const [editingStudent, setEditingStudent] = useState(null);
     const [editStudentForm, setEditStudentForm] = useState({ id: '', studentCode: '', firstName: '', parentName: '', dateOfBirth: '', address: '', phone: '', email: '', passportNumber: '', photoUrl: '' });
+    const [editingPayment, setEditingPayment] = useState(null);
+    const [editPaymentForm, setEditPaymentForm] = useState({ id: '', receiptNumber: '', amount: '', paymentMethod: 'UPI', transactionReference: '', remarks: '' });
 
     const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -763,6 +765,55 @@ function App() {
         }
     }
 
+    function openEditPayment(p) {
+        setEditingPayment(p);
+        setEditPaymentForm({
+            id: p.id,
+            receiptNumber: p.receiptNumber || '',
+            amount: p.amount ? String(p.amount) : '',
+            paymentMethod: p.paymentMethod || 'UPI',
+            transactionReference: p.transactionReference || '',
+            remarks: p.remarks || p.notes || ''
+        });
+    }
+
+    async function updatePaymentSubmit() {
+        try {
+            const res = await fetch(API_BASE + '/payments/' + editPaymentForm.id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify({
+                    ...editPaymentForm,
+                    amount: Number(editPaymentForm.amount) || 0
+                })
+            });
+            const j = await res.json();
+            if (!j.success) return alert(formatErrorMessage(j.message) || 'Update payment failed');
+            fetchAllData();
+            setEditingPayment(null);
+            alert('✓ Payment updated successfully!');
+        } catch (e) {
+            console.error(e);
+            alert('Update payment failed');
+        }
+    }
+
+    async function deletePayment(id, receiptNumber) {
+        if (!window.confirm(`Are you sure you want to delete payment receipt "${receiptNumber || id}"?`)) return;
+        try {
+            const res = await fetch(API_BASE + '/payments/' + id, {
+                method: 'DELETE',
+                headers: { Authorization: 'Bearer ' + token }
+            });
+            const j = await res.json();
+            if (!j.success) return alert(j.message || 'Delete payment failed');
+            fetchAllData();
+        } catch (e) {
+            console.error(e);
+            alert('Delete payment failed');
+        }
+    }
+
     async function createUserSubmit() {
         try {
             const res = await fetch(API_BASE + '/users', {
@@ -1140,6 +1191,8 @@ function App() {
                             onEditStudent={openEditStudent}
                             onDeleteStudent={deleteStudent}
                             onDeleteAdmission={deleteAdmission}
+                            onEditPayment={openEditPayment}
+                            onDeletePayment={deletePayment}
                             onOpenEditProgress={openEditProgress}
                             currentUserId={user?.id}
                             userRole={user?.role}
@@ -2240,6 +2293,89 @@ function App() {
                         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                             <button className="primary" type="submit">Create User</button>
                             <button type="button" onClick={() => setShowAddUser(false)}>Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {editingPayment && (
+                <div className="modal">
+                    <form
+                        className="panel"
+                        style={{ maxWidth: 520, width: '90vw' }}
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            updatePaymentSubmit();
+                        }}
+                    >
+                        <h3 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 700, borderBottom: '1px solid var(--border-color, #e2e8f0)', paddingBottom: 10 }}>Edit Payment</h3>
+                        
+                        {editingPayment.admission && (
+                            <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, padding: '10px 14px', marginBottom: 14 }}>
+                                <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>
+                                    Student: {editingPayment.admission?.student?.firstName} {editingPayment.admission?.student?.lastName || ''}
+                                </div>
+                                <div style={{ fontSize: 12, color: '#0284c7', fontWeight: 600, marginTop: 2 }}>
+                                    Admission #: {editingPayment.admission?.admissionNumber} ({editingPayment.admission?.course?.name})
+                                </div>
+                            </div>
+                        )}
+
+                        <label style={{ display: 'block', marginBottom: 12 }}>
+                            Receipt Number
+                            <input
+                                value={editPaymentForm.receiptNumber}
+                                onChange={(e) => setEditPaymentForm({ ...editPaymentForm, receiptNumber: e.target.value })}
+                                placeholder="REC-1001"
+                                required
+                            />
+                        </label>
+                        <label style={{ display: 'block', marginBottom: 12 }}>
+                            Amount (₹) <span style={{ color: '#dc2626' }}>*</span>
+                            <input
+                                type="number"
+                                value={editPaymentForm.amount}
+                                onChange={(e) => setEditPaymentForm({ ...editPaymentForm, amount: e.target.value })}
+                                placeholder="10000"
+                                required
+                            />
+                        </label>
+                        <label style={{ display: 'block', marginBottom: 12 }}>
+                            Payment Method
+                            <select value={editPaymentForm.paymentMethod} onChange={(e) => setEditPaymentForm({ ...editPaymentForm, paymentMethod: e.target.value })}>
+                                <option value="UPI">UPI</option>
+                                <option value="CASH">CASH</option>
+                                <option value="CARD">CARD</option>
+                                <option value="BANK_TRANSFER">BANK_TRANSFER</option>
+                                <option value="CHEQUE">CHEQUE</option>
+                                <option value="ONLINE">ONLINE</option>
+                            </select>
+                        </label>
+                        <label style={{ display: 'block', marginBottom: 12 }}>
+                            Transaction Reference
+                            <input
+                                value={editPaymentForm.transactionReference}
+                                onChange={(e) => setEditPaymentForm({ ...editPaymentForm, transactionReference: e.target.value })}
+                                placeholder="e.g. UPI-12345678"
+                            />
+                        </label>
+                        <label style={{ display: 'block', marginBottom: 16 }}>
+                            Remarks / Notes
+                            <textarea
+                                rows={2}
+                                value={editPaymentForm.remarks}
+                                onChange={(e) => setEditPaymentForm({ ...editPaymentForm, remarks: e.target.value })}
+                                placeholder="e.g. Payment details updated"
+                                style={{ width: '100%', resize: 'vertical' }}
+                            />
+                        </label>
+                        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                            <button className="primary" type="submit" style={{ minWidth: 120 }}>
+                                Save Changes
+                            </button>
+                            <button type="button" className="secondary" onClick={() => setEditingPayment(null)}>
+                                Cancel
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -3920,45 +4056,68 @@ ${instituteName}`;
                         </div>
                         <div className="table-responsive">
                             <table>
-                                <thead>
-                                    <tr>
-                                        <th>Receipt #</th>
-                                        <th>Student</th>
-                                        <th>Amount</th>
-                                        <th>Method</th>
-                                        <th>Remarks</th>
-                                        <th>Branch</th>
-                                        <th>Date</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {safePayments
-                                        .filter((p) => {
-                                            if (lowerFilter && !(p.receiptNumber + ' ' + (p.admission?.student?.firstName || '') + ' ' + (p.paymentMethod || '')).toLowerCase().includes(lowerFilter)) {
-                                                return false;
-                                            }
-                                            const pDateStr = p.paymentDate ? new Date(p.paymentDate).toISOString().split('T')[0] : '';
-                                            if (paymentFromDate && pDateStr < paymentFromDate) return false;
-                                            if (paymentToDate && pDateStr > paymentToDate) return false;
-                                            if (paymentMonth && paymentMonth !== 'ALL') {
-                                                if (!pDateStr.startsWith(paymentMonth)) return false;
-                                            }
-                                            return true;
-                                        })
-                                        .map((p) => (
-                                            <tr key={p.id}>
-                                                <td><b>{p.receiptNumber}</b></td>
-                                                <td>{p.admission?.student ? `${p.admission.student.firstName} ${p.admission.student.lastName || ''}`.trim() : '-'}</td>
-                                                <td><b>₹{Number(p.amount).toLocaleString()}</b></td>
-                                                <td>{p.paymentMethod}</td>
-                                                <td>{p.remarks || p.notes || '-'}</td>
-                                                <td>{p.branch?.name || 'Gandhipuram'}</td>
-                                                <td>{formatDate(p.paymentDate)}</td>
-                                                <td><span className="status active">{p.status}</span></td>
+                                        <thead>
+                                            <tr>
+                                                <th>Receipt #</th>
+                                                <th>Student</th>
+                                                <th>Amount</th>
+                                                <th>Method</th>
+                                                <th>Remarks</th>
+                                                <th>Branch</th>
+                                                <th>Date</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
                                             </tr>
-                                    ))}
-                                </tbody>
+                                        </thead>
+                                        <tbody>
+                                            {safePayments
+                                                .filter((p) => {
+                                                    if (lowerFilter && !(p.receiptNumber + ' ' + (p.admission?.student?.firstName || '') + ' ' + (p.paymentMethod || '')).toLowerCase().includes(lowerFilter)) {
+                                                        return false;
+                                                    }
+                                                    const pDateStr = p.paymentDate ? new Date(p.paymentDate).toISOString().split('T')[0] : '';
+                                                    if (paymentFromDate && pDateStr < paymentFromDate) return false;
+                                                    if (paymentToDate && pDateStr > paymentToDate) return false;
+                                                    if (paymentMonth && paymentMonth !== 'ALL') {
+                                                        if (!pDateStr.startsWith(paymentMonth)) return false;
+                                                    }
+                                                    return true;
+                                                })
+                                                .map((p) => (
+                                                    <tr key={p.id}>
+                                                        <td><b>{p.receiptNumber}</b></td>
+                                                        <td>{p.admission?.student ? `${p.admission.student.firstName} ${p.admission.student.lastName || ''}`.trim() : '-'}</td>
+                                                        <td><b>₹{Number(p.amount).toLocaleString()}</b></td>
+                                                        <td>{p.paymentMethod}</td>
+                                                        <td>{p.remarks || p.notes || '-'}</td>
+                                                        <td>{p.branch?.name || 'Gandhipuram'}</td>
+                                                        <td>{formatDate(p.paymentDate)}</td>
+                                                        <td><span className="status active">{p.status}</span></td>
+                                                        <td>
+                                                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                                                <button
+                                                                    type="button"
+                                                                    className="secondary"
+                                                                    style={{ padding: '4px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                                    onClick={() => onEditPayment(p)}
+                                                                    title="Edit Payment Details"
+                                                                >
+                                                                    <Edit size={13} /> Edit
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="secondary"
+                                                                    style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                                    onClick={() => onDeletePayment(p.id, p.receiptNumber)}
+                                                                    title="Delete Payment"
+                                                                >
+                                                                    <Trash2 size={13} /> Delete
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                            ))}
+                                        </tbody>
                             </table>
                         </div>
                     </div>

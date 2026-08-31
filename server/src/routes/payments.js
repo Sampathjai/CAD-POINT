@@ -139,4 +139,87 @@ router.post('/', authenticate, authorize(...PAYMENT_ROLES), async (req, res) => 
   }
 });
 
+// PUT /api/payments/:id - Edit payment record
+router.put('/:id', authenticate, authorize(...PAYMENT_ROLES), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const schema = z.object({
+      receiptNumber: z.string().optional(),
+      amount: z.number().min(1, 'Payment amount must be greater than 0'),
+      paymentMethod: z.string().min(1, 'Payment method is required'),
+      installmentNumber: z.number().int().min(1).max(3).optional(),
+      transactionReference: z.string().optional().or(z.literal('')).nullable(),
+      notes: z.string().optional().or(z.literal('')).nullable(),
+      remarks: z.string().optional().or(z.literal('')).nullable()
+    });
+
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      return res.status(400).json({ success: false, message: `${issue.path.join('.')}: ${issue.message}` });
+    }
+
+    const { receiptNumber, amount, paymentMethod, installmentNumber, transactionReference, notes, remarks } = parsed.data;
+
+    const existingPayment = await prisma.payment.findUnique({
+      where: { id },
+      include: { admission: { include: { payments: true, student: true, course: true } } }
+    });
+
+    if (!existingPayment) {
+      return res.status(404).json({ success: false, message: 'Payment record not found' });
+    }
+
+    // Overpayment validation excluding this payment's current amount
+    if (existingPayment.admission) {
+      const finalFee = Number(existingPayment.admission.finalFee) || 0;
+      const otherPaymentsTotal = existingPayment.admission.payments
+        .filter((p) => p.id !== id)
+        .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      const remainingFee = Math.max(0, finalFee - otherPaymentsTotal);
+
+      if (amount > remainingFee) {
+        return res.status(400).json({
+          success: false,
+          message: `Updated amount (₹${amount.toLocaleString()}) exceeds the maximum allowable fee (₹${remainingFee.toLocaleString()}).`
+        });
+      }
+    }
+
+    const updatedPayment = await prisma.payment.update({
+      where: { id },
+      data: {
+        ...(receiptNumber ? { receiptNumber: receiptNumber.trim() } : {}),
+        amount,
+        paymentMethod: paymentMethod.toUpperCase(),
+        ...(installmentNumber ? { installmentNumber } : {}),
+        transactionReference: transactionReference || null,
+        notes: notes || remarks || null,
+        remarks: remarks || notes || null
+      },
+      include: {
+        admission: { include: { student: true, course: true, payments: true } },
+        branch: true
+      }
+    });
+
+    res.json({ success: true, data: updatedPayment, message: 'Payment updated successfully' });
+  } catch (err) {
+    console.error('payments.update', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// DELETE /api/payments/:id - Delete payment record
+router.delete('/:id', authenticate, authorize(...PAYMENT_ROLES), async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.payment.delete({ where: { id } });
+    res.json({ success: true, message: 'Payment deleted successfully' });
+  } catch (err) {
+    console.error('payments.delete', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;
