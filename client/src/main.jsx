@@ -2520,21 +2520,30 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
         const payments = Array.isArray(admission?.payments) ? admission.payments : [];
         const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
         const pendingAmount = Math.max(0, finalFee - totalPaid);
+        const progressPct = finalFee > 0 ? Math.min(100, Math.round((totalPaid / finalFee) * 100)) : 0;
 
         let plannedArray = [
             Math.round(finalFee / 3),
             Math.round(finalFee / 3),
             Math.max(0, finalFee - 2 * Math.round(finalFee / 3))
         ];
+        let dueDatesArray = ['', '', ''];
+        let hasCustomPlan = false;
 
         if (admission?.installmentPlan) {
             try {
                 const parsed = typeof admission.installmentPlan === 'string' ? JSON.parse(admission.installmentPlan) : admission.installmentPlan;
                 if (Array.isArray(parsed) && parsed.length > 0) {
+                    hasCustomPlan = true;
                     plannedArray = [
                         Number(parsed[0]?.planned) || 0,
                         Number(parsed[1]?.planned) || 0,
                         Number(parsed[2]?.planned) || 0
+                    ];
+                    dueDatesArray = [
+                        parsed[0]?.dueDate || '',
+                        parsed[1]?.dueDate || '',
+                        parsed[2]?.dueDate || ''
                     ];
                 }
             } catch (e) {
@@ -2550,6 +2559,7 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
 
         const installments = [1, 2, 3].map(num => {
             const planned = plannedArray[num - 1] || 0;
+            const dueDate = dueDatesArray[num - 1] || null;
             const pList = instPayments[num] || [];
             const paid = pList.reduce((s, p) => s + (Number(p.amount) || 0), 0);
             const remaining = Math.max(0, planned - paid);
@@ -2567,6 +2577,7 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
                 planned,
                 paid,
                 remaining,
+                dueDate,
                 status,
                 payments: pList,
                 lastPaymentDate
@@ -2584,6 +2595,8 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
             finalFee,
             totalPaid,
             pendingAmount,
+            progressPct,
+            hasCustomPlan,
             overallStatus,
             installments
         };
@@ -2663,18 +2676,31 @@ ${instituteName}`;
         const inst2 = Number(installmentsForm.inst2) || 0;
         const inst3 = Number(installmentsForm.inst3) || 0;
         const finalFee = Number(configureInstallmentData.finalFee) || 0;
+        const plannedTotal = inst1 + inst2 + inst3;
 
-        if (inst1 + inst2 + inst3 > finalFee) {
-            setInstallmentsError(`Total planned installments (₹${(inst1 + inst2 + inst3).toLocaleString()}) cannot exceed total course fee (₹${finalFee.toLocaleString()}).`);
+        if (plannedTotal > finalFee) {
+            setInstallmentsError(`⚠ Planned installment total (₹${plannedTotal.toLocaleString()}) exceeds total course fee (₹${finalFee.toLocaleString()}) by ₹${(plannedTotal - finalFee).toLocaleString()}.`);
             return;
+        }
+
+        // Payment-aware validation: cannot set planned amount below already paid amount
+        const instDetails = getAdmissionInstallmentDetails(configureInstallmentData);
+        for (let i = 0; i < 3; i++) {
+            const instNum = i + 1;
+            const plannedVal = [inst1, inst2, inst3][i];
+            const paidVal = instDetails.installments[i]?.paid || 0;
+            if (plannedVal < paidVal) {
+                setInstallmentsError(`Installment ${instNum} planned amount (₹${plannedVal.toLocaleString()}) cannot be less than already paid amount (₹${paidVal.toLocaleString()}).`);
+                return;
+            }
         }
 
         setInstallmentsSubmitting(true);
         try {
             const installmentPlan = [
-                { number: 1, planned: inst1 },
-                { number: 2, planned: inst2 },
-                { number: 3, planned: inst3 }
+                { number: 1, planned: inst1, dueDate: installmentsForm.date1 || '' },
+                { number: 2, planned: inst2, dueDate: installmentsForm.date2 || '' },
+                { number: 3, planned: inst3, dueDate: installmentsForm.date3 || '' }
             ];
 
             const res = await fetch(API_BASE + `/admissions/${configureInstallmentData.id}/installments`, {
@@ -3089,9 +3115,46 @@ ${instituteName}`;
 
                                                                 {/* Payment Summary */}
                                                                 <div style={{ background: '#f8fafc', padding: 16, borderRadius: 10, border: '1px solid #e2e8f0', marginBottom: 20 }}>
-                                                                    <h4 style={{ margin: '0 0 12px', fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                                                        Payment Summary
-                                                                    </h4>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+                                                                        <h4 style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                                            Payment Summary
+                                                                        </h4>
+                                                                        {canManagePayments && (
+                                                                            <button
+                                                                                type="button"
+                                                                                className="secondary"
+                                                                                style={{ padding: '5px 12px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, color: '#0284c7', borderColor: '#bae6fd' }}
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    e.preventDefault();
+                                                                                    setConfigureInstallmentData(a);
+                                                                                    setInstallmentsError('');
+                                                                                    setInstallmentsForm({
+                                                                                        inst1: details.installments[0]?.planned ?? Math.round(details.finalFee / 3),
+                                                                                        inst2: details.installments[1]?.planned ?? Math.round(details.finalFee / 3),
+                                                                                        inst3: details.installments[2]?.planned ?? (details.finalFee - 2 * Math.round(details.finalFee / 3)),
+                                                                                        date1: details.installments[0]?.dueDate || '',
+                                                                                        date2: details.installments[1]?.dueDate || '',
+                                                                                        date3: details.installments[2]?.dueDate || ''
+                                                                                    });
+                                                                                }}
+                                                                            >
+                                                                                ⚙ {details.hasCustomPlan ? 'Edit Planned Amounts' : 'Configure Planned Amounts'}
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+
+                                                                    {/* Visual Payment Progress Bar */}
+                                                                    <div style={{ marginBottom: 14 }}>
+                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 600, color: '#334155', marginBottom: 4 }}>
+                                                                            <span>Payment Progress</span>
+                                                                            <span>₹{details.totalPaid.toLocaleString()} / ₹{details.finalFee.toLocaleString()} Paid ({details.progressPct}%)</span>
+                                                                        </div>
+                                                                        <div style={{ width: '100%', height: 10, background: '#e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
+                                                                            <div style={{ width: `${details.progressPct}%`, height: '100%', background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 100%)', borderRadius: 6, transition: 'width 0.3s ease' }}></div>
+                                                                        </div>
+                                                                    </div>
+
                                                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16 }}>
                                                                         <div>
                                                                             <span style={{ fontSize: 12, color: '#64748b', display: 'block' }}>Total Course Fee</span>
@@ -3140,26 +3203,6 @@ ${instituteName}`;
                                                                         <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
                                                                             3-Installment Payment Schedule
                                                                         </h4>
-                                                                        {canManagePayments && (
-                                                                            <button
-                                                                                type="button"
-                                                                                className="secondary"
-                                                                                style={{ padding: '3px 10px', fontSize: 11 }}
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    e.preventDefault();
-                                                                                    setConfigureInstallmentData(a);
-                                                                                    setInstallmentsError('');
-                                                                                    setInstallmentsForm({
-                                                                                        inst1: details.installments[0]?.planned ?? Math.round(details.finalFee / 3),
-                                                                                        inst2: details.installments[1]?.planned ?? Math.round(details.finalFee / 3),
-                                                                                        inst3: details.installments[2]?.planned ?? (details.finalFee - 2 * Math.round(details.finalFee / 3))
-                                                                                    });
-                                                                                }}
-                                                                            >
-                                                                                Configure Planned Amounts
-                                                                            </button>
-                                                                        )}
                                                                     </div>
 
                                                                     <div className="table-responsive">
@@ -3170,7 +3213,7 @@ ${instituteName}`;
                                                                                     <th>Planned Amount</th>
                                                                                     <th>Paid Amount</th>
                                                                                     <th>Remaining</th>
-                                                                                    <th>Last Payment Date</th>
+                                                                                    <th>Due Date</th>
                                                                                     <th>Status</th>
                                                                                     <th>Action</th>
                                                                                 </tr>
@@ -3182,47 +3225,63 @@ ${instituteName}`;
                                                                                         <td>₹{inst.planned.toLocaleString()}</td>
                                                                                         <td><b style={{ color: inst.paid > 0 ? '#16a34a' : 'inherit' }}>₹{inst.paid.toLocaleString()}</b></td>
                                                                                         <td><b style={{ color: inst.remaining > 0 ? '#dc2626' : '#16a34a' }}>₹{inst.remaining.toLocaleString()}</b></td>
-                                                                                        <td>{formatDate(inst.lastPaymentDate)}</td>
+                                                                                        <td>{inst.dueDate ? formatDate(inst.dueDate) : '-'}</td>
                                                                                         <td>
                                                                                             <span className="badge" style={{
                                                                                                 background: inst.status === 'PAID' ? '#dcfce7' : inst.status === 'PARTIAL' ? '#fef3c7' : '#fee2e2',
                                                                                                 color: inst.status === 'PAID' ? '#15803d' : inst.status === 'PARTIAL' ? '#b45309' : '#991b1b',
                                                                                                 padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700
                                                                                             }}>
-                                                                                                {inst.status === 'PAID' ? '✓ Paid' : inst.status === 'PARTIAL' ? 'Partially Paid' : 'Pending'}
+                                                                                                {inst.status === 'PAID' ? '✓ Paid' : inst.status === 'PARTIAL' ? '◐ Partially Paid' : '○ Pending'}
                                                                                             </span>
                                                                                         </td>
                                                                                         <td>
-                                                                                            {inst.remaining > 0 && canManagePayments ? (
-                                                                                                <button
-                                                                                                    type="button"
-                                                                                                    className="primary"
-                                                                                                    style={{ padding: '3px 8px', fontSize: 11 }}
-                                                                                                    onClick={(e) => {
-                                                                                                        e.stopPropagation();
-                                                                                                        e.preventDefault();
-                                                                                                        setPaymentModalData({
-                                                                                                            admission: a,
-                                                                                                            installmentNumber: inst.number,
-                                                                                                            plannedAmount: inst.planned,
-                                                                                                            paidAmount: inst.paid,
-                                                                                                            remainingAmount: inst.remaining
-                                                                                                        });
-                                                                                                        setPaymentForm({
-                                                                                                            amount: inst.remaining,
-                                                                                                            paymentMethod: 'UPI',
-                                                                                                            transactionReference: '',
-                                                                                                            notes: ''
-                                                                                                        });
-                                                                                                    }}
-                                                                                                >
-                                                                                                    + Add Payment
-                                                                                                </button>
-                                                                                            ) : (
-                                                                                                <span style={{ fontSize: 11, color: '#94a3b8' }}>
-                                                                                                    {inst.remaining === 0 ? 'Completed ✓' : 'View Only'}
-                                                                                                </span>
-                                                                                            )}
+                                                                                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                                                                                {inst.remaining > 0 && canManagePayments && (
+                                                                                                    <button
+                                                                                                        type="button"
+                                                                                                        className="primary"
+                                                                                                        style={{ padding: '3px 8px', fontSize: 11 }}
+                                                                                                        onClick={(e) => {
+                                                                                                            e.stopPropagation();
+                                                                                                            e.preventDefault();
+                                                                                                            setPaymentModalData({
+                                                                                                                admission: a,
+                                                                                                                installmentNumber: inst.number,
+                                                                                                                plannedAmount: inst.planned,
+                                                                                                                paidAmount: inst.paid,
+                                                                                                                remainingAmount: inst.remaining
+                                                                                                            });
+                                                                                                            setPaymentForm({
+                                                                                                                amount: inst.remaining,
+                                                                                                                paymentMethod: 'UPI',
+                                                                                                                transactionReference: '',
+                                                                                                                notes: ''
+                                                                                                            });
+                                                                                                        }}
+                                                                                                    >
+                                                                                                        + Add Payment
+                                                                                                    </button>
+                                                                                                )}
+                                                                                                {inst.remaining > 0 && (
+                                                                                                    <button
+                                                                                                        type="button"
+                                                                                                        className="secondary"
+                                                                                                        style={{ background: '#25D366', borderColor: '#25D366', color: '#ffffff', padding: '3px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                                                                        onClick={(e) => {
+                                                                                                            e.stopPropagation();
+                                                                                                            e.preventDefault();
+                                                                                                            generateWhatsAppReminder(a, inst.remaining, inst.paid);
+                                                                                                        }}
+                                                                                                        title="Send WhatsApp Payment Reminder"
+                                                                                                    >
+                                                                                                        <MessageCircle size={12} /> WhatsApp
+                                                                                                    </button>
+                                                                                                )}
+                                                                                                {inst.remaining === 0 && (
+                                                                                                    <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>Completed ✓</span>
+                                                                                                )}
+                                                                                            </div>
                                                                                         </td>
                                                                                     </tr>
                                                                                 ))}
@@ -3448,75 +3507,188 @@ ${instituteName}`;
                 )}
 
                 {/* Modal for Configuring 3-Installment Planned Amounts */}
-                {configureInstallmentData && (
-                    <div className="modal-backdrop">
-                        <form className="panel" onSubmit={handleConfigureInstallmentsSubmit} style={{ maxWidth: 450 }}>
-                            <h3>Configure 3-Installment Plan</h3>
-                            <p style={{ margin: '0 0 12px', fontSize: 13, color: '#64748b' }}>
-                                Set planned targets for <b>{configureInstallmentData.admissionNumber}</b>. Total Fee: <b>₹{Number(configureInstallmentData.finalFee).toLocaleString()}</b>
-                            </p>
-                            {installmentsError && (
-                                <div style={{ background: '#fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
-                                    {installmentsError}
+                {configureInstallmentData && (() => {
+                    const instDetails = getAdmissionInstallmentDetails(configureInstallmentData);
+                    const finalFee = instDetails.finalFee;
+                    const totalPaid = instDetails.totalPaid;
+
+                    const inst1 = Number(installmentsForm.inst1) || 0;
+                    const inst2 = Number(installmentsForm.inst2) || 0;
+                    const inst3 = Number(installmentsForm.inst3) || 0;
+                    const plannedTotal = inst1 + inst2 + inst3;
+                    const remainingToAllocate = finalFee - plannedTotal;
+
+                    const paid1 = instDetails.installments[0]?.paid || 0;
+                    const paid2 = instDetails.installments[1]?.paid || 0;
+                    const paid3 = instDetails.installments[2]?.paid || 0;
+
+                    let localError = '';
+                    if (plannedTotal > finalFee) {
+                        localError = `⚠ Planned total (₹${plannedTotal.toLocaleString()}) exceeds total course fee (₹${finalFee.toLocaleString()}) by ₹${(plannedTotal - finalFee).toLocaleString()}`;
+                    } else if (inst1 < paid1) {
+                        localError = `⚠ Installment 1 planned amount cannot be less than already paid amount (₹${paid1.toLocaleString()})`;
+                    } else if (inst2 < paid2) {
+                        localError = `⚠ Installment 2 planned amount cannot be less than already paid amount (₹${paid2.toLocaleString()})`;
+                    } else if (inst3 < paid3) {
+                        localError = `⚠ Installment 3 planned amount cannot be less than already paid amount (₹${paid3.toLocaleString()})`;
+                    }
+
+                    const isValid = !localError && plannedTotal <= finalFee && inst1 >= paid1 && inst2 >= paid2 && inst3 >= paid3;
+
+                    const handleAutoBalance = () => {
+                        let p1 = Math.max(paid1, Math.round(finalFee / 3));
+                        let p2 = Math.max(paid2, Math.round(finalFee / 3));
+                        let p3 = Math.max(paid3, finalFee - (p1 + p2));
+                        if (p1 + p2 + p3 !== finalFee) {
+                            p3 = Math.max(paid3, finalFee - (p1 + p2));
+                        }
+                        setInstallmentsForm({
+                            ...installmentsForm,
+                            inst1: p1,
+                            inst2: p2,
+                            inst3: p3
+                        });
+                    };
+
+                    return (
+                        <div className="modal-backdrop">
+                            <form className="panel" onSubmit={handleConfigureInstallmentsSubmit} style={{ maxWidth: 540, width: '100%' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderBottom: '1px solid #e2e8f0', paddingBottom: 12 }}>
+                                    <div>
+                                        <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            ⚙ {instDetails.hasCustomPlan ? 'Edit Planned Amounts' : 'Configure Planned Amounts'}
+                                        </h3>
+                                        <p style={{ margin: '3px 0 0', fontSize: 12, color: '#64748b' }}>
+                                            Set how the total admission fee will be divided into 3 installments.
+                                        </p>
+                                    </div>
+                                    <button type="button" className="round" onClick={() => setConfigureInstallmentData(null)}>
+                                        <X size={16} />
+                                    </button>
                                 </div>
-                            )}
-                            <div style={{ marginBottom: 12 }}>
-                                <button
-                                    type="button"
-                                    className="secondary"
-                                    style={{ padding: '4px 12px', fontSize: 12, color: '#0284c7', borderColor: '#bae6fd' }}
-                                    onClick={() => {
-                                        const finalFee = Number(configureInstallmentData.finalFee) || 0;
-                                        const i1 = Math.round(finalFee / 3);
-                                        const i2 = Math.round(finalFee / 3);
-                                        const i3 = Math.max(0, finalFee - (i1 + i2));
-                                        setInstallmentsForm({ inst1: i1, inst2: i2, inst3: i3 });
-                                    }}
-                                >
-                                    ⚡ Auto Split Evenly (1/3 Each)
-                                </button>
-                            </div>
-                            <label>
-                                Installment 1 Target (₹)
-                                <input
-                                    type="number"
-                                    value={installmentsForm.inst1}
-                                    onChange={(e) => setInstallmentsForm({ ...installmentsForm, inst1: e.target.value })}
-                                    required
-                                />
-                            </label>
-                            <label>
-                                Installment 2 Target (₹)
-                                <input
-                                    type="number"
-                                    value={installmentsForm.inst2}
-                                    onChange={(e) => setInstallmentsForm({ ...installmentsForm, inst2: e.target.value })}
-                                    required
-                                />
-                            </label>
-                            <label>
-                                Installment 3 Target (₹)
-                                <input
-                                    type="number"
-                                    value={installmentsForm.inst3}
-                                    onChange={(e) => setInstallmentsForm({ ...installmentsForm, inst3: e.target.value })}
-                                    required
-                                />
-                            </label>
-                            <p style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>
-                                Total Planned: <b>₹{((Number(installmentsForm.inst1) || 0) + (Number(installmentsForm.inst2) || 0) + (Number(installmentsForm.inst3) || 0)).toLocaleString()}</b> / ₹{Number(configureInstallmentData.finalFee).toLocaleString()}
-                            </p>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-                                <button type="button" className="secondary" onClick={() => setConfigureInstallmentData(null)} disabled={installmentsSubmitting}>
-                                    Cancel
-                                </button>
-                                <button type="submit" className="primary" disabled={installmentsSubmitting}>
-                                    {installmentsSubmitting ? 'Saving...' : 'Save Plan'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                )}
+
+                                {/* Admission Fee & Payment Progress Card */}
+                                <div style={{ background: '#f8fafc', padding: 14, borderRadius: 10, border: '1px solid #e2e8f0', marginBottom: 16 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                        <div>
+                                            <span style={{ fontSize: 12, color: '#64748b' }}>Total Course Fee</span>
+                                            <strong style={{ fontSize: 18, color: '#0f172a', display: 'block' }}>₹{finalFee.toLocaleString()}</strong>
+                                        </div>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <span style={{ fontSize: 12, color: '#64748b' }}>Already Paid</span>
+                                            <strong style={{ fontSize: 18, color: '#16a34a', display: 'block' }}>₹{totalPaid.toLocaleString()}</strong>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ marginTop: 8 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                                            <span>Payment Progress</span>
+                                            <span>{instDetails.progressPct}% Paid</span>
+                                        </div>
+                                        <div style={{ width: '100%', height: 8, background: '#cbd5e1', borderRadius: 4, overflow: 'hidden' }}>
+                                            <div style={{ width: `${instDetails.progressPct}%`, height: '100%', background: '#16a34a', borderRadius: 4 }}></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Validation Error Alert */}
+                                {(installmentsError || localError) && (
+                                    <div style={{ background: '#fee2e2', color: '#991b1b', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 16, fontWeight: 600 }}>
+                                        {installmentsError || localError}
+                                    </div>
+                                )}
+
+                                {/* Auto Balance Action Bar */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>3 Installment Slots</span>
+                                    <button
+                                        type="button"
+                                        className="secondary"
+                                        style={{ padding: '4px 12px', fontSize: 12, color: '#0284c7', borderColor: '#bae6fd', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                        onClick={handleAutoBalance}
+                                    >
+                                        ⚡ Auto Balance
+                                    </button>
+                                </div>
+
+                                {/* 3 Installment Configuration Cards */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 360, overflowY: 'auto', paddingRight: 4 }}>
+                                    {[1, 2, 3].map((num) => {
+                                        const instVal = num === 1 ? installmentsForm.inst1 : num === 2 ? installmentsForm.inst2 : installmentsForm.inst3;
+                                        const dateVal = num === 1 ? installmentsForm.date1 : num === 2 ? installmentsForm.date2 : installmentsForm.date3;
+                                        const paidVal = num === 1 ? paid1 : num === 2 ? paid2 : paid3;
+
+                                        return (
+                                            <div key={num} style={{ background: '#ffffff', padding: 14, borderRadius: 10, border: '1px solid #cbd5e1' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                                    <strong style={{ fontSize: 14, color: '#0f172a' }}>Installment {num}</strong>
+                                                    {paidVal > 0 ? (
+                                                        <span className="badge" style={{ background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700 }}>
+                                                            Already Paid: ₹{paidVal.toLocaleString()}
+                                                        </span>
+                                                    ) : (
+                                                        <span style={{ fontSize: 11, color: '#64748b' }}>Pending Payment</span>
+                                                    )}
+                                                </div>
+
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                                    <label style={{ margin: 0 }}>
+                                                        <span style={{ fontSize: 12, fontWeight: 600 }}>Planned Amount (₹)</span>
+                                                        <input
+                                                            type="number"
+                                                            value={instVal}
+                                                            onChange={(e) => setInstallmentsForm({
+                                                                ...installmentsForm,
+                                                                [`inst${num}`]: e.target.value
+                                                            })}
+                                                            min={paidVal}
+                                                            required
+                                                            style={{ marginTop: 4 }}
+                                                        />
+                                                        {paidVal > 0 && (
+                                                            <span style={{ fontSize: 10, color: '#16a34a' }}>Min required: ₹{paidVal.toLocaleString()}</span>
+                                                        )}
+                                                    </label>
+
+                                                    <label style={{ margin: 0 }}>
+                                                        <span style={{ fontSize: 12, fontWeight: 600 }}>Due Date</span>
+                                                        <input
+                                                            type="date"
+                                                            value={dateVal}
+                                                            onChange={(e) => setInstallmentsForm({
+                                                                ...installmentsForm,
+                                                                [`date${num}`]: e.target.value
+                                                            })}
+                                                            style={{ marginTop: 4 }}
+                                                        />
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Real-time Allocation Summary Banner */}
+                                <div style={{ background: remainingToAllocate === 0 ? '#f0fdf4' : remainingToAllocate > 0 ? '#fefce8' : '#fef2f2', padding: 12, borderRadius: 8, border: '1px solid #cbd5e1', marginTop: 16 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700 }}>
+                                        <span>Planned Total: <b style={{ color: plannedTotal > finalFee ? '#dc2626' : '#16a34a' }}>₹{plannedTotal.toLocaleString()}</b></span>
+                                        <span>Remaining to Allocate: <b style={{ color: remainingToAllocate < 0 ? '#dc2626' : remainingToAllocate > 0 ? '#d97706' : '#16a34a' }}>₹{remainingToAllocate.toLocaleString()}</b></span>
+                                    </div>
+                                </div>
+
+                                {/* Actions */}
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+                                    <button type="button" className="secondary" onClick={() => setConfigureInstallmentData(null)} disabled={installmentsSubmitting}>
+                                        Cancel
+                                    </button>
+                                    <button type="submit" className="primary" disabled={installmentsSubmitting || !isValid}>
+                                        {installmentsSubmitting ? 'Saving...' : 'Save Amounts'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    );
+                })()}
             </div>
         </div>
     );

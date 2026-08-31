@@ -152,6 +152,25 @@ router.patch('/:id/installments', authenticate, authorize('SUPER_ADMIN', 'ADMIN'
       });
     }
 
+    // Payment-aware validation: planned amount cannot be less than already paid amount
+    const instPayments = { 1: 0, 2: 0, 3: 0 };
+    admission.payments.forEach(p => {
+      const num = p.installmentNumber && [1, 2, 3].includes(p.installmentNumber) ? p.installmentNumber : 1;
+      instPayments[num] += Number(p.amount) || 0;
+    });
+
+    for (const item of installmentPlan) {
+      const num = item.number;
+      const planned = Number(item.planned) || 0;
+      const paid = instPayments[num] || 0;
+      if (planned < paid) {
+        return res.status(400).json({
+          success: false,
+          message: `Installment ${num} planned amount (₹${planned.toLocaleString()}) cannot be less than already paid amount (₹${paid.toLocaleString()}).`
+        });
+      }
+    }
+
     const updated = await prisma.admission.update({
       where: { id },
       data: {
