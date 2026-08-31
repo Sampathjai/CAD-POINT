@@ -231,7 +231,7 @@ function App() {
     const [editingCourse, setEditingCourse] = useState(null);
     const [editCourseForm, setEditCourseForm] = useState({ id: '', courseCode: '', name: '', description: '', standardFee: '', isActive: true });
     const [editingBatch, setEditingBatch] = useState(null);
-    const [editBatchForm, setEditBatchForm] = useState({ id: '', batchCode: '', name: '', courseId: '', startDate: '', capacity: 25 });
+    const [editBatchForm, setEditBatchForm] = useState({ id: '', batchCode: '', name: '', courseId: '', startDate: '', endDate: '', capacity: 25 });
 
     const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -246,9 +246,9 @@ function App() {
     const [addLeadForm, setAddLeadForm] = useState({ firstName: '', lastName: '', phone: '', email: '', interestedCourse: '', estimatedValue: '', sourceId: '', leadType: 'STANDARD', assignedCounsellorId: '', branchId: '' });
     const [scheduleForm, setScheduleForm] = useState({ leadId: '', scheduledAt: '', type: 'CALL', notes: '' });
     const [addCourseForm, setAddCourseForm] = useState({ courseCode: '', name: '', description: '', standardFee: '' });
-    const [addBatchForm, setAddBatchForm] = useState({ batchCode: '', name: '', courseId: '', startDate: '', capacity: 25 });
+    const [addBatchForm, setAddBatchForm] = useState({ batchCode: '', name: '', courseId: '', startDate: '', endDate: '', capacity: 25 });
     const [addStudentForm, setAddStudentForm] = useState({ studentCode: '', firstName: '', lastName: '', phone: '', email: '', photoUrl: '' });
-    const [addAdmissionForm, setAddAdmissionForm] = useState({ admissionNumber: '', studentId: '', courseId: '', batchId: '', agreedFee: '', finalFee: '' });
+    const [addAdmissionForm, setAddAdmissionForm] = useState({ admissionNumber: '', studentId: '', courseId: '', batchId: '', startDate: '', endDate: '', agreedFee: '', finalFee: '' });
     const [addPaymentForm, setAddPaymentForm] = useState({ admissionId: '', receiptNumber: '', amount: '', paymentMethod: 'UPI', transactionReference: '', remarks: '' });
     const [addUserForm, setAddUserForm] = useState({ name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true });
 
@@ -579,7 +579,7 @@ function App() {
             if (!j.success) return alert(j.message || 'Create batch failed');
             fetchAllData();
             setShowAddBatch(false);
-            setAddBatchForm({ batchCode: '', name: '', courseId: '', startDate: '', capacity: 25 });
+            setAddBatchForm({ batchCode: '', name: '', courseId: '', startDate: '', endDate: '', capacity: 25 });
         } catch (e) {
             console.error(e);
             alert('Create batch failed');
@@ -664,7 +664,7 @@ function App() {
             if (!j.success) return alert(formatErrorMessage(j.message) || 'Create admission failed');
             fetchAllData();
             setShowAddAdmission(false);
-            setAddAdmissionForm({ admissionNumber: '', studentId: '', courseId: '', batchId: '', agreedFee: '', finalFee: '' });
+            setAddAdmissionForm({ admissionNumber: '', studentId: '', courseId: '', batchId: '', startDate: '', endDate: '', agreedFee: '', finalFee: '' });
         } catch (e) {
             console.error(e);
             alert('Create admission failed');
@@ -768,7 +768,7 @@ function App() {
 
     function openEditBatch(b) {
         setEditingBatch(b);
-        setEditBatchForm({ id: b.id, batchCode: b.batchCode, name: b.name, courseId: b.courseId, startDate: b.startDate ? b.startDate.slice(0, 10) : '', capacity: b.capacity });
+        setEditBatchForm({ id: b.id, batchCode: b.batchCode, name: b.name, courseId: b.courseId, startDate: b.startDate ? b.startDate.slice(0, 10) : '', endDate: b.endDate ? b.endDate.slice(0, 10) : '', capacity: b.capacity });
     }
 
     function getNextCode(prefix, list, key) {
@@ -1232,6 +1232,10 @@ function App() {
                             <input type="date" value={editBatchForm.startDate} onChange={(e) => setEditBatchForm({ ...editBatchForm, startDate: e.target.value })} required />
                         </label>
                         <label>
+                            End Date
+                            <input type="date" value={editBatchForm.endDate} onChange={(e) => setEditBatchForm({ ...editBatchForm, endDate: e.target.value })} />
+                        </label>
+                        <label>
                             Capacity
                             <input type="number" value={editBatchForm.capacity} onChange={(e) => setEditBatchForm({ ...editBatchForm, capacity: e.target.value })} required />
                         </label>
@@ -1521,6 +1525,10 @@ function App() {
                             <input type="date" value={addBatchForm.startDate} onChange={(e) => setAddBatchForm({ ...addBatchForm, startDate: e.target.value })} required />
                         </label>
                         <label>
+                            End Date
+                            <input type="date" value={addBatchForm.endDate} onChange={(e) => setAddBatchForm({ ...addBatchForm, endDate: e.target.value })} />
+                        </label>
+                        <label>
                             Capacity
                             <input type="number" value={addBatchForm.capacity} onChange={(e) => setAddBatchForm({ ...addBatchForm, capacity: e.target.value })} required />
                         </label>
@@ -1631,7 +1639,18 @@ function App() {
                         </label>
                         <label>
                             Batch (Optional)
-                            <select value={addAdmissionForm.batchId} onChange={(e) => setAddAdmissionForm({ ...addAdmissionForm, batchId: e.target.value })}>
+                            <select
+                                value={addAdmissionForm.batchId}
+                                onChange={(e) => {
+                                    const selectedB = batches.find((b) => b.id === e.target.value);
+                                    setAddAdmissionForm({
+                                        ...addAdmissionForm,
+                                        batchId: e.target.value,
+                                        startDate: selectedB?.startDate ? selectedB.startDate.slice(0, 10) : addAdmissionForm.startDate,
+                                        endDate: selectedB?.endDate ? selectedB.endDate.slice(0, 10) : addAdmissionForm.endDate
+                                    });
+                                }}
+                            >
                                 <option value="">Select batch</option>
                                 {batches.map((b) => (
                                     <option key={b.id} value={b.id}>{b.name} ({b.batchCode})</option>
@@ -2904,6 +2923,7 @@ ${instituteName}`;
                                 <th>Batch Name</th>
                                 <th>Course</th>
                                 <th>Start Date</th>
+                                <th>End Date</th>
                                 <th>Capacity</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -2918,6 +2938,7 @@ ${instituteName}`;
                                         <td>{b.name}</td>
                                         <td>{b.course?.name || '-'}</td>
                                         <td>{formatDate(b.startDate)}</td>
+                                        <td>{b.endDate ? formatDate(b.endDate) : '-'}</td>
                                         <td>{b.capacity} students</td>
                                         <td><span className="status active">{b.status}</span></td>
                                         <td>

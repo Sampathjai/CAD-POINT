@@ -64,6 +64,15 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
 
     let { admissionNumber, studentId, courseId, batchId, agreedFee, finalFee, counsellorId, branchId, startDate, endDate, installmentPlan } = parsed.data;
 
+    // Inherit start and end dates from selected batch if not explicitly set
+    if (batchId) {
+      const b = await prisma.batch.findUnique({ where: { id: batchId } });
+      if (b) {
+        if (!startDate && b.startDate) startDate = b.startDate;
+        if (!endDate && b.endDate) endDate = b.endDate;
+      }
+    }
+
     if (!admissionNumber || !admissionNumber.trim()) {
       const count = await prisma.admission.count();
       admissionNumber = `ADM-${1001 + count}`;
