@@ -2688,7 +2688,7 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
 
                 {page === 'Settings' && (
                     <ErrorBoundary>
-                        <SettingsView token={token} theme={theme} toggleTheme={toggleTheme} sourcesList={sourcesList} refreshSources={refreshData} />
+                        <SettingsView userRole={userRole} token={token} theme={theme} toggleTheme={toggleTheme} sourcesList={sourcesList} refreshSources={refreshData} usersList={usersList} currentUserId={currentUserId} onOpenAddModal={onOpenAddModal} onEditUser={onEditUser} onDeleteUser={onDeleteUser} />
                     </ErrorBoundary>
                 )}
 
@@ -2968,7 +2968,7 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
     );
 }
 
-function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSources }) {
+function SettingsView({ userRole, token, theme, toggleTheme, sourcesList = [], refreshSources, usersList = [], currentUserId, onOpenAddModal, onEditUser, onDeleteUser }) {
     const [activeTab, setActiveTab] = useState('Profile');
     const [saving, setSaving] = useState(false);
     const [newSourceName, setNewSourceName] = useState('');
@@ -3397,7 +3397,7 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
         }
     }
 
-    const userRole = user?.role || 'RECEPTIONIST';
+    const safeUserRole = userRole || 'RECEPTIONIST';
 
     const allTabs = [
         { id: 'Profile', label: 'Institute Profile', icon: ShieldCheck, perm: 'settings.profile' },
@@ -3411,7 +3411,7 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
         { id: 'System Info', label: 'System Info', icon: Laptop, perm: 'settings.profile' }
     ];
 
-    const tabs = allTabs.filter(t => hasPermission(userRole, t.perm));
+    const tabs = allTabs.filter(t => hasPermission(safeUserRole, t.perm));
 
     useEffect(() => {
         if (tabs.length > 0 && !tabs.some(t => t.id === activeTab)) {
