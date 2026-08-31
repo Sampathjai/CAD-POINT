@@ -4,9 +4,11 @@ const prisma = require('../config/prisma');
 const { authenticate, authorize } = require('../middleware/auth');
 const { z } = require('zod');
 
+// Batches Module Roles: SUPER_ADMIN, ADMIN, COUNSELLOR, TRAINER, RECEPTIONIST
+const BATCH_ROLES = ['SUPER_ADMIN', 'ADMIN', 'COUNSELLOR', 'TRAINER', 'RECEPTIONIST'];
 
 // GET /api/batches
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, authorize(...BATCH_ROLES), async (req, res) => {
   try {
     const batches = await prisma.batch.findMany({
       include: { course: true, trainer: { select: { id: true, name: true } } },
@@ -20,7 +22,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // POST /api/batches
-router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN'), async (req, res) => {
+router.post('/', authenticate, authorize(...BATCH_ROLES), async (req, res) => {
   try {
     const schema = z.object({ batchCode: z.string().min(1), name: z.string().min(1), courseId: z.string().uuid(), startDate: z.string().min(1), endDate: z.string().optional(), capacity: z.number().optional() });
     const parsed = schema.safeParse(req.body);
@@ -35,7 +37,7 @@ router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN'), async (req, res
 });
 
 // PUT /api/batches/:id - Update batch details
-router.put('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+router.put('/:id', authenticate, authorize(...BATCH_ROLES), async (req, res) => {
   try {
     const { id } = req.params;
     const { batchCode, name, courseId, startDate, endDate, capacity, status } = req.body;
@@ -48,25 +50,25 @@ router.put('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, 
     const updated = await prisma.batch.update({
       where: { id },
       data: {
-        batchCode: batchCode || existing.batchCode,
-        name: name || existing.name,
-        courseId: courseId || existing.courseId,
-        startDate: startDate ? new Date(startDate) : existing.startDate,
-        endDate: endDate ? new Date(endDate) : existing.endDate,
-        capacity: capacity ? Number(capacity) : existing.capacity,
-        status: status || existing.status
+        ...(batchCode ? { batchCode: batchCode.trim() } : {}),
+        ...(name ? { name: name.trim() } : {}),
+        ...(courseId ? { courseId } : {}),
+        ...(startDate ? { startDate: new Date(startDate) } : {}),
+        ...(endDate ? { endDate: new Date(endDate) } : {}),
+        ...(capacity ? { capacity: Number(capacity) || 25 } : {}),
+        ...(status ? { status } : {})
       },
       include: { course: true, trainer: { select: { id: true, name: true } } }
     });
 
-    res.json({ success: true, data: updated, message: 'Batch updated successfully' });
+    res.json({ success: true, data: updated });
   } catch (err) {
     console.error('batches.update', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// DELETE /api/batches/:id - Delete batch
+// DELETE /api/batches/:id
 router.delete('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
     const { id } = req.params;

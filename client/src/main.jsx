@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, Component } from 'react';
 import { createRoot } from 'react-dom/client';
+import { hasPermission, getDefaultPageForRole } from './permissions';
 import {
     LayoutDashboard,
     Users as UsersIcon,
@@ -328,14 +329,14 @@ function App() {
     }, [fetchAllData]);
 
     useEffect(() => {
-        if (token && user?.role === 'SUPER_ADMIN') {
+        if (token && hasPermission(user?.role, 'userControl')) {
             fetch(API_BASE + '/users', { headers: { Authorization: 'Bearer ' + token } })
                 .then(r => r.json())
                 .then(j => { if (j.success) setUsersList(j.data || []); })
                 .catch(e => console.error(e));
         }
-        if (user && user.role !== 'SUPER_ADMIN' && page === 'Users') {
-            setPage('Dashboard');
+        if (user && !hasPermission(user.role, page)) {
+            setPage(getDefaultPageForRole(user.role));
         }
     }, [token, user, page]);
 
@@ -379,10 +380,10 @@ function App() {
                 return alert(formatErrorMessage(j.message) || 'Invalid email or password. Please try again.');
             }
             localStorage.setItem('cadpoint_token', j.data.token);
-            // Set user FIRST so useEffect does not trigger redundant /auth/me call
             setUser(j.data.user);
             setToken(j.data.token);
-            setPage('Dashboard');
+            const defaultPage = getDefaultPageForRole(j.data.user?.role);
+            setPage(defaultPage);
 
             console.log(`[PERF FRONTEND] ✅ Dashboard redirected in ${(performance.now() - tStart).toFixed(1)}ms (Server handling: ${j._perf?.totalMs || 'N/A'}ms)`);
         } catch (err) {
@@ -835,7 +836,7 @@ function App() {
             </div>
         );
 
-    const nav = [
+    const allNavItems = [
         ['Dashboard', LayoutDashboard],
         ['Leads', UsersIcon],
         ['Follow-ups', CalendarDays],
@@ -845,9 +846,11 @@ function App() {
         ['Admissions', ArrowUpRight],
         ['Payments', WalletCards],
         ['Reports', BarChart3],
-        ...(user?.role === 'SUPER_ADMIN' ? [['Users', UserCheck]] : []),
+        ['Users', UserCheck],
         ['Settings', Settings]
     ];
+
+    const nav = allNavItems.filter(([pageName]) => hasPermission(user?.role, pageName));
 
     return (
         <div className="app">
@@ -1008,7 +1011,22 @@ function App() {
                 </header>
 
                 <ErrorBoundary key={page}>
-                    {page === 'Dashboard' ? (
+                    {!hasPermission(user?.role, page) ? (
+                        <div className="content" style={{ display: 'grid', placeItems: 'center', minHeight: '50vh' }}>
+                            <div style={{ padding: 40, textAlign: 'center', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 12, maxWidth: 500 }}>
+                                <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#fee2e2', color: '#dc2626', display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}>
+                                    <ShieldCheck size={32} />
+                                </div>
+                                <h2 style={{ margin: '0 0 8px', color: '#991b1b', fontSize: 20 }}>Access Restricted</h2>
+                                <p style={{ margin: '0 0 20px', color: 'var(--text-muted)', fontSize: 14 }}>
+                                    Your account role (<b>{user?.role || 'User'}</b>) does not have permission to access the <b>{page}</b> module.
+                                </p>
+                                <button className="primary" onClick={() => setPage(getDefaultPageForRole(user?.role))}>
+                                    Return to {getDefaultPageForRole(user?.role)}
+                                </button>
+                            </div>
+                        </div>
+                    ) : page === 'Dashboard' ? (
                         <Dashboard
                             leads={leads}
                             followups={followups}
@@ -1045,6 +1063,7 @@ function App() {
                             onDeleteAdmission={deleteAdmission}
                             onOpenEditProgress={openEditProgress}
                             currentUserId={user?.id}
+                            userRole={user?.role}
                             token={token}
                             theme={theme}
                             toggleTheme={toggleTheme}
@@ -3378,14 +3397,25 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
         }
     }
 
-    const tabs = [
-        { id: 'Profile', label: 'Institute Profile', icon: ShieldCheck },
-        { id: 'Appearance', label: 'Appearance & Theme', icon: Sun },
-        { id: 'Storage & Database', label: 'Storage & Database', icon: Database },
-        { id: 'Enquiry Sources', label: 'Enquiry Sources', icon: Plus },
-        { id: 'WhatsApp & API', label: 'WhatsApp & API', icon: MessageCircle },
-        { id: 'System Info', label: 'System Info', icon: Laptop }
+    const userRole = user?.role || 'RECEPTIONIST';
+
+    const allTabs = [
+        { id: 'Profile', label: 'Institute Profile', icon: ShieldCheck, perm: 'settings.profile' },
+        { id: 'Appearance', label: 'Appearance & Theme', icon: Sun, perm: 'settings.appearance' },
+        { id: 'Storage & Database', label: 'Storage & Database', icon: Database, perm: 'settings.whatsapp' },
+        { id: 'Enquiry Sources', label: 'Enquiry Sources', icon: Plus, perm: 'settings.whatsapp' },
+        { id: 'WhatsApp & API', label: 'WhatsApp & API', icon: MessageCircle, perm: 'settings.whatsapp' },
+        { id: 'Registered Devices', label: 'Registered Devices', icon: HardDrive, perm: 'settings.devices' },
+        { id: 'System Info', label: 'System Info', icon: Laptop, perm: 'settings.profile' }
     ];
+
+    const tabs = allTabs.filter(t => hasPermission(userRole, t.perm));
+
+    useEffect(() => {
+        if (tabs.length > 0 && !tabs.some(t => t.id === activeTab)) {
+            setActiveTab(tabs[0].id);
+        }
+    }, [tabs, activeTab]);
 
     function renderDeviceTypeIcon(type) {
         const t = (type || '').toUpperCase();

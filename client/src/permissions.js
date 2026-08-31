@@ -1,0 +1,139 @@
+/**
+ * Centralized Role-Based Access Control (RBAC) Permissions Matrix for CAD POINT CRM Frontend
+ */
+
+export const ROLE_PERMISSIONS = {
+  SUPER_ADMIN: [
+    'dashboard',
+    'leads',
+    'followups',
+    'courses',
+    'batches',
+    'admissions',
+    'payments',
+    'reports',
+    'userControl',
+    'settings',
+    'settings.profile',
+    'settings.appearance',
+    'settings.whatsapp',
+    'settings.devices',
+    'settings.branches',
+    'settings.users'
+  ],
+  ADMIN: [
+    'dashboard',
+    'leads',
+    'followups',
+    'courses',
+    'batches',
+    'admissions',
+    'payments',
+    'reports',
+    'settings',
+    'settings.profile',
+    'settings.appearance',
+    'settings.whatsapp',
+    'settings.devices',
+    'settings.branches'
+  ],
+  COUNSELLOR: [
+    'leads',
+    'followups',
+    'courses',
+    'batches',
+    'admissions',
+    'settings',
+    'settings.profile',
+    'settings.appearance'
+  ],
+  TRAINER: [
+    'courses',
+    'batches',
+    'settings',
+    'settings.profile',
+    'settings.appearance'
+  ],
+  ACCOUNTANT: [
+    'dashboard',
+    'payments',
+    'reports',
+    'settings',
+    'settings.profile',
+    'settings.appearance'
+  ],
+  ACCOUNTS: [
+    'dashboard',
+    'payments',
+    'reports',
+    'settings',
+    'settings.profile',
+    'settings.appearance'
+  ],
+  RECEPTIONIST: [
+    'leads',
+    'followups',
+    'batches',
+    'settings',
+    'settings.profile',
+    'settings.appearance'
+  ]
+};
+
+export const PAGE_TO_PERMISSION_KEY = {
+  Dashboard: 'dashboard',
+  dashboard: 'dashboard',
+  Leads: 'leads',
+  leads: 'leads',
+  'Follow-ups': 'followups',
+  followups: 'followups',
+  Courses: 'courses',
+  courses: 'courses',
+  Batches: 'batches',
+  batches: 'batches',
+  Students: 'admissions',
+  Admissions: 'admissions',
+  'Student Admissions': 'admissions',
+  admissions: 'admissions',
+  Payments: 'payments',
+  payments: 'payments',
+  Reports: 'reports',
+  reports: 'reports',
+  Users: 'userControl',
+  'User Control': 'userControl',
+  userControl: 'userControl',
+  Settings: 'settings',
+  settings: 'settings'
+};
+
+export function normalizeRole(role) {
+  if (!role) return 'RECEPTIONIST';
+  const r = (role + '').toUpperCase().trim();
+  if (r === 'ACCOUNTANT') return 'ACCOUNTS';
+  return r;
+}
+
+export function hasPermission(role, permissionKey) {
+  const normRole = normalizeRole(role);
+  const allowedPermissions = ROLE_PERMISSIONS[normRole] || [];
+  const targetKey = PAGE_TO_PERMISSION_KEY[permissionKey] || permissionKey;
+  return allowedPermissions.includes(targetKey);
+}
+
+export function getDefaultPageForRole(role) {
+  const normRole = normalizeRole(role);
+  switch (normRole) {
+    case 'SUPER_ADMIN':
+    case 'ADMIN':
+    case 'ACCOUNTS':
+    case 'ACCOUNTANT':
+      return 'Dashboard';
+    case 'COUNSELLOR':
+    case 'RECEPTIONIST':
+      return 'Leads';
+    case 'TRAINER':
+      return 'Courses';
+    default:
+      return 'Leads';
+  }
+}

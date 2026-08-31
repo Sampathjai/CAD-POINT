@@ -4,9 +4,11 @@ const prisma = require('../config/prisma');
 const { authenticate, authorize } = require('../middleware/auth');
 const { z } = require('zod');
 
+// Student Admissions Module Roles: SUPER_ADMIN, ADMIN, COUNSELLOR
+const ADMISSION_ROLES = ['SUPER_ADMIN', 'ADMIN', 'COUNSELLOR'];
 
 // GET /api/admissions
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) => {
   try {
     const { branchId } = req.query;
     const where = {};
@@ -38,19 +40,19 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // POST /api/admissions
-router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR','RECEPTIONIST'), async (req, res) => {
+router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) => {
   try {
     const schema = z.object({
       admissionNumber: z.string().optional().or(z.literal('')),
       studentId: z.string().uuid('Please select a valid student'),
       courseId: z.string().uuid('Please select a valid course'),
       batchId: z.string().uuid().optional().or(z.literal('')).nullable(),
-      agreedFee: z.number().optional(),
-      finalFee: z.number({ invalid_type_error: 'Final fee must be a number' }),
+      agreedFee: z.number().optional().or(z.literal(0)),
+      finalFee: z.number().min(0, 'Fee cannot be negative'),
       counsellorId: z.string().uuid().optional().or(z.literal('')).nullable(),
       branchId: z.string().optional(),
-      startDate: z.string().optional().nullable(),
-      endDate: z.string().optional().nullable()
+      startDate: z.string().optional().or(z.literal('')).nullable(),
+      endDate: z.string().optional().or(z.literal('')).nullable()
     });
 
     const parsed = schema.safeParse(req.body);
@@ -73,101 +75,96 @@ router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR','REC
       });
       if (b) finalBranchId = b.id;
     }
+
     if (!finalBranchId) {
       const defaultBranch = await prisma.branch.findFirst({ where: { code: 'gandhipuram' } });
       if (defaultBranch) finalBranchId = defaultBranch.id;
     }
 
-    const created = await prisma.admission.create({
+    const admission = await prisma.admission.create({
       data: {
-        admissionNumber: admissionNumber.trim(),
+        admissionNumber,
         studentId,
         courseId,
-        batchId: batchId && batchId.trim() ? batchId.trim() : null,
+        batchId: batchId || null,
         agreedFee: agreedFee || finalFee,
         finalFee,
+        counsellorId: counsellorId || req.user?.id || null,
         branchId: finalBranchId,
-        startDate: startDate ? new Date(startDate) : null,
+        startDate: startDate ? new Date(startDate) : new Date(),
         endDate: endDate ? new Date(endDate) : null,
-        counsellorId: counsellorId && counsellorId.trim() ? counsellorId.trim() : null
+        status: 'CONFIRMED'
+      },
+      include: {
+        student: true,
+        course: true,
+        batch: true,
+        payments: true,
+        branch: true
       }
     });
 
-    res.json({ success: true, data: created });
+    res.status(201).json({ success: true, data: admission });
   } catch (err) {
     console.error('admissions.create', err);
-    if (err.code === 'P2002') {
-      return res.status(400).json({ success: false, message: 'Admission number already exists' });
-    }
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// PATCH /api/admissions/:id/progress - Update course dates, completion % & certificate status
-router.patch('/:id/progress', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR','TRAINER'), async (req, res) => {
-  const { id } = req.params;
-  const { startDate, endDate, completionPct, certificateStatus, issueDate } = req.body;
-
+// PATCH /api/admissions/:id/progress - Update progress & certificate info (Trainers, Counsellors, Admins)
+router.patch('/:id/progress', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'COUNSELLOR', 'TRAINER'), async (req, res) => {
   try {
-    const admission = await prisma.admission.findUnique({ where: { id }, include: { certificate: true, student: true } });
-    if (!admission) return res.status(404).json({ success: false, message: 'Admission not found' });
+    const { id } = req.params;
+    const { startDate, endDate, completionPct, certificateStatus, issueDate } = req.body;
 
-    const updateData = {};
-    if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null;
-    if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
-    if (completionPct !== undefined) {
-      updateData.completionPct = Math.min(100, Math.max(0, Number(completionPct) || 0));
+    const admission = await prisma.admission.findUnique({ where: { id } });
+    if (!admission) return res.status(404).json({ success: false, message: 'Admission record not found' });
+
+    if (startDate || endDate) {
+      await prisma.admission.update({
+        where: { id },
+        data: {
+          ...(startDate ? { startDate: new Date(startDate) } : {}),
+          ...(endDate ? { endDate: new Date(endDate) } : {})
+        }
+      });
     }
 
-    const updated = await prisma.admission.update({
-      where: { id },
-      data: updateData,
-      include: { student: true, course: true, certificate: true, branch: true }
-    });
-
-    // Sync or update Certificate record if certificateStatus passed
-    if (certificateStatus) {
-      const certCode = 'CERT-' + Date.now().toString(36).toUpperCase();
-      const certData = {
-        status: certificateStatus,
-        issueDate: issueDate ? new Date(issueDate) : (certificateStatus === 'ISSUED' ? new Date() : null)
-      };
-
-      if (admission.certificate) {
-        await prisma.certificate.update({ where: { id: admission.certificate.id }, data: certData });
-      } else {
-        await prisma.certificate.create({
-          data: {
-            studentId: admission.studentId,
-            admissionId: admission.id,
-            certificateNumber: certCode,
-            ...certData
-          }
-        });
+    const certificate = await prisma.certificate.upsert({
+      where: { admissionId: id },
+      create: {
+        admissionId: id,
+        studentId: admission.studentId,
+        courseId: admission.courseId,
+        certificateNumber: `CERT-${Date.now().toString(36).toUpperCase()}`,
+        completionPct: Number(completionPct) || 0,
+        status: certificateStatus || 'NOT_STARTED',
+        issueDate: issueDate ? new Date(issueDate) : null
+      },
+      update: {
+        completionPct: Number(completionPct) || 0,
+        status: certificateStatus || 'NOT_STARTED',
+        issueDate: issueDate ? new Date(issueDate) : null
       }
-    }
+    });
 
-    const finalResult = await prisma.admission.findUnique({
+    const updatedAdmission = await prisma.admission.findUnique({
       where: { id },
       include: { student: true, course: true, certificate: true, branch: true }
     });
 
-    res.json({ success: true, data: finalResult });
+    res.json({ success: true, data: updatedAdmission });
   } catch (err) {
-    console.error('admissions.progress', err);
+    console.error('admissions.progress.update', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
 // DELETE /api/admissions/:id
 router.delete('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
-  const { id } = req.params;
   try {
-    await prisma.$transaction(async (tx) => {
-      await tx.certificate.deleteMany({ where: { admissionId: id } });
-      await tx.payment.deleteMany({ where: { admissionId: id } });
-      await tx.admission.delete({ where: { id } });
-    });
+    const { id } = req.params;
+    await prisma.admission.delete({ where: { id } });
     res.json({ success: true, message: 'Admission deleted successfully' });
   } catch (err) {
     console.error('admissions.delete', err);

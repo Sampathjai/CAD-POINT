@@ -4,8 +4,11 @@ const prisma = require('../config/prisma');
 const { authenticate, authorize } = require('../middleware/auth');
 const { z } = require('zod');
 
+// Student Admissions Module Roles: SUPER_ADMIN, ADMIN, COUNSELLOR
+const ADMISSION_ROLES = ['SUPER_ADMIN', 'ADMIN', 'COUNSELLOR'];
+
 // GET /api/students
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) => {
   try {
     const { branchId } = req.query;
     const where = {};
@@ -33,7 +36,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // POST /api/students
-router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR','RECEPTIONIST'), async (req, res) => {
+router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) => {
   try {
     const schema = z.object({
       studentCode: z.string().optional().or(z.literal('')),
@@ -65,51 +68,59 @@ router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR','REC
       });
       if (b) finalBranchId = b.id;
     }
+
     if (!finalBranchId) {
       const defaultBranch = await prisma.branch.findFirst({ where: { code: 'gandhipuram' } });
       if (defaultBranch) finalBranchId = defaultBranch.id;
     }
 
-    const created = await prisma.student.create({
+    const student = await prisma.student.create({
       data: {
-        studentCode: studentCode.trim(),
-        firstName: firstName.trim(),
-        lastName: lastName && lastName.trim() ? lastName.trim() : null,
-        phone: phone.trim(),
-        email: email && email.trim() ? email.trim() : null,
-        photoUrl: photoUrl && photoUrl.trim() ? photoUrl.trim() : null,
+        studentCode,
+        firstName,
+        lastName: lastName || null,
+        phone,
+        email: email || null,
+        photoUrl: photoUrl || null,
         branchId: finalBranchId
       },
-      include: { branch: true }
+      include: {
+        branch: true
+      }
     });
 
-    res.json({ success: true, data: created });
+    res.status(201).json({ success: true, data: student });
   } catch (err) {
     console.error('students.create', err);
-    if (err.code === 'P2002') {
-      return res.status(400).json({ success: false, message: 'Student code or phone number already exists' });
-    }
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
 // PUT /api/students/:id
-router.put('/:id', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR','RECEPTIONIST'), async (req, res) => {
-  const { id } = req.params;
+router.put('/:id', authenticate, authorize(...ADMISSION_ROLES), async (req, res) => {
   try {
+    const { id } = req.params;
     const { firstName, lastName, phone, email, photoUrl, branchId } = req.body;
-    const updateData = {};
-    if (firstName !== undefined) updateData.firstName = firstName.trim();
-    if (lastName !== undefined) updateData.lastName = lastName ? lastName.trim() : null;
-    if (phone !== undefined) updateData.phone = phone.trim();
-    if (email !== undefined) updateData.email = email ? email.trim() : null;
-    if (photoUrl !== undefined) updateData.photoUrl = photoUrl ? photoUrl.trim() : null;
-    if (branchId !== undefined) updateData.branchId = branchId;
+
+    let finalBranchId = branchId;
+    if (finalBranchId) {
+      const b = await prisma.branch.findFirst({
+        where: { OR: [{ id: finalBranchId }, { code: finalBranchId.toLowerCase() }] }
+      });
+      if (b) finalBranchId = b.id;
+    }
 
     const updated = await prisma.student.update({
       where: { id },
-      data: updateData,
-      include: { branch: true, admissions: { include: { course: true, batch: true } } }
+      data: {
+        firstName,
+        lastName: lastName || null,
+        phone,
+        email: email || null,
+        photoUrl: photoUrl || null,
+        ...(finalBranchId ? { branchId: finalBranchId } : {})
+      },
+      include: { branch: true }
     });
 
     res.json({ success: true, data: updated });
@@ -121,21 +132,10 @@ router.put('/:id', authenticate, authorize('SUPER_ADMIN','ADMIN','COUNSELLOR','R
 
 // DELETE /api/students/:id
 router.delete('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
-  const { id } = req.params;
   try {
-    await prisma.$transaction(async (tx) => {
-      const admissions = await tx.admission.findMany({ where: { studentId: id }, select: { id: true } });
-      const admissionIds = admissions.map((a) => a.id);
-
-      if (admissionIds.length > 0) {
-        await tx.payment.deleteMany({ where: { admissionId: { in: admissionIds } } });
-        await tx.admission.deleteMany({ where: { studentId: id } });
-      }
-
-      await tx.student.delete({ where: { id } });
-    });
-
-    res.json({ success: true, message: 'Student and related records deleted successfully' });
+    const { id } = req.params;
+    await prisma.student.delete({ where: { id } });
+    res.json({ success: true, message: 'Student deleted successfully' });
   } catch (err) {
     console.error('students.delete', err);
     res.status(500).json({ success: false, message: err.message });

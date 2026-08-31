@@ -4,9 +4,11 @@ const prisma = require('../config/prisma');
 const { authenticate, authorize } = require('../middleware/auth');
 const { z } = require('zod');
 
+// Courses Module Roles: SUPER_ADMIN, ADMIN, COUNSELLOR, TRAINER
+const COURSE_ROLES = ['SUPER_ADMIN', 'ADMIN', 'COUNSELLOR', 'TRAINER'];
 
 // GET /api/courses
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, authorize(...COURSE_ROLES), async (req, res) => {
   try {
     const courses = await prisma.course.findMany({ orderBy: { name: 'asc' } });
     res.json({ success: true, data: courses });
@@ -17,7 +19,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // POST /api/courses
-router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN'), async (req, res) => {
+router.post('/', authenticate, authorize(...COURSE_ROLES), async (req, res) => {
   try {
     const schema = z.object({ courseCode: z.string().min(1), name: z.string().min(1), description: z.string().optional(), standardFee: z.number() });
     const parsed = schema.safeParse(req.body);
@@ -32,7 +34,7 @@ router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN'), async (req, res
 });
 
 // PATCH /api/courses/:id
-router.patch('/:id', authenticate, authorize('SUPER_ADMIN','ADMIN'), async (req, res) => {
+router.patch('/:id', authenticate, authorize(...COURSE_ROLES), async (req, res) => {
   const { id } = req.params;
   try {
     const schema = z.object({
@@ -56,24 +58,12 @@ router.patch('/:id', authenticate, authorize('SUPER_ADMIN','ADMIN'), async (req,
   }
 });
 
-// DELETE /api/courses/:id - Complete permanent deletion
+// DELETE /api/courses/:id
 router.delete('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   const { id } = req.params;
   try {
-    const existing = await prisma.course.findUnique({ where: { id } });
-    if (!existing) {
-      return res.status(404).json({ success: false, message: 'Course not found' });
-    }
-
-    // Hard delete all dependent items and the course in a single transaction
-    await prisma.$transaction([
-      prisma.payment.deleteMany({ where: { admission: { courseId: id } } }),
-      prisma.admission.deleteMany({ where: { courseId: id } }),
-      prisma.batch.deleteMany({ where: { courseId: id } }),
-      prisma.course.delete({ where: { id } })
-    ]);
-
-    res.json({ success: true, message: `Course "${existing.name}" deleted completely from database` });
+    await prisma.course.delete({ where: { id } });
+    res.json({ success: true, message: 'Course deleted successfully' });
   } catch (err) {
     console.error('courses.delete', err);
     res.status(500).json({ success: false, message: err.message });

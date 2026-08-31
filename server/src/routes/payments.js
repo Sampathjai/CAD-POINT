@@ -4,8 +4,11 @@ const prisma = require('../config/prisma');
 const { authenticate, authorize } = require('../middleware/auth');
 const { z } = require('zod');
 
+// Allowed Roles for Payments: SUPER_ADMIN, ADMIN, ACCOUNTS, ACCOUNTANT
+const PAYMENT_ROLES = ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTS', 'ACCOUNTANT'];
+
 // GET /api/payments with branch, date range, and month filtering
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, authorize(...PAYMENT_ROLES), async (req, res) => {
   try {
     const { branchId, fromDate, toDate, month } = req.query;
     const where = {};
@@ -50,7 +53,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // POST /api/payments
-router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN','ACCOUNTS','COUNSELLOR','RECEPTIONIST'), async (req, res) => {
+router.post('/', authenticate, authorize(...PAYMENT_ROLES), async (req, res) => {
   try {
     const schema = z.object({
       admissionId: z.string().uuid(),
@@ -58,18 +61,18 @@ router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN','ACCOUNTS','COUNS
       amount: z.number(),
       paymentMethod: z.string().min(1),
       transactionReference: z.string().optional(),
-      remarks: z.string().optional(),
-      status: z.string().optional(),
       branchId: z.string().optional()
     });
 
     const parsed = schema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ success: false, message: parsed.error.message });
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, message: parsed.error.message });
+    }
 
-    const { admissionId, receiptNumber, amount, paymentMethod, transactionReference, remarks, status, branchId } = parsed.data;
+    let { admissionId, receiptNumber, amount, paymentMethod, transactionReference, branchId } = parsed.data;
 
-    const admission = await prisma.admission.findUnique({ where: { id: admissionId } });
-    let finalBranchId = branchId || admission?.branchId;
+    // Resolve branch ID if provided
+    let finalBranchId = branchId;
     if (finalBranchId) {
       const b = await prisma.branch.findFirst({
         where: { OR: [{ id: finalBranchId }, { code: finalBranchId.toLowerCase() }] }
@@ -77,22 +80,33 @@ router.post('/', authenticate, authorize('SUPER_ADMIN','ADMIN','ACCOUNTS','COUNS
       if (b) finalBranchId = b.id;
     }
 
-    const created = await prisma.payment.create({
+    if (!finalBranchId) {
+      const admission = await prisma.admission.findUnique({ where: { id: admissionId }, select: { branchId: true } });
+      if (admission) finalBranchId = admission.branchId;
+    }
+
+    if (!finalBranchId) {
+      const defaultBranch = await prisma.branch.findFirst({ where: { code: 'gandhipuram' } });
+      if (defaultBranch) finalBranchId = defaultBranch.id;
+    }
+
+    const payment = await prisma.payment.create({
       data: {
         admissionId,
         receiptNumber,
         amount,
         paymentMethod,
         transactionReference: transactionReference || null,
-        remarks: remarks || null,
-        status: status || 'SUCCESS',
-        branchId: finalBranchId || null,
-        createdById: req.user.id
+        branchId: finalBranchId,
+        createdById: req.user?.id || null
       },
-      include: { admission: { include: { student: true, course: true } }, branch: true }
+      include: {
+        admission: { include: { student: true, course: true } },
+        branch: true
+      }
     });
 
-    res.json({ success: true, data: created });
+    res.status(201).json({ success: true, data: payment });
   } catch (err) {
     console.error('payments.create', err);
     res.status(500).json({ success: false, message: err.message });
