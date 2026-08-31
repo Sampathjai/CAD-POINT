@@ -251,6 +251,8 @@ function App() {
     const [addBatchForm, setAddBatchForm] = useState({ batchCode: '', name: '', courseId: '', startDate: '', endDate: '', capacity: 25 });
     const [addStudentForm, setAddStudentForm] = useState({ studentCode: '', firstName: '', lastName: '', phone: '', email: '', photoUrl: '' });
     const [addAdmissionForm, setAddAdmissionForm] = useState({ admissionNumber: '', leadId: '', studentId: '', studentName: '', studentPhone: '', studentEmail: '', studentAddress: '', courseId: '', batchId: '', startDate: '', endDate: '', agreedFee: '', finalFee: '' });
+    const [studentSearchQuery, setStudentSearchQuery] = useState('');
+    const [showStudentDropdown, setShowStudentDropdown] = useState(false);
     const [addPaymentForm, setAddPaymentForm] = useState({ admissionId: '', receiptNumber: '', amount: '', paymentMethod: 'UPI', transactionReference: '', remarks: '' });
     const [addUserForm, setAddUserForm] = useState({ name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true });
 
@@ -1768,14 +1770,125 @@ function App() {
                             Admission Number
                             <input value={addAdmissionForm.admissionNumber} onChange={(e) => setAddAdmissionForm({ ...addAdmissionForm, admissionNumber: e.target.value })} placeholder="ADM-1001" required />
                         </label>
-                        <label>
-                            Student
-                            <select value={addAdmissionForm.studentId} onChange={(e) => setAddAdmissionForm({ ...addAdmissionForm, studentId: e.target.value })} required={!addAdmissionForm.studentName}>
-                                <option value="">{addAdmissionForm.studentName ? `Auto-create / Link Student: ${addAdmissionForm.studentName} (${addAdmissionForm.studentPhone})` : 'Select student'}</option>
-                                {students.map((s) => (
-                                    <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.studentCode})</option>
-                                ))}
-                            </select>
+                        <label style={{ display: 'block', marginBottom: 12 }}>
+                            Student <span style={{ color: '#dc2626' }}>*</span>
+                            {(() => {
+                                const selectedStudent = students.find(s => s.id === addAdmissionForm.studentId);
+                                
+                                if (selectedStudent) {
+                                    return (
+                                        <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, padding: '10px 14px', position: 'relative', marginTop: 4 }}>
+                                            <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>
+                                                {selectedStudent.firstName} {selectedStudent.lastName || ''}
+                                            </div>
+                                            <div style={{ fontSize: 12, color: '#0284c7', fontWeight: 700, marginTop: 2 }}>
+                                                Student ID: <b>{selectedStudent.studentCode}</b>
+                                            </div>
+                                            <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                                                Phone: {selectedStudent.phone} {selectedStudent.email ? ` • ${selectedStudent.email}` : ''}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setAddAdmissionForm(prev => ({ ...prev, studentId: '' }))}
+                                                style={{ position: 'absolute', top: 10, right: 10, background: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '50%', width: 22, height: 22, cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}
+                                                title="Deselect student"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    );
+                                }
+
+                                const filteredStudentOptions = (students || []).filter(s => {
+                                    const q = (studentSearchQuery || '').trim().toLowerCase();
+                                    if (!q) return true;
+                                    return (
+                                        (s.studentCode || '').toLowerCase().includes(q) ||
+                                        (s.firstName || '').toLowerCase().includes(q) ||
+                                        (s.lastName || '').toLowerCase().includes(q) ||
+                                        (s.phone || '').toLowerCase().includes(q) ||
+                                        (s.email || '').toLowerCase().includes(q)
+                                    );
+                                }).slice(0, 50);
+
+                                return (
+                                    <div style={{ position: 'relative', marginTop: 4 }}>
+                                        {addAdmissionForm.studentName && !addAdmissionForm.studentId && (
+                                            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', padding: '6px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
+                                                ✓ Auto-creating Student: <b>{addAdmissionForm.studentName}</b> ({addAdmissionForm.studentPhone}) — or select an existing student below:
+                                            </div>
+                                        )}
+                                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                            <Search size={16} style={{ position: 'absolute', left: 12, color: '#64748b', pointerEvents: 'none' }} />
+                                            <input
+                                                type="text"
+                                                placeholder="🔍 Search student by name, ID (e.g. STU-1001) or phone..."
+                                                value={studentSearchQuery}
+                                                onChange={(e) => {
+                                                    setStudentSearchQuery(e.target.value);
+                                                    setShowStudentDropdown(true);
+                                                }}
+                                                onFocus={() => setShowStudentDropdown(true)}
+                                                style={{ paddingLeft: 36, width: '100%' }}
+                                            />
+                                        </div>
+
+                                        {showStudentDropdown && (
+                                            <div
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: '100%',
+                                                    left: 0,
+                                                    right: 0,
+                                                    background: '#ffffff',
+                                                    border: '1px solid #cbd5e1',
+                                                    borderRadius: 8,
+                                                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2)',
+                                                    zIndex: 2000,
+                                                    maxHeight: 220,
+                                                    overflowY: 'auto',
+                                                    marginTop: 4
+                                                }}
+                                            >
+                                                {filteredStudentOptions.length === 0 ? (
+                                                    <div style={{ padding: '12px 14px', fontSize: 13, color: '#64748b', textAlign: 'center' }}>
+                                                        No matching students found
+                                                    </div>
+                                                ) : (
+                                                    filteredStudentOptions.map((s) => (
+                                                        <div
+                                                            key={s.id}
+                                                            onClick={() => {
+                                                                setAddAdmissionForm(prev => ({ ...prev, studentId: s.id }));
+                                                                setShowStudentDropdown(false);
+                                                                setStudentSearchQuery('');
+                                                            }}
+                                                            style={{
+                                                                padding: '10px 14px',
+                                                                borderBottom: '1px solid #f1f5f9',
+                                                                cursor: 'pointer',
+                                                                transition: 'background 0.15s'
+                                                            }}
+                                                            onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                                                            onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
+                                                        >
+                                                            <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>
+                                                                {s.firstName} {s.lastName || ''}
+                                                            </div>
+                                                            <div style={{ fontSize: 12, color: '#0284c7', fontWeight: 700, marginTop: 2 }}>
+                                                                Student ID: <b>{s.studentCode}</b>
+                                                            </div>
+                                                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                                                                Phone: {s.phone} {s.email ? ` • ${s.email}` : ''}
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
                         </label>
                         <label>
                             Course

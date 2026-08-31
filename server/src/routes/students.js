@@ -10,7 +10,7 @@ const ADMISSION_ROLES = ['SUPER_ADMIN', 'ADMIN', 'COUNSELLOR'];
 // GET /api/students
 router.get('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) => {
   try {
-    const { branchId } = req.query;
+    const { branchId, q, limit } = req.query;
     const where = {};
     if (branchId && branchId !== 'all') {
       const b = await prisma.branch.findFirst({
@@ -19,8 +19,20 @@ router.get('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =>
       if (b) where.branchId = b.id;
     }
 
+    if (q && q.trim()) {
+      const query = q.trim();
+      where.OR = [
+        { studentCode: { contains: query, mode: 'insensitive' } },
+        { firstName: { contains: query, mode: 'insensitive' } },
+        { lastName: { contains: query, mode: 'insensitive' } },
+        { phone: { contains: query, mode: 'insensitive' } },
+        { email: { contains: query, mode: 'insensitive' } }
+      ];
+    }
+
     const students = await prisma.student.findMany({
       where,
+      take: limit ? Math.min(250, parseInt(limit, 10)) : 100,
       include: {
         branch: true,
         admissions: { include: { course: true, batch: true, payments: true, certificate: true } },

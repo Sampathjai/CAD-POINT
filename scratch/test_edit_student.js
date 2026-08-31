@@ -50,3 +50,4 @@ if (
   console.error('\n❌ EDIT STUDENT VERIFICATION FAILED');
   process.exit(1);
 }
+
