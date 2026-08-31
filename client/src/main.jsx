@@ -3402,10 +3402,12 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
     const allTabs = [
         { id: 'Profile', label: 'Institute Profile', icon: ShieldCheck, perm: 'settings.profile' },
         { id: 'Appearance', label: 'Appearance & Theme', icon: Sun, perm: 'settings.appearance' },
-        { id: 'Storage & Database', label: 'Storage & Database', icon: Database, perm: 'settings.whatsapp' },
-        { id: 'Enquiry Sources', label: 'Enquiry Sources', icon: Plus, perm: 'settings.whatsapp' },
+        { id: 'User Control', label: 'User Control & Roles', icon: UserCheck, perm: 'settings.users' },
+        { id: 'Branch Management', label: 'Branch Management', icon: Database, perm: 'settings.branches' },
         { id: 'WhatsApp & API', label: 'WhatsApp & API', icon: MessageCircle, perm: 'settings.whatsapp' },
         { id: 'Registered Devices', label: 'Registered Devices', icon: HardDrive, perm: 'settings.devices' },
+        { id: 'Storage & Database', label: 'Storage & Database', icon: Database, perm: 'settings.whatsapp' },
+        { id: 'Enquiry Sources', label: 'Enquiry Sources', icon: Plus, perm: 'settings.whatsapp' },
         { id: 'System Info', label: 'System Info', icon: Laptop, perm: 'settings.profile' }
     ];
 
@@ -3513,6 +3515,109 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
                         <button className="primary" onClick={toggleTheme}>
                             {theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* User Control & Roles Tab (Super Admin Only) */}
+            {activeTab === 'User Control' && (
+                <div className="settings-card">
+                    <div className="settings-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                        <div>
+                            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <UserCheck size={20} color="#16a34a" /> User Control & Role Management
+                            </h3>
+                            <p>Super Admin control center to manage user accounts, assign roles, and reset credentials.</p>
+                        </div>
+                        <button className="primary" onClick={() => onOpenAddModal && onOpenAddModal('User')} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Plus size={16} /> + Add User
+                        </button>
+                    </div>
+
+                    <div className="table-responsive" style={{ marginTop: 16 }}>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>User Name</th>
+                                    <th>Email</th>
+                                    <th>Phone</th>
+                                    <th>Assigned Role</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {safeUsers.map((u) => (
+                                    <tr key={u.id}>
+                                        <td><b>{u.name}</b></td>
+                                        <td>{u.email}</td>
+                                        <td>{u.phone || 'N/A'}</td>
+                                        <td>
+                                            <span className="badge" style={{ background: u.role === 'SUPER_ADMIN' ? '#fee2e2' : u.role === 'ADMIN' ? '#e0f2fe' : '#f1f5f9', color: u.role === 'SUPER_ADMIN' ? '#991b1b' : u.role === 'ADMIN' ? '#0369a1' : '#334155', padding: '4px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700 }}>
+                                                {u.role}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span className={u.isActive !== false ? 'status active' : 'status lost'}>
+                                                ● {u.isActive !== false ? 'ACTIVE' : 'INACTIVE'}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: 6 }}>
+                                                <button className="round" onClick={() => onEditUser && onEditUser(u)} title="Edit User">
+                                                    <Edit size={14} />
+                                                </button>
+                                                {u.id !== currentUserId && (
+                                                    <button className="round" style={{ color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => onDeleteUser && onDeleteUser(u.id)} title="Delete User">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Branch Management Tab */}
+            {activeTab === 'Branch Management' && (
+                <div className="settings-card">
+                    <div className="settings-card-header">
+                        <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Database size={20} color="#16a34a" /> Multi-Branch Management
+                        </h3>
+                        <p>Configure multi-branch organization details, active branch codes, and locations.</p>
+                    </div>
+
+                    <div className="table-responsive" style={{ marginTop: 16 }}>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Branch Name</th>
+                                    <th>Branch Code</th>
+                                    <th>Address</th>
+                                    <th>Phone</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(branches && branches.length > 0 ? branches : [
+                                    { id: '1', name: 'Gandhipuram Branch', code: 'gandhipuram', address: '100 Feet Road, Gandhipuram, Coimbatore', phone: '0422-2525251', isActive: true },
+                                    { id: '2', name: 'Saravanapatti Branch', code: 'saravanapatti', address: 'Sathy Road, Saravanapatti, Coimbatore', phone: '0422-2525252', isActive: true }
+                                ]).map((b) => (
+                                    <tr key={b.id}>
+                                        <td><b>{b.name}</b></td>
+                                        <td><code>{b.code}</code></td>
+                                        <td>{b.address || 'N/A'}</td>
+                                        <td>{b.phone || 'N/A'}</td>
+                                        <td><span className="status active">● ACTIVE</span></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             )}

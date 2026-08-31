@@ -137,3 +137,4 @@ export function getDefaultPageForRole(role) {
       return 'Leads';
   }
 }
+
