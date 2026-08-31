@@ -38,6 +38,7 @@ export const ROLE_PERMISSIONS = {
     'settings.branches'
   ],
   COUNSELLOR: [
+    'dashboard',
     'leads',
     'followups',
     'courses',
@@ -125,10 +126,10 @@ export function getDefaultPageForRole(role) {
   switch (normRole) {
     case 'SUPER_ADMIN':
     case 'ADMIN':
+    case 'COUNSELLOR':
     case 'ACCOUNTS':
     case 'ACCOUNTANT':
       return 'Dashboard';
-    case 'COUNSELLOR':
     case 'RECEPTIONIST':
       return 'Leads';
     case 'TRAINER':
@@ -137,4 +138,3 @@ export function getDefaultPageForRole(role) {
       return 'Leads';
   }
 }
-

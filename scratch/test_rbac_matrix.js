@@ -1,12 +1,12 @@
 const path = require('path');
-const { hasPermission, getDefaultPageForRole, ROLE_PERMISSIONS } = require(path.join(__dirname, '../server/src/config/permissions'));
+const { hasPermission, getDefaultPageForRole } = require(path.join(__dirname, '../server/src/config/permissions'));
 
 async function runRbacTests() {
   console.log('--- TESTING ROLE-BASED ACCESS CONTROL (RBAC) PERMISSION MATRIX ---\n');
 
   const matrix = [
     // [Module, Super Admin, Admin, Counsellor, Trainer, Accountant, Receptionist]
-    ['Dashboard',          true,  true,  false, false, true,  false],
+    ['Dashboard',          true,  true,  true,  false, true,  false],
     ['Leads',              true,  true,  true,  false, false, true],
     ['Follow-ups',         true,  true,  true,  false, false, true],
     ['Courses',            true,  true,  true,  true,  false, false],
@@ -43,7 +43,7 @@ async function runRbacTests() {
   const expectedDefaultPages = {
     SUPER_ADMIN: 'Dashboard',
     ADMIN: 'Dashboard',
-    COUNSELLOR: 'Leads',
+    COUNSELLOR: 'Dashboard',
     TRAINER: 'Courses',
     ACCOUNTANT: 'Dashboard',
     ACCOUNTS: 'Dashboard',
@@ -73,4 +73,3 @@ runRbacTests().catch(e => {
   console.error(e);
   process.exit(1);
 });
-

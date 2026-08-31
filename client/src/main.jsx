@@ -1028,6 +1028,8 @@ function App() {
                         </div>
                     ) : page === 'Dashboard' ? (
                         <Dashboard
+                            user={user}
+                            token={token}
                             leads={leads}
                             followups={followups}
                             admissions={admissions}
@@ -1847,11 +1849,28 @@ function WhatsAppModal({ data, onClose, token }) {
     );
 }
 
-function Dashboard({ leads = [], followups = [], admissions = [], payments = [], onAddLead, onSchedule, onCompleteFollowup, onOpenWhatsApp, onNavigate }) {
+function Dashboard({ user, token, leads = [], followups = [], admissions = [], payments = [], onAddLead, onSchedule, onCompleteFollowup, onOpenWhatsApp, onNavigate }) {
     const safeLeads = Array.isArray(leads) ? leads : [];
     const safeFollowups = Array.isArray(followups) ? followups : [];
     const safeAdmissions = Array.isArray(admissions) ? admissions : [];
     const safePayments = Array.isArray(payments) ? payments : [];
+
+    const isCounsellor = user?.role === 'COUNSELLOR';
+    const [counsellorPeriod, setCounsellorPeriod] = useState('6_months');
+    const [counsellorData, setCounsellorData] = useState(null);
+
+    useEffect(() => {
+        if (isCounsellor && token) {
+            fetch(API_BASE + `/reports/counsellor-dashboard?period=${counsellorPeriod}`, {
+                headers: { Authorization: 'Bearer ' + token }
+            })
+            .then(r => r.json())
+            .then(j => {
+                if (j.success && j.data) setCounsellorData(j.data);
+            })
+            .catch(e => console.error('counsellor dashboard fetch error', e));
+        }
+    }, [isCounsellor, token, counsellorPeriod]);
 
     const now = new Date();
     const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -1924,6 +1943,255 @@ function Dashboard({ leads = [], followups = [], admissions = [], payments = [],
 
     const selectedMonthObj = monthOptions.find(m => m.key === selectedMonth);
     const monthTitleLabel = selectedMonth === 'ALL' ? 'All Months (Year-to-Date)' : (selectedMonthObj ? selectedMonthObj.label : 'Monthly Overview');
+
+    if (isCounsellor) {
+        const cTotalLeads = counsellorData?.totalLeads ?? safeLeads.length;
+        const cNewLeads = counsellorData?.newLeads ?? safeLeads.filter(l => (l.status || '').toUpperCase() === 'NEW').length;
+        const cFollowUps = counsellorData?.followUps ?? safeFollowups.length;
+        const cAdmissions = counsellorData?.totalAdmissions ?? safeAdmissions.length;
+        const cConverted = counsellorData?.convertedLeads ?? safeLeads.filter(l => (l.status || '').toUpperCase() === 'CONVERTED' || (l.status || '').toUpperCase() === 'ENROLLED').length;
+        const cConvRate = counsellorData?.conversionRate ?? (cTotalLeads > 0 ? `${Math.round((cAdmissions / cTotalLeads) * 100)}%` : '0%');
+
+        const monthlyEnquiries = counsellorData?.monthlyEnquiries || monthlyTrends.map(t => ({ month: t.label, shortMonth: t.shortLabel, count: t.leads }));
+        const monthlyAdmissions = counsellorData?.monthlyAdmissions || monthlyTrends.map(t => ({ month: t.label, shortMonth: t.shortLabel, count: t.admissions }));
+
+        const maxEnquiryCount = Math.max(1, ...monthlyEnquiries.map(e => e.count));
+        const maxAdmissionCount = Math.max(1, ...monthlyAdmissions.map(a => a.count));
+
+        return (
+            <div className="content">
+                {/* Header Toolbar */}
+                <div className="actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ background: '#0284c7', color: '#ffffff', width: 36, height: 36, borderRadius: 8, display: 'grid', placeItems: 'center' }}>
+                            <UsersIcon size={20} />
+                        </div>
+                        <div>
+                            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>COUNSELLOR DASHBOARD</h2>
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Lead conversion, enquiry trends & student admission statistics</span>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-surface)', padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                            <Filter size={15} color="#0284c7" />
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Period:</span>
+                            <select
+                                value={counsellorPeriod}
+                                onChange={(e) => setCounsellorPeriod(e.target.value)}
+                                style={{ border: 'none', background: 'transparent', fontWeight: 700, cursor: 'pointer', color: 'var(--text-primary)', fontSize: 13 }}
+                            >
+                                <option value="6_months">Last 6 Months</option>
+                                <option value="12_months">Last 12 Months</option>
+                                <option value="this_year">This Year</option>
+                            </select>
+                        </div>
+
+                        <button className="primary" onClick={onAddLead} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <Plus size={17} /> Add Lead
+                        </button>
+                        <button className="secondary" onClick={onSchedule} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            Schedule Follow-up
+                        </button>
+                    </div>
+                </div>
+
+                {/* 4 Top KPI Cards */}
+                <div className="cards">
+                    <div className="card">
+                        <span>Total Leads</span>
+                        <strong>{cTotalLeads}</strong>
+                        <small className="good">Enquiries logged</small>
+                        <small>Active pipeline</small>
+                    </div>
+                    <div className="card">
+                        <span>New Leads</span>
+                        <strong>{cNewLeads}</strong>
+                        <small className="good">Fresh enquiries</small>
+                        <small>Awaiting contact</small>
+                    </div>
+                    <div className="card">
+                        <span>Follow-ups</span>
+                        <strong>{cFollowUps}</strong>
+                        <small style={{ color: '#0284c7' }}>Scheduled tasks</small>
+                        <small>Active follow-ups</small>
+                    </div>
+                    <div className="card">
+                        <span>Admissions</span>
+                        <strong>{cAdmissions}</strong>
+                        <small className="good">{cConvRate} conversion rate</small>
+                        <small>Enrolled students</small>
+                    </div>
+                </div>
+
+                {/* Lead Analytics & Funnel */}
+                <div className="settings-card" style={{ marginTop: 20 }}>
+                    <div className="settings-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                        <div>
+                            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+                                <BarChart3 size={18} color="#0284c7" /> Lead Analytics & Conversion Performance
+                            </h3>
+                            <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>Overview of total leads, converted students, and conversion efficiency.</p>
+                        </div>
+                        <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 700 }}>
+                            Conversion Rate: {cConvRate}
+                        </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginTop: 16 }}>
+                        <div style={{ padding: 16, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 8 }}>
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block' }}>Total Leads</span>
+                            <strong style={{ fontSize: 22, color: 'var(--text-primary)' }}>{cTotalLeads}</strong>
+                        </div>
+                        <div style={{ padding: 16, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 8 }}>
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block' }}>Converted Students</span>
+                            <strong style={{ fontSize: 22, color: '#16a34a' }}>{cConverted}</strong>
+                        </div>
+                        <div style={{ padding: 16, background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 8 }}>
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block' }}>Conversion Rate</span>
+                            <strong style={{ fontSize: 22, color: '#0284c7' }}>{cConvRate}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Monthly Enquiries Trend Chart & Monthly Admissions Trend Chart */}
+                <div className="grid" style={{ marginTop: 20 }}>
+                    {/* Monthly Enquiries */}
+                    <section className="panel">
+                        <div className="panelhead">
+                            <div>
+                                <b style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <BarChart3 size={18} color="#0284c7" /> Monthly Enquiries Trend
+                                </b>
+                                <span>Month-by-month enquiries received</span>
+                            </div>
+                        </div>
+                        <div className="chart" style={{ paddingTop: 20, paddingBottom: 10 }}>
+                            <div className="bars" style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: 160, paddingBottom: 20 }}>
+                                {monthlyEnquiries.map((e, idx) => {
+                                    const heightPct = maxEnquiryCount > 0 ? Math.max(14, Math.round((e.count / maxEnquiryCount) * 140)) : 14;
+                                    return (
+                                        <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flex: 1, maxWidth: 54 }} title={`${e.month || e.shortMonth}: ${e.count} enquiries`}>
+                                            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-secondary)' }}>{e.count}</span>
+                                            <div style={{ width: '100%', height: heightPct, background: 'linear-gradient(180deg, #0284c7 0%, #0369a1 100%)', borderRadius: '6px 6px 0 0' }}></div>
+                                            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>{e.shortMonth || e.month}</label>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Monthly Admissions */}
+                    <section className="panel">
+                        <div className="panelhead">
+                            <div>
+                                <b style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <GraduationCap size={18} color="#16a34a" /> Monthly Admissions Trend
+                                </b>
+                                <span>Month-by-month student enrollments</span>
+                            </div>
+                        </div>
+                        <div className="chart" style={{ paddingTop: 20, paddingBottom: 10 }}>
+                            <div className="bars" style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: 160, paddingBottom: 20 }}>
+                                {monthlyAdmissions.map((a, idx) => {
+                                    const heightPct = maxAdmissionCount > 0 ? Math.max(14, Math.round((a.count / maxAdmissionCount) * 140)) : 14;
+                                    return (
+                                        <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flex: 1, maxWidth: 54 }} title={`${a.month || a.shortMonth}: ${a.count} admissions`}>
+                                            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-secondary)' }}>{a.count}</span>
+                                            <div style={{ width: '100%', height: heightPct, background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)', borderRadius: '6px 6px 0 0' }}></div>
+                                            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>{a.shortMonth || a.month}</label>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                {/* Follow-ups & Recent Enquiries Grid */}
+                <div className="grid" style={{ marginTop: 20 }}>
+                    <section className="panel">
+                        <div className="panelhead">
+                            <div>
+                                <b>Today's Follow-ups</b>
+                                <span>{safeFollowups.length} tasks need attention</span>
+                            </div>
+                            <button className="link" onClick={() => onNavigate('Follow-ups')}>
+                                View calendar
+                            </button>
+                        </div>
+                        {safeFollowups.length === 0 ? (
+                            <p style={{ padding: 16, color: '#64748b' }}>No pending follow-ups scheduled for today.</p>
+                        ) : (
+                            safeFollowups.slice(0, 8).map((f) => {
+                                const time = formatDateTime(f.scheduledAt);
+                                const leadName = f.lead ? `${f.lead.firstName} ${f.lead.lastName || ''}`.trim() : (f.leadId || 'Unknown Lead');
+                                return (
+                                    <div className="task" key={f.id}>
+                                        <time>{time}</time>
+                                        <div className="taskavatar">{leadName.split(' ').map((x) => x[0]).join('').slice(0, 2)}</div>
+                                        <div>
+                                            <b>{leadName}</b>
+                                            <span>{f.notes || f.type}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: 6 }}>
+                                            <button className="round" style={{ color: '#16a34a', borderColor: '#86efac' }} onClick={() => onOpenWhatsApp(f.lead, f)} title="Send WhatsApp Message">
+                                                <MessageCircle size={15} />
+                                            </button>
+                                            <button className="round" onClick={() => onCompleteFollowup(f.id)} title="Mark Complete">
+                                                <Check size={15} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </section>
+
+                    <section className="panel">
+                        <div className="panelhead">
+                            <div>
+                                <b>Recent Enquiries</b>
+                                <span>Latest lead submissions</span>
+                            </div>
+                            <button className="link" onClick={() => onNavigate('Leads')}>
+                                View all
+                            </button>
+                        </div>
+                        {safeLeads.length === 0 ? (
+                            <p style={{ padding: 16, color: '#64748b' }}>No leads recorded yet.</p>
+                        ) : (
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Lead</th>
+                                        <th>Phone</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {safeLeads.slice(0, 6).map((l) => {
+                                        const name = (l.firstName || '') + (l.lastName ? ' ' + l.lastName : '');
+                                        const statusStr = (l.status || 'NEW') + '';
+                                        return (
+                                            <tr key={l.id}>
+                                                <td><b>{name}</b></td>
+                                                <td>{l.phone}</td>
+                                                <td>
+                                                    <span className={'status ' + statusStr.replaceAll(' ', '').toLowerCase()}>{statusStr}</span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        )}
+                    </section>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="content">
