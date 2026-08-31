@@ -3435,76 +3435,241 @@ ${instituteName}`;
                     />
                 )}
                 {/* Modal for Recording Installment Payment */}
-                {paymentModalData && (
-                    <div className="modal-backdrop">
-                        <form className="panel" onSubmit={handleRecordPaymentSubmit} style={{ maxWidth: 450 }}>
-                            <h3>Record Installment Payment</h3>
-                            <p style={{ margin: '0 0 12px', fontSize: 13, color: '#64748b' }}>
-                                Recording payment for <b>Installment {paymentModalData.installmentNumber}</b> (Admission: {paymentModalData.admission.admissionNumber})
-                            </p>
-                            {paymentError && (
-                                <div style={{ background: '#fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
-                                    {paymentError}
+                {paymentModalData && (() => {
+                    const admission = paymentModalData.admission;
+                    const instNum = paymentModalData.installmentNumber;
+                    const planned = paymentModalData.plannedAmount || 0;
+                    const paid = paymentModalData.paidAmount || 0;
+                    const maxRemaining = paymentModalData.remainingAmount || 0;
+
+                    const enteredAmount = Number(paymentForm.amount) || 0;
+                    const remainingAfterPayment = Math.max(0, maxRemaining - enteredAmount);
+
+                    let instStatus = 'PENDING';
+                    if (paid >= planned && planned > 0) instStatus = 'PAID';
+                    else if (paid > 0) instStatus = 'PARTIAL';
+
+                    let amountError = '';
+                    if (enteredAmount <= 0) {
+                        amountError = '⚠ Enter a valid payment amount greater than ₹0';
+                    } else if (enteredAmount > maxRemaining) {
+                        amountError = `⚠ Payment amount cannot exceed remaining balance of ₹${maxRemaining.toLocaleString()}`;
+                    }
+
+                    const isValid = !amountError && enteredAmount > 0 && enteredAmount <= maxRemaining;
+
+                    const studentName = admission?.student
+                        ? `${admission.student.firstName} ${admission.student.lastName || ''}`.trim()
+                        : '-';
+
+                    return (
+                        <div
+                            className="modal"
+                            style={{
+                                position: 'fixed',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                width: '100vw',
+                                height: '100vh',
+                                background: 'rgba(15, 23, 42, 0.75)',
+                                backdropFilter: 'blur(6px)',
+                                WebkitBackdropFilter: 'blur(6px)',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                zIndex: 2500,
+                                padding: 16,
+                                boxSizing: 'border-box'
+                            }}
+                            onClick={(e) => {
+                                if (e.target === e.currentTarget) setPaymentModalData(null);
+                            }}
+                        >
+                            <form
+                                className="panel"
+                                onSubmit={handleRecordPaymentSubmit}
+                                style={{
+                                    maxWidth: 580,
+                                    width: '100%',
+                                    maxHeight: '90vh',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    padding: 0,
+                                    overflow: 'hidden',
+                                    borderRadius: 12,
+                                    boxShadow: '0 25px 60px rgba(0, 0, 0, 0.35)',
+                                    background: '#ffffff',
+                                    boxSizing: 'border-box'
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {/* Sticky Header */}
+                                <div style={{ background: '#ffffff', padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
+                                    <div>
+                                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#0f172a' }}>
+                                            Record Installment Payment
+                                        </h3>
+                                        <div style={{ margin: '4px 0 0', fontSize: 12, color: '#475569', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                                            <span><b>Installment {instNum}</b></span>
+                                            <span>• <b>Admission #:</b> {admission?.admissionNumber || admission?.id}</span>
+                                            <span>• <b>Student:</b> {studentName}</span>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="round"
+                                        onClick={() => setPaymentModalData(null)}
+                                        style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', padding: 6, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                        title="Close"
+                                    >
+                                        <X size={18} />
+                                    </button>
                                 </div>
-                            )}
-                            <label>
-                                Payment Amount (₹)
-                                <input
-                                    type="number"
-                                    value={paymentForm.amount}
-                                    onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                                    max={paymentModalData.remainingAmount}
-                                    required
-                                />
-                                <span style={{ fontSize: 11, color: '#64748b' }}>
-                                    Max remaining for Installment {paymentModalData.installmentNumber}: ₹{paymentModalData.remainingAmount.toLocaleString()}
-                                </span>
-                            </label>
-                            <label>
-                                Payment Method
-                                <select
-                                    value={paymentForm.paymentMethod}
-                                    onChange={(e) => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
-                                    required
-                                >
-                                    <option value="UPI">UPI</option>
-                                    <option value="CASH">Cash</option>
-                                    <option value="BANK_TRANSFER">Bank Transfer</option>
-                                    <option value="CARD">Card</option>
-                                    <option value="CHEQUE">Cheque</option>
-                                    <option value="ONLINE">Online</option>
-                                    <option value="OTHER">Other</option>
-                                </select>
-                            </label>
-                            <label>
-                                Transaction / Reference ID (Optional)
-                                <input
-                                    type="text"
-                                    value={paymentForm.transactionReference}
-                                    onChange={(e) => setPaymentForm({ ...paymentForm, transactionReference: e.target.value })}
-                                    placeholder="e.g. UPI-99882211"
-                                />
-                            </label>
-                            <label>
-                                Notes / Remarks (Optional)
-                                <input
-                                    type="text"
-                                    value={paymentForm.notes}
-                                    onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-                                    placeholder="Payment notes"
-                                />
-                            </label>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-                                <button type="button" className="secondary" onClick={() => setPaymentModalData(null)} disabled={paymentSubmitting}>
-                                    Cancel
-                                </button>
-                                <button type="submit" className="primary" disabled={paymentSubmitting}>
-                                    {paymentSubmitting ? 'Recording...' : 'Save Payment'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                )}
+
+                                {/* Scrollable Body */}
+                                <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+                                    {/* Installment Context Card */}
+                                    <div style={{ background: '#f8fafc', padding: 16, borderRadius: 10, border: '1px solid #e2e8f0', marginBottom: 20 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                            <h4 style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                Installment {instNum} Context
+                                            </h4>
+                                            <span className="badge" style={{
+                                                background: instStatus === 'PAID' ? '#dcfce7' : instStatus === 'PARTIAL' ? '#fef3c7' : '#fee2e2',
+                                                color: instStatus === 'PAID' ? '#15803d' : instStatus === 'PARTIAL' ? '#b45309' : '#991b1b',
+                                                padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700
+                                            }}>
+                                                {instStatus === 'PAID' ? '✓ Paid' : instStatus === 'PARTIAL' ? '◐ Partially Paid' : '○ Pending'}
+                                            </span>
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                                            <div>
+                                                <span style={{ fontSize: 11, color: '#64748b', display: 'block' }}>Planned Amount</span>
+                                                <strong style={{ fontSize: 15, color: '#0f172a' }}>₹{planned.toLocaleString()}</strong>
+                                            </div>
+                                            <div>
+                                                <span style={{ fontSize: 11, color: '#64748b', display: 'block' }}>Already Paid</span>
+                                                <strong style={{ fontSize: 15, color: '#16a34a' }}>₹{paid.toLocaleString()}</strong>
+                                            </div>
+                                            <div>
+                                                <span style={{ fontSize: 11, color: '#64748b', display: 'block' }}>Remaining</span>
+                                                <strong style={{ fontSize: 15, color: maxRemaining > 0 ? '#dc2626' : '#16a34a' }}>₹{maxRemaining.toLocaleString()}</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Submission Error Alert */}
+                                    {paymentError && (
+                                        <div style={{ background: '#fee2e2', color: '#991b1b', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 16, fontWeight: 600 }}>
+                                            {paymentError}
+                                        </div>
+                                    )}
+
+                                    {/* Payment Amount Field */}
+                                    <div style={{ marginBottom: 20 }}>
+                                        <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#0f172a', marginBottom: 6 }}>
+                                            Payment Amount (₹) <span style={{ color: '#dc2626' }}>*</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={paymentForm.amount}
+                                            onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                                            max={maxRemaining}
+                                            min={1}
+                                            placeholder="Enter amount to pay"
+                                            required
+                                            style={{ width: '100%', padding: '10px 12px', fontSize: 14, borderRadius: 8, border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                                        />
+                                        <div style={{ marginTop: 6, fontSize: 12 }}>
+                                            {amountError ? (
+                                                <span style={{ color: '#dc2626', fontWeight: 600 }}>{amountError}</span>
+                                            ) : (
+                                                <span style={{ color: '#475569' }}>
+                                                    Max payable: <b>₹{maxRemaining.toLocaleString()}</b>
+                                                    {enteredAmount > 0 && enteredAmount <= maxRemaining && (
+                                                        <b style={{ color: remainingAfterPayment === 0 ? '#16a34a' : '#0284c7', marginLeft: 8 }}>
+                                                            {remainingAfterPayment === 0
+                                                                ? '✓ This payment will fully complete Installment ' + instNum
+                                                                : `(Remaining after payment: ₹${remainingAfterPayment.toLocaleString()})`
+                                                            }
+                                                        </b>
+                                                    )}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Payment Method Field */}
+                                    <div style={{ marginBottom: 20 }}>
+                                        <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#0f172a', marginBottom: 6 }}>
+                                            Payment Method <span style={{ color: '#dc2626' }}>*</span>
+                                        </label>
+                                        <select
+                                            value={paymentForm.paymentMethod}
+                                            onChange={(e) => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
+                                            required
+                                            style={{ width: '100%', padding: '10px 12px', fontSize: 14, borderRadius: 8, border: '1px solid #cbd5e1', background: '#ffffff', boxSizing: 'border-box' }}
+                                        >
+                                            <option value="UPI">UPI (Google Pay / PhonePe / Paytm)</option>
+                                            <option value="CASH">Cash</option>
+                                            <option value="BANK_TRANSFER">Bank Transfer (NEFT / IMPS / RTGS)</option>
+                                            <option value="CARD">Debit / Credit Card</option>
+                                            <option value="CHEQUE">Cheque</option>
+                                            <option value="ONLINE">Online Payment Gateway</option>
+                                            <option value="OTHER">Other</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Transaction / Reference ID Field */}
+                                    <div style={{ marginBottom: 20 }}>
+                                        <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#0f172a', marginBottom: 4 }}>
+                                            Transaction / Reference ID
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={paymentForm.transactionReference}
+                                            onChange={(e) => setPaymentForm({ ...paymentForm, transactionReference: e.target.value })}
+                                            placeholder="e.g. UPI-99882211 or UTR-123456"
+                                            style={{ width: '100%', padding: '10px 12px', fontSize: 14, borderRadius: 8, border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                                        />
+                                        <span style={{ display: 'block', marginTop: 4, fontSize: 11, color: '#64748b' }}>
+                                            Optional — useful for UPI or bank transfer tracking.
+                                        </span>
+                                    </div>
+
+                                    {/* Notes / Remarks Field */}
+                                    <div style={{ marginBottom: 10 }}>
+                                        <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#0f172a', marginBottom: 4 }}>
+                                            Notes / Remarks
+                                        </label>
+                                        <textarea
+                                            value={paymentForm.notes}
+                                            onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                                            placeholder="Add any additional payment remarks..."
+                                            rows={3}
+                                            style={{ width: '100%', padding: '10px 12px', fontSize: 14, borderRadius: 8, border: '1px solid #cbd5e1', minHeight: 80, resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                                        />
+                                        <span style={{ display: 'block', marginTop: 4, fontSize: 11, color: '#64748b' }}>
+                                            Optional — internal payment notes.
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Sticky Footer */}
+                                <div style={{ background: '#ffffff', padding: '14px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10 }}>
+                                    <button type="button" className="secondary" onClick={() => setPaymentModalData(null)} disabled={paymentSubmitting}>
+                                        Cancel
+                                    </button>
+                                    <button type="submit" className="primary" disabled={paymentSubmitting || !isValid}>
+                                        {paymentSubmitting ? 'Saving...' : '✓ Save Payment'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    );
+                })()}
 
                 {/* Modal for Configuring 3-Installment Planned Amounts */}
                 {configureInstallmentData && (() => {
