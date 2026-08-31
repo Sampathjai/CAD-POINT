@@ -1923,12 +1923,13 @@ function Dashboard({ user, token, leads = [], followups = [], admissions = [], p
 
     // Filtered arrays based on selectedMonth ('ALL' or 'YYYY-MM')
     const filteredLeads = safeLeads.filter(l => selectedMonth === 'ALL' || getYM(l.createdAt) === selectedMonth);
-    const filteredAdmissions = safeAdmissions.filter(a => selectedMonth === 'ALL' || getYM(a.createdAt || a.startDate) === selectedMonth);
+    const filteredAdmissions = safeAdmissions.filter(a => selectedMonth === 'ALL' || getYM(a.admissionDate || a.createdAt || a.startDate) === selectedMonth);
     const filteredPayments = safePayments.filter(p => selectedMonth === 'ALL' || getYM(p.paymentDate || p.createdAt) === selectedMonth);
 
     // Selected Month Metrics
     const monthlyRevenue = filteredPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-    const monthlyAgreedFees = filteredAdmissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
+    const businessValue = filteredAdmissions.reduce((sum, a) => sum + (Number(a.finalFee || a.agreedFee) || 0), 0);
+    const monthlyAgreedFees = businessValue;
     const monthlyOutstanding = Math.max(0, monthlyAgreedFees - monthlyRevenue);
     const monthlyAdmissionsCount = filteredAdmissions.length;
     const monthlyLeadsCount = filteredLeads.length;
@@ -2271,6 +2272,12 @@ function Dashboard({ user, token, leads = [], followups = [], admissions = [], p
                     <strong>₹{monthlyRevenue.toLocaleString()}</strong>
                     <small className="good">{filteredPayments.length} receipts</small>
                     <small>collections this period</small>
+                </div>
+                <div className="card">
+                    <span>Business Value</span>
+                    <strong>₹{businessValue.toLocaleString()}</strong>
+                    <small className="good">Total value of new admissions</small>
+                    <small>{monthlyAdmissionsCount} new admissions</small>
                 </div>
                 <div className="card">
                     <span>Monthly Fee Pending</span>

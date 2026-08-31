@@ -6,6 +6,55 @@ const { authenticate, authorize } = require('../middleware/auth');
 // Allowed Roles for Financial Student Reports: SUPER_ADMIN, ADMIN, ACCOUNTS, ACCOUNTANT
 const REPORT_ROLES = ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTS', 'ACCOUNTANT'];
 
+// GET /api/reports/dashboard-stats - Calculates Monthly Revenue and Business Value (total course fee of new admissions)
+router.get('/dashboard-stats', authenticate, authorize(...REPORT_ROLES, 'COUNSELLOR', 'RECEPTIONIST', 'TRAINER'), async (req, res) => {
+  try {
+    const { month, branchId } = req.query;
+
+    const whereAdmission = {};
+    const wherePayment = { status: 'SUCCESS' };
+
+    if (month && month !== 'ALL') {
+      const [year, m] = month.split('-').map(Number);
+      const startDate = new Date(year, m - 1, 1);
+      const endDate = new Date(year, m, 0, 23, 59, 59, 999);
+      whereAdmission.createdAt = { gte: startDate, lte: endDate };
+      wherePayment.createdAt = { gte: startDate, lte: endDate };
+    }
+
+    if (branchId && branchId !== 'all') {
+      const b = await prisma.branch.findFirst({
+        where: { OR: [{ id: branchId }, { code: branchId.toLowerCase() }] }
+      });
+      if (b) {
+        whereAdmission.branchId = b.id;
+        wherePayment.branchId = b.id;
+      }
+    }
+
+    const [admissions, payments] = await Promise.all([
+      prisma.admission.findMany({ where: whereAdmission, select: { finalFee: true, agreedFee: true } }),
+      prisma.payment.findMany({ where: wherePayment, select: { amount: true } })
+    ]);
+
+    const businessValue = admissions.reduce((sum, a) => sum + (Number(a.finalFee || a.agreedFee) || 0), 0);
+    const monthlyRevenue = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    return res.json({
+      success: true,
+      data: {
+        monthlyRevenue,
+        businessValue,
+        admissionsCount: admissions.length,
+        paymentsCount: payments.length
+      }
+    });
+  } catch (err) {
+    console.error('reports.dashboard-stats', err);
+    res.status(500).json({ success: false, message: 'Server error loading dashboard stats' });
+  }
+});
+
 // GET /api/reports/counsellor-dashboard - Dedicated non-financial analytics API for Counsellor role
 router.get('/counsellor-dashboard', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'COUNSELLOR'), async (req, res) => {
   try {
