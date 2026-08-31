@@ -2515,7 +2515,7 @@ function Dashboard({ user, token, leads = [], followups = [], admissions = [], p
 }
 
 function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onDeleteStudent, onDeleteAdmission, onOpenEditProgress, currentUserId, userRole, user, token, theme, toggleTheme, refreshData }) {
-    const itemSingular = page.endsWith('s') ? page.slice(0, -1) : page;
+    const itemSingular = page === 'Batches' ? 'Batch' : (page.endsWith('es') ? page.slice(0, -2) : (page.endsWith('s') ? page.slice(0, -1) : page));
     const [filterText, setFilterText] = useState('');
     const [paymentFromDate, setPaymentFromDate] = useState('');
     const [paymentToDate, setPaymentToDate] = useState('');
