@@ -2733,7 +2733,7 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Code</th>
+                                    <th>ID</th>
                                     <th>Student</th>
                                     <th>Phone</th>
                                     <th>Email</th>
