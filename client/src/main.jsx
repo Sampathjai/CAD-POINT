@@ -1833,91 +1833,217 @@ function Dashboard({ leads = [], followups = [], admissions = [], payments = [],
     const safeAdmissions = Array.isArray(admissions) ? admissions : [];
     const safePayments = Array.isArray(payments) ? payments : [];
 
+    const now = new Date();
+    const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    const [selectedMonth, setSelectedMonth] = useState(currentYearMonth);
+
+    // Generate Month Options dynamically for the last 12 months
+    const monthOptions = React.useMemo(() => {
+        const options = [];
+        const n = new Date();
+        for (let i = 0; i < 12; i++) {
+            const d = new Date(n.getFullYear(), n.getMonth() - i, 1);
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const key = `${y}-${m}`;
+            const label = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+            const shortLabel = d.toLocaleString('default', { month: 'short' });
+            options.push({ key, label, shortLabel, year: y, monthIndex: d.getMonth() });
+        }
+        return options;
+    }, []);
+
+    // Helper to extract YYYY-MM
+    const getYM = (dateStr) => {
+        if (!dateStr) return null;
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return null;
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    };
+
+    // Filtered arrays based on selectedMonth ('ALL' or 'YYYY-MM')
+    const filteredLeads = safeLeads.filter(l => selectedMonth === 'ALL' || getYM(l.createdAt) === selectedMonth);
+    const filteredAdmissions = safeAdmissions.filter(a => selectedMonth === 'ALL' || getYM(a.createdAt || a.startDate) === selectedMonth);
+    const filteredPayments = safePayments.filter(p => selectedMonth === 'ALL' || getYM(p.paymentDate || p.createdAt) === selectedMonth);
+
+    // Selected Month Metrics
+    const monthlyRevenue = filteredPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const monthlyAgreedFees = filteredAdmissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
+    const monthlyOutstanding = Math.max(0, monthlyAgreedFees - monthlyRevenue);
+    const monthlyAdmissionsCount = filteredAdmissions.length;
+    const monthlyLeadsCount = filteredLeads.length;
+    const monthlyConversionRate = monthlyLeadsCount > 0 ? ((monthlyAdmissionsCount / monthlyLeadsCount) * 100).toFixed(0) : '0';
+
+    // Global All-Time Metrics
     const totalRevenue = safePayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
     const totalAgreedFees = safeAdmissions.reduce((sum, a) => sum + (Number(a.finalFee) || 0), 0);
-    const outstandingFees = Math.max(0, totalAgreedFees - totalRevenue);
+    const totalOutstanding = Math.max(0, totalAgreedFees - totalRevenue);
     const totalAdmissions = safeAdmissions.length;
     const totalLeads = safeLeads.length;
-    const conversionRate = totalLeads > 0 ? ((totalAdmissions / totalLeads) * 100).toFixed(0) : '0';
 
-    const newLeadsCount = safeLeads.filter((l) => !l.status || (l.status + '').toUpperCase() === 'NEW').length;
-    const contactedCount = safeLeads.filter((l) => l.status && (l.status + '').toUpperCase() === 'CONTACTED').length;
-    const interestedCount = safeLeads.filter((l) => l.status && (l.status + '').toUpperCase() === 'INTERESTED').length;
-    const demoCount = safeLeads.filter((l) => l.status && (l.status + '').toUpperCase().includes('DEMO')).length;
+    // Funnel Counts
+    const contactedCount = filteredLeads.filter((l) => l.status && (l.status + '').toUpperCase() === 'CONTACTED').length;
+    const interestedCount = filteredLeads.filter((l) => l.status && (l.status + '').toUpperCase() === 'INTERESTED').length;
+    const demoCount = filteredLeads.filter((l) => l.status && (l.status + '').toUpperCase().includes('DEMO')).length;
+
+    // Build Chronological Monthly Trend (Last 6 Months)
+    const monthlyTrends = React.useMemo(() => {
+        const last6 = monthOptions.slice(0, 6).reverse();
+        return last6.map(m => {
+            const mLeads = safeLeads.filter(l => getYM(l.createdAt) === m.key).length;
+            const mAdmissions = safeAdmissions.filter(a => getYM(a.createdAt || a.startDate) === m.key).length;
+            const mPayments = safePayments.filter(p => getYM(p.paymentDate || p.createdAt) === m.key);
+            const mRevenue = mPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+            const mConv = mLeads > 0 ? ((mAdmissions / mLeads) * 100).toFixed(0) : '0';
+            return { ...m, leads: mLeads, admissions: mAdmissions, revenue: mRevenue, conversion: mConv };
+        });
+    }, [monthOptions, safeLeads, safeAdmissions, safePayments]);
+
+    const maxTrendRevenue = Math.max(1, ...monthlyTrends.map(t => t.revenue));
+
+    const selectedMonthObj = monthOptions.find(m => m.key === selectedMonth);
+    const monthTitleLabel = selectedMonth === 'ALL' ? 'All Months (Year-to-Date)' : (selectedMonthObj ? selectedMonthObj.label : 'Monthly Overview');
 
     return (
         <div className="content">
-            <div className="actions">
-                <button className="primary" onClick={onAddLead}>
-                    <Plus size={17} /> Add Lead
-                </button>
-                <button className="secondary" onClick={onSchedule}>
-                    Schedule Follow-up
-                </button>
+            {/* Header Toolbar with Month Filter */}
+            <div className="actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ background: '#16a34a', color: '#ffffff', width: 36, height: 36, borderRadius: 8, display: 'grid', placeItems: 'center' }}>
+                        <CalendarDays size={20} />
+                    </div>
+                    <div>
+                        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>Dashboard & Monthly Overview</h2>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Showing analytics for <b>{monthTitleLabel}</b></span>
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg-surface)', padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                        <Filter size={15} color="#16a34a" />
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Month Filter:</span>
+                        <select
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            style={{ border: 'none', background: 'transparent', fontWeight: 700, cursor: 'pointer', color: 'var(--text-primary)', fontSize: 13 }}
+                        >
+                            {monthOptions.map(m => (
+                                <option key={m.key} value={m.key}>{m.label}</option>
+                            ))}
+                            <option value="ALL">All Months (Year-to-Date)</option>
+                        </select>
+                    </div>
+
+                    <button className="primary" onClick={onAddLead} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <Plus size={17} /> Add Lead
+                    </button>
+                    <button className="secondary" onClick={onSchedule} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        Schedule Follow-up
+                    </button>
+                </div>
             </div>
+
+            {/* Monthly Key Metrics Cards */}
             <div className="cards">
                 <div className="card">
-                    <span>Total Leads</span>
-                    <strong>{totalLeads}</strong>
-                    <small className="good">{totalLeads > 0 ? '+100%' : '0%'}</small>
-                    <small>enquiries logged</small>
+                    <span>Monthly Enquiries</span>
+                    <strong>{monthlyLeadsCount}</strong>
+                    <small className="good">{selectedMonth === 'ALL' ? 'Total YTD' : 'This Period'}</small>
+                    <small>{safeLeads.length} total logged</small>
                 </div>
                 <div className="card">
-                    <span>Admissions</span>
-                    <strong>{totalAdmissions}</strong>
-                    <small className="good">{conversionRate}% conv. rate</small>
+                    <span>Monthly Admissions</span>
+                    <strong>{monthlyAdmissionsCount}</strong>
+                    <small className="good">{monthlyConversionRate}% conv. rate</small>
                     <small>enrolled students</small>
                 </div>
                 <div className="card">
-                    <span>Revenue Collected</span>
-                    <strong>₹{totalRevenue.toLocaleString()}</strong>
-                    <small className="good">{safePayments.length} receipts</small>
-                    <small>collected total</small>
+                    <span>Monthly Revenue</span>
+                    <strong>₹{monthlyRevenue.toLocaleString()}</strong>
+                    <small className="good">{filteredPayments.length} receipts</small>
+                    <small>collections this period</small>
                 </div>
                 <div className="card">
-                    <span>Outstanding Fees</span>
-                    <strong>₹{outstandingFees.toLocaleString()}</strong>
-                    <small style={{ color: outstandingFees > 0 ? '#dc2626' : '#238558' }}>
-                        {outstandingFees > 0 ? 'Pending collection' : 'Fully paid'}
+                    <span>Monthly Fee Pending</span>
+                    <strong>₹{monthlyOutstanding.toLocaleString()}</strong>
+                    <small style={{ color: monthlyOutstanding > 0 ? '#dc2626' : '#238558' }}>
+                        {monthlyOutstanding > 0 ? 'Pending collection' : 'Fully collected'}
                     </small>
-                    <small>balance remaining</small>
+                    <small>agreed fee balance</small>
                 </div>
             </div>
+
+            {/* Monthly Trend Analytics & Lead Funnel */}
             <div className="grid">
                 <section className="panel wide">
                     <div className="panelhead">
                         <div>
-                            <b>Revenue Overview</b>
-                            <span>Monthly collections analytics</span>
+                            <b style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <BarChart3 size={18} color="#16a34a" /> Monthly Revenue & Trend Analysis
+                            </b>
+                            <span>Live collection trends across the last 6 months</span>
                         </div>
-                        <select>
-                            <option>Current Year</option>
-                        </select>
+                        <span className="badge" style={{ background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: 16, fontSize: 12, fontWeight: 700 }}>
+                            Live Analytics
+                        </span>
                     </div>
-                    <div className="chart">
-                        <div className="bars">
-                            {[42, 58, 51, 74, 68, 91, 79, 96, 84, 100, 88, 108].map((h, i) => (
-                                <div key={i} style={{ height: h * 1.65 }}>
-                                    <span></span>
-                                    <label>{['Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'][Math.floor(i / 2)]}</label>
-                                </div>
-                            ))}
+                    <div className="chart" style={{ paddingTop: 20, paddingBottom: 10 }}>
+                        <div className="bars" style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: 160, paddingBottom: 20 }}>
+                            {monthlyTrends.map((t) => {
+                                const heightPct = maxTrendRevenue > 0 ? Math.max(14, Math.round((t.revenue / maxTrendRevenue) * 140)) : 14;
+                                const isSelected = t.key === selectedMonth;
+                                return (
+                                    <div
+                                        key={t.key}
+                                        onClick={() => setSelectedMonth(t.key)}
+                                        style={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            gap: 6,
+                                            cursor: 'pointer',
+                                            flex: 1,
+                                            maxWidth: 64
+                                        }}
+                                        title={`${t.label}: ₹${t.revenue.toLocaleString()} (${t.admissions} admissions)`}
+                                    >
+                                        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-secondary)' }}>
+                                            {t.revenue > 0 ? `₹${(t.revenue / 1000).toFixed(0)}k` : '₹0'}
+                                        </span>
+                                        <div
+                                            style={{
+                                                width: '100%',
+                                                height: heightPct,
+                                                background: isSelected ? 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)' : 'linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%)',
+                                                borderRadius: '6px 6px 0 0',
+                                                boxShadow: isSelected ? '0 0 10px rgba(22, 163, 74, 0.5)' : 'none',
+                                                transition: 'all 0.2s ease'
+                                            }}
+                                        ></div>
+                                        <label style={{ fontSize: 11, fontWeight: isSelected ? 700 : 500, color: isSelected ? '#16a34a' : 'var(--text-secondary)' }}>
+                                            {t.shortLabel}
+                                        </label>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 </section>
+
                 <section className="panel">
                     <div className="panelhead">
                         <div>
-                            <b>Lead Funnel Analytics</b>
-                            <span>Live conversion breakdown</span>
+                            <b>Lead Conversion Funnel</b>
+                            <span>{monthTitleLabel} breakdown</span>
                         </div>
                     </div>
                     {[
-                        ['Total Enquiries', totalLeads, '100%'],
-                        ['Contacted', contactedCount || Math.round(totalLeads * 0.7), totalLeads > 0 ? Math.round(((contactedCount || Math.round(totalLeads * 0.7)) / totalLeads) * 100) + '%' : '0%'],
-                        ['Interested', interestedCount || Math.round(totalLeads * 0.4), totalLeads > 0 ? Math.round(((interestedCount || Math.round(totalLeads * 0.4)) / totalLeads) * 100) + '%' : '0%'],
-                        ['Demo Scheduled', demoCount || Math.round(totalLeads * 0.2), totalLeads > 0 ? Math.round(((demoCount || Math.round(totalLeads * 0.2)) / totalLeads) * 100) + '%' : '0%'],
-                        ['Enrolled Admission', totalAdmissions, totalLeads > 0 ? conversionRate + '%' : '0%']
+                        ['Monthly Enquiries', monthlyLeadsCount, '100%'],
+                        ['Contacted', contactedCount, monthlyLeadsCount > 0 ? Math.round((contactedCount / monthlyLeadsCount) * 100) + '%' : '0%'],
+                        ['Interested', interestedCount, monthlyLeadsCount > 0 ? Math.round((interestedCount / monthlyLeadsCount) * 100) + '%' : '0%'],
+                        ['Demo Scheduled', demoCount, monthlyLeadsCount > 0 ? Math.round((demoCount / monthlyLeadsCount) * 100) + '%' : '0%'],
+                        ['Enrolled Admission', monthlyAdmissionsCount, monthlyConversionRate + '%']
                     ].map((x, i) => (
                         <div className="funnel" key={i}>
                             <div>
@@ -1930,6 +2056,62 @@ function Dashboard({ leads = [], followups = [], admissions = [], payments = [],
                         </div>
                     ))}
                 </section>
+            </div>
+
+            {/* Month-by-Month Overview Summary Breakdown Table */}
+            <div className="settings-card" style={{ marginTop: 20 }}>
+                <div className="settings-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                    <div>
+                        <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+                            <CalendarDays size={18} color="#16a34a" /> Month-by-Month Performance Breakdown
+                        </h3>
+                        <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>Comparative monthly statistics for leads, admissions, collections, and conversion rates.</p>
+                    </div>
+                </div>
+
+                <div className="table-responsive" style={{ marginTop: 12 }}>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>New Enquiries</th>
+                                <th>Admissions</th>
+                                <th>Revenue Collected</th>
+                                <th>Conversion Rate</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {monthlyTrends.map((m) => (
+                                <tr key={m.key} style={{ background: m.key === selectedMonth ? 'rgba(22, 163, 74, 0.08)' : 'transparent' }}>
+                                    <td>
+                                        <b style={{ color: m.key === selectedMonth ? '#16a34a' : 'inherit' }}>
+                                            {m.label} {m.key === currentYearMonth ? ' (Current)' : ''}
+                                        </b>
+                                    </td>
+                                    <td><b>{m.leads}</b> leads</td>
+                                    <td><b style={{ color: '#16a34a' }}>{m.admissions}</b> students</td>
+                                    <td><b style={{ color: '#0284c7' }}>₹{m.revenue.toLocaleString()}</b></td>
+                                    <td>
+                                        <span className="badge" style={{ background: Number(m.conversion) >= 30 ? '#dcfce7' : '#fef3c7', color: Number(m.conversion) >= 30 ? '#15803d' : '#b45309', padding: '3px 8px', borderRadius: 12, fontSize: 12, fontWeight: 700 }}>
+                                            {m.conversion}%
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button
+                                            type="button"
+                                            className="secondary"
+                                            onClick={() => setSelectedMonth(m.key)}
+                                            style={{ padding: '4px 10px', fontSize: 11, color: m.key === selectedMonth ? '#16a34a' : 'inherit', borderColor: m.key === selectedMonth ? '#86efac' : 'inherit' }}
+                                        >
+                                            {m.key === selectedMonth ? 'Selected ✓' : 'Select Month'}
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
             <div className="grid">
                 <section className="panel">
