@@ -3399,6 +3399,7 @@ function SettingsView({ userRole, user, token, theme, toggleTheme, sourcesList =
     }
 
     const safeUserRole = userRole || user?.role || 'RECEPTIONIST';
+    const safeUsers = Array.isArray(usersList) ? usersList : [];
 
     const allTabs = [
         { id: 'Profile', label: 'Institute Profile', icon: ShieldCheck, perm: 'settings.profile' },
@@ -3406,7 +3407,6 @@ function SettingsView({ userRole, user, token, theme, toggleTheme, sourcesList =
         { id: 'User Control', label: 'User Control & Roles', icon: UserCheck, perm: 'settings.users' },
         { id: 'Branch Management', label: 'Branch Management', icon: Database, perm: 'settings.branches' },
         { id: 'WhatsApp & API', label: 'WhatsApp & API', icon: MessageCircle, perm: 'settings.whatsapp' },
-        { id: 'Registered Devices', label: 'Registered Devices', icon: HardDrive, perm: 'settings.devices' },
         { id: 'Storage & Database', label: 'Storage & Database', icon: Database, perm: 'settings.whatsapp' },
         { id: 'Enquiry Sources', label: 'Enquiry Sources', icon: Plus, perm: 'settings.whatsapp' },
         { id: 'System Info', label: 'System Info', icon: Laptop, perm: 'settings.profile' }
