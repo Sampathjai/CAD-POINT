@@ -334,11 +334,15 @@ function App() {
                 .then(j => { if (j.success) setUsersList(j.data || []); })
                 .catch(e => console.error(e));
         }
-    }, [token, user?.role]);
+        if (user && user.role !== 'SUPER_ADMIN' && page === 'Users') {
+            setPage('Dashboard');
+        }
+    }, [token, user, page]);
 
     function logout() {
         setToken('');
         setUser(null);
+        setPage('Dashboard');
         localStorage.removeItem('cadpoint_token');
     }
 
@@ -378,6 +382,7 @@ function App() {
             // Set user FIRST so useEffect does not trigger redundant /auth/me call
             setUser(j.data.user);
             setToken(j.data.token);
+            setPage('Dashboard');
 
             console.log(`[PERF FRONTEND] ✅ Dashboard redirected in ${(performance.now() - tStart).toFixed(1)}ms (Server handling: ${j._perf?.totalMs || 'N/A'}ms)`);
         } catch (err) {
