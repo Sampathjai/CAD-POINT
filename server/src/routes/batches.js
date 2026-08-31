@@ -24,11 +24,30 @@ router.get('/', authenticate, authorize(...BATCH_ROLES), async (req, res) => {
 // POST /api/batches
 router.post('/', authenticate, authorize(...BATCH_ROLES), async (req, res) => {
   try {
-    const schema = z.object({ batchCode: z.string().min(1), name: z.string().min(1), courseId: z.string().uuid(), startDate: z.string().min(1), endDate: z.string().optional(), capacity: z.number().optional() });
+    const schema = z.object({
+      batchCode: z.string().min(1),
+      name: z.string().min(1),
+      courseId: z.string().uuid(),
+      trainerId: z.string().optional().or(z.literal('')).nullable(),
+      startDate: z.string().min(1),
+      endDate: z.string().optional().or(z.literal('')).nullable(),
+      capacity: z.number().optional()
+    });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ success: false, message: parsed.error.message });
-    const { batchCode, name, courseId, startDate, endDate, capacity } = parsed.data;
-    const created = await prisma.batch.create({ data: { batchCode, name, courseId, startDate: new Date(startDate), endDate: endDate?new Date(endDate):null, capacity: capacity||25 } });
+    const { batchCode, name, courseId, trainerId, startDate, endDate, capacity } = parsed.data;
+    const created = await prisma.batch.create({
+      data: {
+        batchCode,
+        name,
+        courseId,
+        trainerId: trainerId || null,
+        startDate: new Date(startDate),
+        endDate: endDate ? new Date(endDate) : null,
+        capacity: capacity || 25
+      },
+      include: { course: true, trainer: { select: { id: true, name: true } } }
+    });
     res.json({ success: true, data: created });
   } catch (err) {
     console.error('batches.create', err);
@@ -40,7 +59,7 @@ router.post('/', authenticate, authorize(...BATCH_ROLES), async (req, res) => {
 router.put('/:id', authenticate, authorize(...BATCH_ROLES), async (req, res) => {
   try {
     const { id } = req.params;
-    const { batchCode, name, courseId, startDate, endDate, capacity, status } = req.body;
+    const { batchCode, name, courseId, trainerId, startDate, endDate, capacity, status } = req.body;
 
     const existing = await prisma.batch.findUnique({ where: { id } });
     if (!existing) {
@@ -53,6 +72,7 @@ router.put('/:id', authenticate, authorize(...BATCH_ROLES), async (req, res) => 
         ...(batchCode ? { batchCode: batchCode.trim() } : {}),
         ...(name ? { name: name.trim() } : {}),
         ...(courseId ? { courseId } : {}),
+        trainerId: trainerId !== undefined ? (trainerId || null) : existing.trainerId,
         ...(startDate ? { startDate: new Date(startDate) } : {}),
         ...(endDate ? { endDate: new Date(endDate) } : {}),
         ...(capacity ? { capacity: Number(capacity) || 25 } : {}),

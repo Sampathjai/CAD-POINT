@@ -73,3 +73,4 @@ if (activePreviewUrl === sampleAdmission.student.photoUrl) {
 }
 
 console.log('\n🎉 ALL ADMISSION DETAILS STUDENT PHOTO PREVIEW TESTS PASSED 100%!');
+

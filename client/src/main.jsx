@@ -261,7 +261,7 @@ function App() {
     const [editingCourse, setEditingCourse] = useState(null);
     const [editCourseForm, setEditCourseForm] = useState({ id: '', courseCode: '', name: '', description: '', standardFee: '', isActive: true });
     const [editingBatch, setEditingBatch] = useState(null);
-    const [editBatchForm, setEditBatchForm] = useState({ id: '', batchCode: '', name: '', courseId: '', startDate: '', endDate: '', capacity: 25 });
+    const [editBatchForm, setEditBatchForm] = useState({ id: '', batchCode: '', name: '', courseId: '', trainerId: '', startDate: '', endDate: '', capacity: 25 });
     const [editingStudent, setEditingStudent] = useState(null);
     const [editStudentForm, setEditStudentForm] = useState({ id: '', studentCode: '', firstName: '', parentName: '', dateOfBirth: '', address: '', phone: '', email: '', passportNumber: '', photoUrl: '' });
     const [editingPayment, setEditingPayment] = useState(null);
@@ -280,7 +280,7 @@ function App() {
     const [addLeadForm, setAddLeadForm] = useState({ firstName: '', lastName: '', phone: '', email: '', interestedCourse: '', estimatedValue: '', sourceId: '', leadType: 'STANDARD', assignedCounsellorId: '', branchId: '', leadDate: new Date().toISOString().slice(0, 10) });
     const [scheduleForm, setScheduleForm] = useState({ leadId: '', scheduledAt: '', type: 'CALL', notes: '' });
     const [addCourseForm, setAddCourseForm] = useState({ courseCode: '', name: '', description: '', standardFee: '' });
-    const [addBatchForm, setAddBatchForm] = useState({ batchCode: '', name: '', courseId: '', startDate: '', endDate: '', capacity: 25 });
+    const [addBatchForm, setAddBatchForm] = useState({ batchCode: '', name: '', courseId: '', trainerId: '', startDate: '', endDate: '', capacity: 25 });
     const [addStudentForm, setAddStudentForm] = useState({ studentCode: '', firstName: '', parentName: '', dateOfBirth: '', address: '', phone: '', email: '', passportNumber: '', photoUrl: '' });
     const [addAdmissionForm, setAddAdmissionForm] = useState({ admissionNumber: '', leadId: '', studentId: '', studentName: '', studentPhone: '', studentEmail: '', studentAddress: '', courseId: '', batchId: '', startDate: '', endDate: '', agreedFee: '', finalFee: '' });
     const [studentSearchQuery, setStudentSearchQuery] = useState('');
@@ -615,7 +615,7 @@ function App() {
             if (!j.success) return alert(j.message || 'Create batch failed');
             fetchAllData();
             setShowAddBatch(false);
-            setAddBatchForm({ batchCode: '', name: '', courseId: '', startDate: '', endDate: '', capacity: 25 });
+            setAddBatchForm({ batchCode: '', name: '', courseId: '', trainerId: '', startDate: '', endDate: '', capacity: 25 });
         } catch (e) {
             console.error(e);
             alert('Create batch failed');
@@ -907,7 +907,7 @@ function App() {
 
     function openEditBatch(b) {
         setEditingBatch(b);
-        setEditBatchForm({ id: b.id, batchCode: b.batchCode, name: b.name, courseId: b.courseId, startDate: b.startDate ? b.startDate.slice(0, 10) : '', endDate: b.endDate ? b.endDate.slice(0, 10) : '', capacity: b.capacity });
+        setEditBatchForm({ id: b.id, batchCode: b.batchCode, name: b.name, courseId: b.courseId, trainerId: b.trainerId || b.trainer?.id || '', startDate: b.startDate ? b.startDate.slice(0, 10) : '', endDate: b.endDate ? b.endDate.slice(0, 10) : '', capacity: b.capacity });
     }
 
     function openEditStudent(s) {
@@ -1388,6 +1388,15 @@ function App() {
                             </select>
                         </label>
                         <label>
+                            Faculty Person / Trainer
+                            <select value={editBatchForm.trainerId} onChange={(e) => setEditBatchForm({ ...editBatchForm, trainerId: e.target.value })}>
+                                <option value="">Select Faculty Person (Optional)</option>
+                                {usersList.map((u) => (
+                                    <option key={u.id} value={u.id}>{u.name} ({u.role ? u.role.replace('_', ' ') : 'Staff'})</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label>
                             Start Date
                             <input type="date" value={editBatchForm.startDate} onChange={(e) => setEditBatchForm({ ...editBatchForm, startDate: e.target.value })} required />
                         </label>
@@ -1686,6 +1695,15 @@ function App() {
                                 <option value="">Select course</option>
                                 {courses.map((c) => (
                                     <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label>
+                            Faculty Person / Trainer
+                            <select value={addBatchForm.trainerId} onChange={(e) => setAddBatchForm({ ...addBatchForm, trainerId: e.target.value })}>
+                                <option value="">Select Faculty Person (Optional)</option>
+                                {usersList.map((u) => (
+                                    <option key={u.id} value={u.id}>{u.name} ({u.role ? u.role.replace('_', ' ') : 'Staff'})</option>
                                 ))}
                             </select>
                         </label>
@@ -3721,6 +3739,7 @@ ${instituteName}`;
                                 <th>Code</th>
                                 <th>Batch Name</th>
                                 <th>Course</th>
+                                <th>Faculty Person</th>
                                 <th>Start Date</th>
                                 <th>End Date</th>
                                 <th>Capacity</th>
@@ -3730,12 +3749,13 @@ ${instituteName}`;
                         </thead>
                         <tbody>
                             {safeBatches
-                                .filter((b) => !lowerFilter || (b.name + ' ' + b.batchCode).toLowerCase().includes(lowerFilter))
+                                .filter((b) => !lowerFilter || (b.name + ' ' + b.batchCode + ' ' + (b.trainer?.name || '')).toLowerCase().includes(lowerFilter))
                                 .map((b) => (
                                     <tr key={b.id}>
                                         <td><b>{b.batchCode}</b></td>
                                         <td>{b.name}</td>
                                         <td>{b.course?.name || '-'}</td>
+                                        <td><b>{b.trainer?.name || '-'}</b></td>
                                         <td>{formatDate(b.startDate)}</td>
                                         <td>{b.endDate ? formatDate(b.endDate) : '-'}</td>
                                         <td>{b.capacity} students</td>
