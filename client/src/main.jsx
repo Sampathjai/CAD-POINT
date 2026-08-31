@@ -991,9 +991,13 @@ function App() {
                                 }}
                                 style={{ border: 'none', background: 'transparent', fontWeight: 700, cursor: 'pointer', color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
                             >
-                                <option value="gandhipuram">Gandhipuram</option>
-                                <option value="saravanapatti">Saravanapatti</option>
-                                <option value="all">All Branches</option>
+                                {(branchesList && branchesList.length > 0 ? branchesList : [
+                                    { id: 'gandhipuram', name: 'Gandhipuram', code: 'gandhipuram' },
+                                    { id: 'saravanapatti', name: 'Saravanapatti', code: 'saravanapatti' }
+                                ]).map((b) => (
+                                    <option key={b.id} value={b.code ? b.code.toLowerCase() : b.id}>{b.name}</option>
+                                ))}
+                                {user?.role === 'SUPER_ADMIN' && <option value="all">All Branches</option>}
                             </select>
                         </div>
 
@@ -2852,12 +2856,14 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
         }
     }, [token]);
 
-    // Fetch live device architecture from central API
+    const [deviceCountInfo, setDeviceCountInfo] = useState({ activeCount: 0, maxLimit: 10 });
+
+    // Fetch live device architecture from central API per branch
     const fetchDevices = useCallback(async () => {
         if (!token) return;
         setDeviceLoading(true);
         try {
-            const res = await fetch(API_BASE + '/devices', {
+            const res = await fetch(API_BASE + '/devices?branchId=' + (newDeviceForm?.branchId || 'gandhipuram'), {
                 headers: {
                     Authorization: 'Bearer ' + token,
                     'X-Device-Id': deviceInfo.deviceId
@@ -2867,13 +2873,17 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
             if (j.success && j.data) {
                 setPrimaryDevice(j.data.primaryDevice || null);
                 setAuthorizedDevices(j.data.authorizedDevices || []);
+                setDeviceCountInfo({
+                    activeCount: j.data.activeCount || (j.data.primaryDevice ? 1 : 0) + (j.data.authorizedDevices || []).length,
+                    maxLimit: j.data.maxLimit || 10
+                });
             }
         } catch (e) {
             console.error('fetchDevices error', e);
         } finally {
             setDeviceLoading(false);
         }
-    }, [token, deviceInfo.deviceId]);
+    }, [token, deviceInfo.deviceId, newDeviceForm?.branchId]);
 
     // Initial load
     useEffect(() => {
@@ -3392,17 +3402,23 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
                                 <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                     <ShieldCheck size={20} color="#16a34a" /> AUTHORIZED DEVICES
                                 </h3>
-                                <p>All authorized devices (laptops, mobile phones, desktops, tablets) share the same live central CRM database.</p>
+                                <p>All authorized devices (laptops, mobile phones, desktops, tablets) communicate directly with the central Supabase PostgreSQL database.</p>
                             </div>
-                            <div style={{ display: 'flex', gap: 8 }}>
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                                <span className="badge" style={{ background: deviceCountInfo.activeCount >= 10 ? '#fee2e2' : '#e0f2fe', color: deviceCountInfo.activeCount >= 10 ? '#b91c1c' : '#0369a1', padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 700 }}>
+                                    Registered Devices: {deviceCountInfo.activeCount} / 10
+                                </span>
                                 <button
                                     className="primary"
                                     onClick={() => {
+                                        if (deviceCountInfo.activeCount >= 10) {
+                                            return alert("Device limit reached. Maximum 10 devices are allowed for this branch. Remove an existing device to register a new device.");
+                                        }
                                         setNewDeviceForm({
                                             deviceName: deviceInfo.suggestedName,
                                             deviceType: deviceInfo.suggestedType,
                                             deviceRole: 'AUTHORIZED',
-                                            branchId: 'gandhipuram'
+                                            branchId: newDeviceForm.branchId || 'gandhipuram'
                                         });
                                         setShowAddDeviceModal(true);
                                     }}

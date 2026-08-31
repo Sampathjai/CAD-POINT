@@ -3,11 +3,25 @@ const router = express.Router();
 const prisma = require('../config/prisma');
 const { authenticate, authorize } = require('../middleware/auth');
 
+const MAX_DEVICES_PER_BRANCH = 10;
 
-// GET /api/devices - List primary device and all authorized devices
+// GET /api/devices - List primary device and all authorized devices (filterable by branchId)
 router.get('/', authenticate, async (req, res) => {
   try {
+    const { branchId } = req.query;
+    let targetBranchId = null;
+
+    if (branchId && branchId !== 'all') {
+      const b = await prisma.branch.findFirst({
+        where: { OR: [{ id: branchId }, { code: branchId.toLowerCase() }] }
+      });
+      if (b) targetBranchId = b.id;
+    }
+
+    const whereClause = targetBranchId ? { branchId: targetBranchId } : {};
+
     const devices = await prisma.device.findMany({
+      where: whereClause,
       include: {
         branch: { select: { id: true, name: true, code: true } },
         user: { select: { id: true, name: true, email: true } }
@@ -15,6 +29,7 @@ router.get('/', authenticate, async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
+    const activeDevices = devices.filter(d => d.status === 'ACTIVE');
     const primaryDevice = devices.find(d => d.deviceRole === 'PRIMARY' && d.status === 'ACTIVE') || null;
     const authorizedDevices = devices.filter(d => d.id !== primaryDevice?.id);
 
@@ -23,6 +38,8 @@ router.get('/', authenticate, async (req, res) => {
       data: {
         primaryDevice,
         authorizedDevices,
+        activeCount: activeDevices.length,
+        maxLimit: MAX_DEVICES_PER_BRANCH,
         totalRegistered: devices.length
       }
     });
@@ -32,11 +49,23 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/devices/primary - Fetch current Primary Device
+// GET /api/devices/primary - Fetch current Primary Device for active branch
 router.get('/primary', authenticate, async (req, res) => {
   try {
+    const { branchId } = req.query;
+    let targetBranchId = null;
+    if (branchId && branchId !== 'all') {
+      const b = await prisma.branch.findFirst({
+        where: { OR: [{ id: branchId }, { code: branchId.toLowerCase() }] }
+      });
+      if (b) targetBranchId = b.id;
+    }
+
+    const whereClause = { deviceRole: 'PRIMARY', status: 'ACTIVE' };
+    if (targetBranchId) whereClause.branchId = targetBranchId;
+
     const primaryDevice = await prisma.device.findFirst({
-      where: { deviceRole: 'PRIMARY', status: 'ACTIVE' },
+      where: whereClause,
       include: {
         branch: { select: { id: true, name: true, code: true } },
         user: { select: { id: true, name: true, email: true } }
@@ -53,7 +82,7 @@ router.get('/primary', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/devices/register - Register a new device (PRIMARY or AUTHORIZED)
+// POST /api/devices/register - Register a new device with 10 Device Limit per Branch
 router.post('/register', authenticate, async (req, res) => {
   try {
     const { deviceId, deviceName, deviceType, deviceRole, branchId, forceReplace } = req.body;
@@ -65,6 +94,20 @@ router.post('/register', authenticate, async (req, res) => {
     const role = (deviceRole || 'AUTHORIZED').toUpperCase();
     const type = (deviceType || 'LAPTOP').toUpperCase();
 
+    // Resolve branch ID
+    let resolvedBranchId = branchId || null;
+    if (branchId) {
+      const branchRecord = await prisma.branch.findFirst({
+        where: { OR: [{ id: branchId }, { code: branchId.toLowerCase() }] }
+      });
+      if (branchRecord) resolvedBranchId = branchRecord.id;
+    }
+
+    if (!resolvedBranchId) {
+      const defaultBranch = await prisma.branch.findFirst({ where: { code: 'gandhipuram' } });
+      if (defaultBranch) resolvedBranchId = defaultBranch.id;
+    }
+
     // Check if device is already registered by deviceId
     let existingDev = await prisma.device.findUnique({ where: { deviceId } });
     if (existingDev) {
@@ -74,6 +117,7 @@ router.post('/register', authenticate, async (req, res) => {
           deviceName: deviceName.trim(),
           deviceType: type,
           deviceRole: role,
+          branchId: resolvedBranchId,
           lastActiveAt: new Date(),
           status: existingDev.status === 'REVOKED' ? 'ACTIVE' : existingDev.status
         }
@@ -85,10 +129,28 @@ router.post('/register', authenticate, async (req, res) => {
       });
     }
 
-    // Single Primary Device Enforcement Rule
+    // Enforce Hard Limit: Maximum 10 Registered Devices per Branch
+    const activeDeviceCount = await prisma.device.count({
+      where: {
+        branchId: resolvedBranchId,
+        status: 'ACTIVE'
+      }
+    });
+
+    if (activeDeviceCount >= MAX_DEVICES_PER_BRANCH) {
+      const targetBranch = await prisma.branch.findUnique({ where: { id: resolvedBranchId } });
+      const branchName = targetBranch?.name || 'this';
+      return res.status(400).json({
+        success: false,
+        limitReached: true,
+        message: `Maximum device limit reached for ${branchName} branch. This branch already has 10 registered devices. Please remove an existing device before registering a new one.`
+      });
+    }
+
+    // Enforce 1 Primary Device per Branch
     if (role === 'PRIMARY') {
       const activePrimary = await prisma.device.findFirst({
-        where: { deviceRole: 'PRIMARY', status: 'ACTIVE' }
+        where: { branchId: resolvedBranchId, deviceRole: 'PRIMARY', status: 'ACTIVE' }
       });
 
       if (activePrimary) {
@@ -97,25 +159,16 @@ router.post('/register', authenticate, async (req, res) => {
             success: false,
             primaryExists: true,
             existingPrimary: activePrimary,
-            message: `Primary device already exists (${activePrimary.deviceName}). You cannot register multiple Primary devices simultaneously.`
+            message: `Primary device already exists for this branch (${activePrimary.deviceName}). You cannot register multiple Primary devices simultaneously for the same branch.`
           });
         }
 
-        // Downgrade existing primary device to AUTHORIZED
+        // Downgrade existing primary device for this branch to AUTHORIZED
         await prisma.device.update({
           where: { id: activePrimary.id },
           data: { deviceRole: 'AUTHORIZED' }
         });
       }
-    }
-
-    // Resolve branch ID if code was passed
-    let resolvedBranchId = branchId || null;
-    if (branchId) {
-      const branchRecord = await prisma.branch.findFirst({
-        where: { OR: [{ id: branchId }, { code: branchId.toLowerCase() }] }
-      });
-      if (branchRecord) resolvedBranchId = branchRecord.id;
     }
 
     const newDevice = await prisma.device.create({
@@ -188,11 +241,16 @@ router.post('/:id/block', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async
 // POST /api/devices/:id/replace-primary - Replace Primary Device role
 router.post('/:id/replace-primary', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
-    // Demote current primary
-    await prisma.device.updateMany({
-      where: { deviceRole: 'PRIMARY' },
-      data: { deviceRole: 'AUTHORIZED' }
-    });
+    const targetDev = await prisma.device.findUnique({ where: { id: req.params.id } });
+    if (!targetDev) return res.status(404).json({ success: false, message: 'Device not found' });
+
+    // Demote current primary for this branch
+    if (targetDev.branchId) {
+      await prisma.device.updateMany({
+        where: { branchId: targetDev.branchId, deviceRole: 'PRIMARY' },
+        data: { deviceRole: 'AUTHORIZED' }
+      });
+    }
 
     // Promote requested device
     const updated = await prisma.device.update({
@@ -200,7 +258,7 @@ router.post('/:id/replace-primary', authenticate, authorize('SUPER_ADMIN', 'ADMI
       data: { deviceRole: 'PRIMARY', status: 'ACTIVE' }
     });
 
-    res.json({ success: true, message: 'Primary device updated.', data: updated });
+    res.json({ success: true, message: 'Primary device updated for branch.', data: updated });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -221,4 +279,3 @@ router.delete('/cleanup-all', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), a
 });
 
 module.exports = router;
-
