@@ -401,27 +401,70 @@ function App() {
     }
 
     async function doLogin() {
-        if (!loginForm.email || !loginForm.email.trim()) {
+        const cleanEmail = (loginForm.email || '').trim();
+        const cleanPassword = (loginForm.password || '').trim();
+
+        if (!cleanEmail) {
             return alert('Please enter your email address');
         }
-        if (!loginForm.password || !loginForm.password.trim()) {
+        if (!cleanPassword) {
             return alert('Please enter your password');
         }
+
         const tStart = performance.now();
         console.log('[PERF FRONTEND] 🚀 Login request sent to API...');
-        try {
-            const res = await fetch(API_BASE + '/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(loginForm)
-            });
-            const tHttp = performance.now();
-            console.log(`[PERF FRONTEND] HTTP response received in ${(tHttp - tStart).toFixed(1)}ms`);
 
-            const j = await res.json();
+        const payload = { email: cleanEmail, password: cleanPassword };
+
+        async function attemptFetch(url) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout for cold start
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                return res;
+            } catch (e) {
+                clearTimeout(timeoutId);
+                throw e;
+            }
+        }
+
+        try {
+            let res;
+            try {
+                res = await attemptFetch(API_BASE + '/auth/login');
+            } catch (fetchErr) {
+                console.warn('Initial login fetch failed, retrying once...', fetchErr);
+                // Retry once in case of serverless cold-start or temporary network glitch
+                res = await attemptFetch(API_BASE + '/auth/login');
+            }
+
+            const tHttp = performance.now();
+            console.log(`[PERF FRONTEND] HTTP response received in ${(tHttp - tStart).toFixed(1)}ms (Status: ${res.status})`);
+
+            const contentType = res.headers.get('content-type') || '';
+            let j = null;
+
+            if (contentType.includes('application/json')) {
+                j = await res.json();
+            } else {
+                const rawText = await res.text();
+                console.error(`Non-JSON server response (HTTP ${res.status}):`, rawText);
+                if (res.status === 504 || res.status === 502 || res.status === 503) {
+                    return alert(`Server is waking up (HTTP ${res.status}). Please click Sign In again.`);
+                }
+                return alert(`Server error (HTTP ${res.status}). Please try logging in again.`);
+            }
+
             if (!res.ok || !j.success) {
                 return alert(formatErrorMessage(j.message) || 'Invalid email or password. Please try again.');
             }
+
             localStorage.setItem('cadpoint_token', j.data.token);
             setUser(j.data.user);
             setToken(j.data.token);
@@ -431,7 +474,11 @@ function App() {
             console.log(`[PERF FRONTEND] ✅ Dashboard redirected in ${(performance.now() - tStart).toFixed(1)}ms (Server handling: ${j._perf?.totalMs || 'N/A'}ms)`);
         } catch (err) {
             console.error('Login error', err);
-            alert('Unable to connect to login server. Please verify the API server is active.');
+            if (err.name === 'AbortError') {
+                alert('Login request timed out while connecting to the server. Please try again.');
+            } else {
+                alert(`Unable to connect to login server (${err.message || 'Network error'}). Please verify your connection and try again.`);
+            }
         }
     }
 

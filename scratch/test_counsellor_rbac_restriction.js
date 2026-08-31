@@ -46,3 +46,4 @@ if (adminAdmissions === true && superAdminAdmissions === true) {
 }
 
 console.log('\n🎉 ALL COUNSELLOR RBAC RESTRICTION TESTS PASSED 100%!');
+
