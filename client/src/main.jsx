@@ -45,6 +45,7 @@ import {
     Copy,
     CheckCircle2,
     Crown,
+    User,
     Key,
     Ban,
     Slash,
@@ -55,6 +56,33 @@ import './styles.css';
 const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL && String(import.meta.env.VITE_API_URL).trim())
     ? String(import.meta.env.VITE_API_URL).trim().replace(/\/+$/, '')
     : '/api';
+
+function StudentPhotoWithFallback({ src, alt = 'Student Photo', style = {}, className = '' }) {
+    const [imgError, setImgError] = useState(false);
+
+    useEffect(() => {
+        setImgError(false);
+    }, [src]);
+
+    if (!src || imgError) {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', textAlign: 'center', padding: 4, width: '100%', height: '100%', background: '#f1f5f9' }}>
+                <User size={28} color="#94a3b8" />
+                <span style={{ fontSize: 10, fontWeight: 600, color: '#64748b', marginTop: 2 }}>No Photo</span>
+            </div>
+        );
+    }
+
+    return (
+        <img
+            src={src}
+            alt={alt}
+            style={style}
+            className={className}
+            onError={() => setImgError(true)}
+        />
+    );
+}
 
 // Persistent Device Identifier for Browser/Device Security
 function getOrGenerateDeviceId() {
@@ -219,6 +247,7 @@ function App() {
 
     // UI Modals
     const [whatsAppModalData, setWhatsAppModalData] = useState(null);
+    const [previewPhotoUrl, setPreviewPhotoUrl] = useState(null);
     const [showAddLead, setShowAddLead] = useState(false);
     const [showSchedule, setShowSchedule] = useState(false);
     const [showAddCourse, setShowAddCourse] = useState(false);
@@ -1194,6 +1223,7 @@ function App() {
                             onDeleteAdmission={deleteAdmission}
                             onEditPayment={openEditPayment}
                             onDeletePayment={deletePayment}
+                            onPreviewPhoto={(url) => setPreviewPhotoUrl(url)}
                             onOpenEditProgress={openEditProgress}
                             currentUserId={user?.id}
                             userRole={user?.role}
@@ -2381,6 +2411,84 @@ function App() {
                     </form>
                 </div>
             )}
+
+            {previewPhotoUrl && (
+                <div
+                    className="modal"
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        width: '100vw',
+                        height: '100vh',
+                        background: 'rgba(15, 23, 42, 0.82)',
+                        backdropFilter: 'blur(6px)',
+                        WebkitBackdropFilter: 'blur(6px)',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        zIndex: 3000,
+                        padding: 16
+                    }}
+                    onClick={() => setPreviewPhotoUrl(null)}
+                >
+                    <div
+                        style={{
+                            position: 'relative',
+                            background: '#ffffff',
+                            padding: 12,
+                            borderRadius: 14,
+                            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.4)',
+                            maxWidth: '90vw',
+                            maxHeight: '85vh',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            type="button"
+                            onClick={() => setPreviewPhotoUrl(null)}
+                            style={{
+                                position: 'absolute',
+                                top: -14,
+                                right: -14,
+                                background: '#0f172a',
+                                color: '#ffffff',
+                                border: '2px solid #ffffff',
+                                borderRadius: '50%',
+                                width: 32,
+                                height: 32,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                                zIndex: 10
+                            }}
+                            title="Close preview"
+                        >
+                            <X size={18} />
+                        </button>
+                        <img
+                            src={previewPhotoUrl}
+                            alt="Student Full Photo"
+                            style={{
+                                maxWidth: '80vw',
+                                maxHeight: '75vh',
+                                objectFit: 'contain',
+                                borderRadius: 10
+                            }}
+                        />
+                        <div style={{ marginTop: 10, fontSize: 12, color: '#64748b', fontWeight: 600 }}>
+                            Student Profile Photo Preview
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -3131,7 +3239,7 @@ function Dashboard({ user, token, leads = [], followups = [], admissions = [], p
     );
 }
 
-function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onAdmitFromFollowup, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onEditStudent, onDeleteStudent, onDeleteAdmission, onOpenEditProgress, currentUserId, userRole, user, token, theme, toggleTheme, refreshData }) {
+function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onAdmitFromFollowup, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onEditStudent, onDeleteStudent, onDeleteAdmission, onEditPayment, onDeletePayment, onPreviewPhoto, onOpenEditProgress, currentUserId, userRole, user, token, theme, toggleTheme, refreshData }) {
     const itemSingular = page === 'Batches' ? 'Batch' : (page.endsWith('es') ? page.slice(0, -2) : (page.endsWith('s') ? page.slice(0, -1) : page));
     const [filterText, setFilterText] = useState('');
     const [paymentFromDate, setPaymentFromDate] = useState('');
@@ -3905,11 +4013,47 @@ ${instituteName}`;
                                                                 {/* Student & Course Info */}
                                                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginBottom: 20 }}>
                                                                     <div style={{ background: '#ffffff', padding: 14, borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                                                                        <h5 style={{ margin: '0 0 8px', fontSize: 13, color: '#0284c7', fontWeight: 700 }}>Student Information</h5>
-                                                                        <p style={{ margin: '3px 0', fontSize: 13 }}><b>Name:</b> {a.student ? `${a.student.firstName} ${a.student.lastName || ''}`.trim() : '-'}</p>
-                                                                        <p style={{ margin: '3px 0', fontSize: 13 }}><b>Phone:</b> {a.student?.phone || '-'}</p>
-                                                                        <p style={{ margin: '3px 0', fontSize: 13 }}><b>Email:</b> {a.student?.email || '-'}</p>
-                                                                        <p style={{ margin: '3px 0', fontSize: 13 }}><b>Address:</b> {a.student?.address || a.student?.lastName || '-'}</p>
+                                                                        <h5 style={{ margin: '0 0 10px', fontSize: 13, color: '#0284c7', fontWeight: 700 }}>Student Information</h5>
+                                                                        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                                                                            {/* Student Photo Container */}
+                                                                            <div
+                                                                                style={{
+                                                                                    width: 95,
+                                                                                    height: 105,
+                                                                                    borderRadius: 8,
+                                                                                    border: '1px solid #cbd5e1',
+                                                                                    background: '#f8fafc',
+                                                                                    overflow: 'hidden',
+                                                                                    flexShrink: 0,
+                                                                                    display: 'flex',
+                                                                                    flexDirection: 'column',
+                                                                                    alignItems: 'center',
+                                                                                    justifyContent: 'center',
+                                                                                    cursor: a.student?.photoUrl ? 'pointer' : 'default',
+                                                                                    position: 'relative'
+                                                                                }}
+                                                                                onClick={() => {
+                                                                                    if (a.student?.photoUrl && onPreviewPhoto) {
+                                                                                        onPreviewPhoto(a.student.photoUrl);
+                                                                                    }
+                                                                                }}
+                                                                                title={a.student?.photoUrl ? 'Click to view full photo' : 'No photo uploaded'}
+                                                                            >
+                                                                                <StudentPhotoWithFallback
+                                                                                    src={a.student?.photoUrl}
+                                                                                    alt={a.student ? `${a.student.firstName}` : 'Student'}
+                                                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                                                />
+                                                                            </div>
+
+                                                                            {/* Student Text Details */}
+                                                                            <div style={{ flex: 1, minWidth: 150 }}>
+                                                                                <p style={{ margin: '2px 0 4px', fontSize: 13 }}><b>Name:</b> {a.student ? `${a.student.firstName} ${a.student.lastName || ''}`.trim() : '-'}</p>
+                                                                                <p style={{ margin: '3px 0', fontSize: 13 }}><b>Phone:</b> {a.student?.phone || '-'}</p>
+                                                                                <p style={{ margin: '3px 0', fontSize: 13 }}><b>Email:</b> {a.student?.email || '-'}</p>
+                                                                                <p style={{ margin: '3px 0', fontSize: 13, overflowWrap: 'anywhere' }}><b>Address:</b> {a.student?.address || a.student?.lastName || '-'}</p>
+                                                                            </div>
+                                                                        </div>
                                                                     </div>
                                                                     <div style={{ background: '#ffffff', padding: 14, borderRadius: 8, border: '1px solid #e2e8f0' }}>
                                                                         <h5 style={{ margin: '0 0 8px', fontSize: 13, color: '#16a34a', fontWeight: 700 }}>Course & Batch Information</h5>
@@ -4938,7 +5082,7 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
                         <b style={{ fontSize: 16, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 8 }}>
                             <AlertCircle size={18} /> Monthly Outstanding Fee Breakdown
                         </b>
-                        <span style={{ fontSize: 12, color: '#64748b' }}>Students with pending fee balances for the selected date range ({fromDate || 'Start'} to {toDate || 'Today'})</span>
+                        <span style={{ fontSize: 12, color: '#64748b' }}>Students with pending fee balances for {selectedMonth === 'ALL' ? 'all months' : selectedMonth}</span>
                     </div>
                     <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c', padding: '4px 10px', fontSize: 12, fontWeight: 700 }}>
                         Total Pending: ₹{totalFilteredPending.toLocaleString()}
