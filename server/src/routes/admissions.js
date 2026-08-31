@@ -52,7 +52,8 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
       counsellorId: z.string().uuid().optional().or(z.literal('')).nullable(),
       branchId: z.string().optional(),
       startDate: z.string().optional().or(z.literal('')).nullable(),
-      endDate: z.string().optional().or(z.literal('')).nullable()
+      endDate: z.string().optional().or(z.literal('')).nullable(),
+      installmentPlan: z.array(z.object({ number: z.number(), planned: z.number() })).optional()
     });
 
     const parsed = schema.safeParse(req.body);
@@ -61,7 +62,7 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
       return res.status(400).json({ success: false, message: `${issue.path.join('.')}: ${issue.message}` });
     }
 
-    let { admissionNumber, studentId, courseId, batchId, agreedFee, finalFee, counsellorId, branchId, startDate, endDate } = parsed.data;
+    let { admissionNumber, studentId, courseId, batchId, agreedFee, finalFee, counsellorId, branchId, startDate, endDate, installmentPlan } = parsed.data;
 
     if (!admissionNumber || !admissionNumber.trim()) {
       const count = await prisma.admission.count();
@@ -81,6 +82,18 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
       if (defaultBranch) finalBranchId = defaultBranch.id;
     }
 
+    let planJson = null;
+    if (Array.isArray(installmentPlan) && installmentPlan.length > 0) {
+      if (installmentPlan.length > 3) {
+        return res.status(400).json({ success: false, message: 'Maximum 3 installments allowed per admission.' });
+      }
+      const sumPlanned = installmentPlan.reduce((sum, item) => sum + (Number(item.planned) || 0), 0);
+      if (sumPlanned > finalFee) {
+        return res.status(400).json({ success: false, message: `Sum of planned installments (₹${sumPlanned.toLocaleString()}) cannot exceed total course fee (₹${finalFee.toLocaleString()}).` });
+      }
+      planJson = JSON.stringify(installmentPlan);
+    }
+
     const admission = await prisma.admission.create({
       data: {
         admissionNumber,
@@ -93,7 +106,8 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
         branchId: finalBranchId,
         startDate: startDate ? new Date(startDate) : new Date(),
         endDate: endDate ? new Date(endDate) : null,
-        status: 'CONFIRMED'
+        status: 'CONFIRMED',
+        installmentPlan: planJson
       },
       include: {
         student: true,
@@ -107,6 +121,48 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
     res.status(201).json({ success: true, data: admission });
   } catch (err) {
     console.error('admissions.create', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// PATCH /api/admissions/:id/installments - Configure custom installment plan
+router.patch('/:id/installments', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'COUNSELLOR', 'ACCOUNTS', 'ACCOUNTANT'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { installmentPlan } = req.body;
+
+    const admission = await prisma.admission.findUnique({ where: { id }, include: { payments: true } });
+    if (!admission) return res.status(404).json({ success: false, message: 'Admission record not found' });
+
+    if (!Array.isArray(installmentPlan)) {
+      return res.status(400).json({ success: false, message: 'installmentPlan must be an array' });
+    }
+
+    if (installmentPlan.length > 3) {
+      return res.status(400).json({ success: false, message: 'Maximum 3 installments allowed per admission.' });
+    }
+
+    const finalFee = Number(admission.finalFee) || 0;
+    const sumPlanned = installmentPlan.reduce((sum, item) => sum + (Number(item.planned) || 0), 0);
+
+    if (sumPlanned > finalFee) {
+      return res.status(400).json({
+        success: false,
+        message: `Sum of planned installments (₹${sumPlanned.toLocaleString()}) cannot exceed total course fee (₹${finalFee.toLocaleString()}).`
+      });
+    }
+
+    const updated = await prisma.admission.update({
+      where: { id },
+      data: {
+        installmentPlan: JSON.stringify(installmentPlan)
+      },
+      include: { student: true, course: true, batch: true, payments: true, branch: true }
+    });
+
+    res.json({ success: true, data: updated, message: 'Installment plan configured successfully' });
+  } catch (err) {
+    console.error('admissions.installments.update', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });

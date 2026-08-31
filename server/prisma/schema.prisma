@@ -318,6 +318,7 @@ model Admission {
   finalFee        Decimal         @db.Decimal(12, 2)
   status          AdmissionStatus @default(PENDING)
   notes           String?
+  installmentPlan String?
   payments        Payment[]
   attendance      Attendance[]
   certificate     Certificate?
@@ -337,6 +338,7 @@ model Payment {
   branch               Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
   receiptNumber        String        @unique
   amount               Decimal       @db.Decimal(12, 2)
+  installmentNumber    Int?          @default(1)
   paymentMethod        PaymentMethod
   transactionReference String?
   paymentDate          DateTime      @default(now())

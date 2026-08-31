@@ -15,6 +15,7 @@ import {
     Plus,
     Phone,
     MessageCircle,
+    Eye,
     ArrowUpRight,
     MoreHorizontal,
     UserCheck,
@@ -2501,6 +2502,199 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
     const [paymentToDate, setPaymentToDate] = useState('');
     const [paymentMonth, setPaymentMonth] = useState('ALL');
 
+    const [expandedAdmissionId, setExpandedAdmissionId] = useState(null);
+    const [paymentModalData, setPaymentModalData] = useState(null);
+    const [paymentForm, setPaymentForm] = useState({ amount: '', paymentMethod: 'UPI', transactionReference: '', notes: '' });
+    const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+    const [paymentError, setPaymentError] = useState('');
+
+    const [configureInstallmentData, setConfigureInstallmentData] = useState(null);
+    const [installmentsForm, setInstallmentsForm] = useState({ inst1: '', inst2: '', inst3: '' });
+    const [installmentsSubmitting, setInstallmentsSubmitting] = useState(false);
+    const [installmentsError, setInstallmentsError] = useState('');
+
+    const canManagePayments = ['SUPER_ADMIN', 'ADMIN', 'ACCOUNTS', 'ACCOUNTANT'].includes(userRole || user?.role);
+
+    const getAdmissionInstallmentDetails = (admission) => {
+        const finalFee = Number(admission?.finalFee) || 0;
+        const payments = Array.isArray(admission?.payments) ? admission.payments : [];
+        const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        const pendingAmount = Math.max(0, finalFee - totalPaid);
+
+        let plannedArray = [
+            Math.round(finalFee / 3),
+            Math.round(finalFee / 3),
+            Math.max(0, finalFee - 2 * Math.round(finalFee / 3))
+        ];
+
+        if (admission?.installmentPlan) {
+            try {
+                const parsed = typeof admission.installmentPlan === 'string' ? JSON.parse(admission.installmentPlan) : admission.installmentPlan;
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    plannedArray = [
+                        Number(parsed[0]?.planned) || 0,
+                        Number(parsed[1]?.planned) || 0,
+                        Number(parsed[2]?.planned) || 0
+                    ];
+                }
+            } catch (e) {
+                console.error('Invalid installmentPlan JSON', e);
+            }
+        }
+
+        const instPayments = { 1: [], 2: [], 3: [] };
+        payments.forEach(p => {
+            const num = p.installmentNumber && [1, 2, 3].includes(p.installmentNumber) ? p.installmentNumber : 1;
+            instPayments[num].push(p);
+        });
+
+        const installments = [1, 2, 3].map(num => {
+            const planned = plannedArray[num - 1] || 0;
+            const pList = instPayments[num] || [];
+            const paid = pList.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+            const remaining = Math.max(0, planned - paid);
+            let status = 'PENDING';
+            if (paid >= planned && planned > 0) {
+                status = 'PAID';
+            } else if (paid > 0) {
+                status = 'PARTIAL';
+            }
+
+            const lastPaymentDate = pList.length > 0 ? pList[pList.length - 1].paymentDate : null;
+
+            return {
+                number: num,
+                planned,
+                paid,
+                remaining,
+                status,
+                payments: pList,
+                lastPaymentDate
+            };
+        });
+
+        let overallStatus = 'PENDING';
+        if (totalPaid >= finalFee && finalFee > 0) {
+            overallStatus = 'FULLY_PAID';
+        } else if (totalPaid > 0) {
+            overallStatus = 'PARTIALLY_PAID';
+        }
+
+        return {
+            finalFee,
+            totalPaid,
+            pendingAmount,
+            overallStatus,
+            installments
+        };
+    };
+
+    const generateWhatsAppReminder = (admission, pendingAmount, totalPaid) => {
+        const studentName = admission.student ? `${admission.student.firstName} ${admission.student.lastName || ''}`.trim() : 'Student';
+        const courseName = admission.course?.name || 'Course';
+        const phone = admission.student?.whatsappNumber || admission.student?.phone || '';
+        const finalFee = Number(admission.finalFee) || 0;
+        const instituteName = 'CAD POINT';
+
+        const text = `Hello ${studentName},
+
+This is a reminder regarding your pending course fees.
+
+Course: ${courseName}
+Total Fees: ₹${finalFee.toLocaleString()}
+Amount Paid: ₹${totalPaid.toLocaleString()}
+Pending Amount: ₹${pendingAmount.toLocaleString()}
+
+Kindly complete the pending payment at your earliest convenience.
+
+Thank you,
+${instituteName}`;
+
+        const waUrl = `https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(text)}`;
+        window.open(waUrl, '_blank');
+    };
+
+    const handleRecordPaymentSubmit = async (e) => {
+        e.preventDefault();
+        setPaymentError('');
+        const amt = Number(paymentForm.amount);
+        if (!amt || amt <= 0) {
+            setPaymentError('Payment amount must be greater than 0');
+            return;
+        }
+        if (paymentModalData?.remainingAmount && amt > paymentModalData.remainingAmount) {
+            setPaymentError(`Payment amount cannot exceed installment remaining amount (₹${paymentModalData.remainingAmount.toLocaleString()})`);
+            return;
+        }
+        setPaymentSubmitting(true);
+        try {
+            const payload = {
+                admissionId: paymentModalData.admission.id,
+                installmentNumber: paymentModalData.installmentNumber,
+                amount: amt,
+                paymentMethod: paymentForm.paymentMethod,
+                transactionReference: paymentForm.transactionReference,
+                notes: paymentForm.notes,
+                branchId: paymentModalData.admission.branchId
+            };
+            const res = await fetch(API_BASE + '/payments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.message || 'Failed to record payment');
+            }
+            setPaymentModalData(null);
+            setPaymentForm({ amount: '', paymentMethod: 'UPI', transactionReference: '', notes: '' });
+            if (typeof refreshData === 'function') refreshData();
+        } catch (err) {
+            setPaymentError(err.message);
+        } finally {
+            setPaymentSubmitting(false);
+        }
+    };
+
+    const handleConfigureInstallmentsSubmit = async (e) => {
+        e.preventDefault();
+        setInstallmentsError('');
+        const inst1 = Number(installmentsForm.inst1) || 0;
+        const inst2 = Number(installmentsForm.inst2) || 0;
+        const inst3 = Number(installmentsForm.inst3) || 0;
+        const finalFee = Number(configureInstallmentData.finalFee) || 0;
+
+        if (inst1 + inst2 + inst3 > finalFee) {
+            setInstallmentsError(`Total planned installments (₹${(inst1 + inst2 + inst3).toLocaleString()}) cannot exceed total course fee (₹${finalFee.toLocaleString()}).`);
+            return;
+        }
+
+        setInstallmentsSubmitting(true);
+        try {
+            const installmentPlan = [
+                { number: 1, planned: inst1 },
+                { number: 2, planned: inst2 },
+                { number: 3, planned: inst3 }
+            ];
+
+            const res = await fetch(API_BASE + `/admissions/${configureInstallmentData.id}/installments`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify({ installmentPlan })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.message || 'Failed to update installment plan');
+            }
+            setConfigureInstallmentData(null);
+            if (typeof refreshData === 'function') refreshData();
+        } catch (err) {
+            setInstallmentsError(err.message);
+        } finally {
+            setInstallmentsSubmitting(false);
+        }
+    };
+
     const safeLeads = Array.isArray(leads) ? leads : [];
     const safeFollowups = Array.isArray(followups) ? followups : [];
     const safeCourses = Array.isArray(courses) ? courses : [];
@@ -2792,49 +2986,248 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
                             <tbody>
                                 {safeAdmissions
                                     .filter((a) => !lowerFilter || (a.admissionNumber + ' ' + (a.student?.firstName || '') + ' ' + (a.course?.name || '')).toLowerCase().includes(lowerFilter))
-                                    .map((a) => (
-                                        <tr key={a.id}>
-                                            <td><b>{a.admissionNumber}</b></td>
-                                            <td>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                    {a.student?.photoUrl ? (
-                                                        <img src={a.student.photoUrl} alt="Student" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
-                                                    ) : null}
-                                                    <div>
-                                                        <b>{a.student ? `${a.student.firstName} ${a.student.lastName || ''}`.trim() : '-'}</b>
-                                                        <div style={{ fontSize: 11, color: '#64748b' }}>{a.student?.phone}</div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>{a.course?.name || '-'}</td>
-                                            <td>{a.branch?.name || 'Gandhipuram'}</td>
-                                            <td style={{ minWidth: 120 }}>
-                                                <ProgressBar percentage={a.completionPct || 0} />
-                                            </td>
-                                            <td>
-                                                <CertificateBadge status={a.certificate?.status || 'NOT_STARTED'} issueDate={a.certificate?.issueDate} />
-                                            </td>
-                                            <td><b>₹{Number(a.finalFee).toLocaleString()}</b></td>
-                                            <td>
-                                                <div style={{ display: 'flex', gap: 6 }}>
-                                                    <button
-                                                        className="secondary"
-                                                        style={{ padding: '4px 8px', fontSize: 11, color: '#0284c7', borderColor: '#bae6fd', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                        onClick={() => onOpenEditProgress(a)}
-                                                    >
-                                                        <Edit size={12} /> Progress
-                                                    </button>
-                                                    <button
-                                                        className="secondary"
-                                                        style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                        onClick={() => onDeleteAdmission(a.id, a.admissionNumber)}
-                                                    >
-                                                        <Trash2 size={12} /> Delete
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                ))}
+                                    .map((a) => {
+                                        const details = getAdmissionInstallmentDetails(a);
+                                        const isExpanded = expandedAdmissionId === a.id;
+                                        return (
+                                            <React.Fragment key={a.id}>
+                                                <tr style={{ cursor: 'pointer', background: isExpanded ? 'rgba(22, 163, 74, 0.05)' : 'transparent' }} onClick={() => setExpandedAdmissionId(isExpanded ? null : a.id)}>
+                                                    <td><b>{a.admissionNumber}</b></td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                            {a.student?.photoUrl ? (
+                                                                <img src={a.student.photoUrl} alt="Student" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
+                                                            ) : null}
+                                                            <div>
+                                                                <b>{a.student ? `${a.student.firstName} ${a.student.lastName || ''}`.trim() : '-'}</b>
+                                                                <div style={{ fontSize: 11, color: '#64748b' }}>{a.student?.phone}</div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td>{a.course?.name || '-'}</td>
+                                                    <td>{a.branch?.name || 'Gandhipuram'}</td>
+                                                    <td style={{ minWidth: 120 }}>
+                                                        <ProgressBar percentage={a.completionPct || 0} />
+                                                    </td>
+                                                    <td>
+                                                        <CertificateBadge status={a.certificate?.status || 'NOT_STARTED'} issueDate={a.certificate?.issueDate} />
+                                                    </td>
+                                                    <td>
+                                                        <b>₹{details.finalFee.toLocaleString()}</b>
+                                                        <div style={{ fontSize: 11, color: details.pendingAmount <= 0 ? '#16a34a' : '#d97706', fontWeight: 600 }}>
+                                                            {details.pendingAmount <= 0 ? '✓ Paid' : `Due: ₹${details.pendingAmount.toLocaleString()}`}
+                                                        </div>
+                                                    </td>
+                                                    <td onClick={(e) => e.stopPropagation()}>
+                                                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                                            <button
+                                                                className="secondary"
+                                                                style={{ padding: '4px 8px', fontSize: 11, color: '#16a34a', borderColor: '#86efac', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                                onClick={() => setExpandedAdmissionId(isExpanded ? null : a.id)}
+                                                            >
+                                                                <Eye size={12} /> {isExpanded ? 'Hide Details' : 'View Details'}
+                                                            </button>
+                                                            <button
+                                                                className="secondary"
+                                                                style={{ padding: '4px 8px', fontSize: 11, color: '#0284c7', borderColor: '#bae6fd', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                                onClick={() => onOpenEditProgress(a)}
+                                                            >
+                                                                <Edit size={12} /> Progress
+                                                            </button>
+                                                            <button
+                                                                className="secondary"
+                                                                style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                                onClick={() => onDeleteAdmission(a.id, a.admissionNumber)}
+                                                            >
+                                                                <Trash2 size={12} /> Delete
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+
+                                                {isExpanded && (
+                                                    <tr key={a.id + '-details'} style={{ background: '#f8fafc' }}>
+                                                        <td colSpan={8} style={{ padding: 20 }}>
+                                                            <div style={{ background: '#ffffff', borderRadius: 12, border: '1px solid #cbd5e1', padding: 20, boxShadow: '0 4px 10px rgba(0,0,0,0.06)' }}>
+                                                                {/* Details Header */}
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid #e2e8f0' }}>
+                                                                    <div>
+                                                                        <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, color: '#0f172a' }}>
+                                                                            <GraduationCap size={20} color="#16a34a" /> ADMISSION DETAILS — {a.admissionNumber}
+                                                                        </h3>
+                                                                        <span style={{ fontSize: 12, color: '#64748b' }}>
+                                                                            Student Code: <b>{a.student?.studentCode}</b> | Branch: <b>{a.branch?.name || 'Gandhipuram'}</b>
+                                                                        </span>
+                                                                    </div>
+
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                                        <span className="badge" style={{
+                                                                            background: details.pendingAmount <= 0 ? '#dcfce7' : '#fee2e2',
+                                                                            color: details.pendingAmount <= 0 ? '#15803d' : '#991b1b',
+                                                                            padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 700
+                                                                        }}>
+                                                                            {details.pendingAmount <= 0 ? '✓ Fully Paid' : '⚠ Fee Pending'}
+                                                                        </span>
+
+                                                                        {/* WhatsApp Payment Reminder (Only shown if pendingAmount > 0) */}
+                                                                        {details.pendingAmount > 0 && (
+                                                                            <button
+                                                                                type="button"
+                                                                                className="primary"
+                                                                                style={{ background: '#25D366', borderColor: '#25D366', color: '#ffffff', padding: '6px 14px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                                                                                onClick={() => generateWhatsAppReminder(a, details.pendingAmount, details.totalPaid)}
+                                                                            >
+                                                                                <MessageCircle size={15} /> WhatsApp Reminder
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Payment Summary */}
+                                                                <div style={{ background: '#f8fafc', padding: 16, borderRadius: 10, border: '1px solid #e2e8f0', marginBottom: 20 }}>
+                                                                    <h4 style={{ margin: '0 0 12px', fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                                        Payment Summary
+                                                                    </h4>
+                                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16 }}>
+                                                                        <div>
+                                                                            <span style={{ fontSize: 12, color: '#64748b', display: 'block' }}>Total Course Fee</span>
+                                                                            <strong style={{ fontSize: 18, color: '#0f172a' }}>₹{details.finalFee.toLocaleString()}</strong>
+                                                                        </div>
+                                                                        <div>
+                                                                            <span style={{ fontSize: 12, color: '#64748b', display: 'block' }}>Total Amount Paid</span>
+                                                                            <strong style={{ fontSize: 18, color: '#16a34a' }}>₹{details.totalPaid.toLocaleString()}</strong>
+                                                                        </div>
+                                                                        <div>
+                                                                            <span style={{ fontSize: 12, color: '#64748b', display: 'block' }}>Pending Fee</span>
+                                                                            <strong style={{ fontSize: 18, color: details.pendingAmount > 0 ? '#dc2626' : '#16a34a' }}>
+                                                                                ₹{details.pendingAmount.toLocaleString()}
+                                                                            </strong>
+                                                                        </div>
+                                                                        <div>
+                                                                            <span style={{ fontSize: 12, color: '#64748b', display: 'block' }}>Payment Status</span>
+                                                                            <strong style={{ fontSize: 15, color: details.pendingAmount <= 0 ? '#16a34a' : '#d97706' }}>
+                                                                                {details.pendingAmount <= 0 ? '✓ Fully Paid' : 'Pending'}
+                                                                            </strong>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Student & Course Info */}
+                                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginBottom: 20 }}>
+                                                                    <div style={{ background: '#ffffff', padding: 14, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                                                        <h5 style={{ margin: '0 0 8px', fontSize: 13, color: '#0284c7', fontWeight: 700 }}>Student Information</h5>
+                                                                        <p style={{ margin: '3px 0', fontSize: 13 }}><b>Name:</b> {a.student ? `${a.student.firstName} ${a.student.lastName || ''}`.trim() : '-'}</p>
+                                                                        <p style={{ margin: '3px 0', fontSize: 13 }}><b>Phone:</b> {a.student?.phone || '-'}</p>
+                                                                        <p style={{ margin: '3px 0', fontSize: 13 }}><b>Email:</b> {a.student?.email || '-'}</p>
+                                                                        <p style={{ margin: '3px 0', fontSize: 13 }}><b>Address:</b> {a.student?.address || a.student?.lastName || '-'}</p>
+                                                                    </div>
+                                                                    <div style={{ background: '#ffffff', padding: 14, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                                                        <h5 style={{ margin: '0 0 8px', fontSize: 13, color: '#16a34a', fontWeight: 700 }}>Course & Batch Information</h5>
+                                                                        <p style={{ margin: '3px 0', fontSize: 13 }}><b>Course:</b> {a.course?.name || '-'}</p>
+                                                                        <p style={{ margin: '3px 0', fontSize: 13 }}><b>Batch:</b> {a.batch?.name || 'Standard Batch'}</p>
+                                                                        <p style={{ margin: '3px 0', fontSize: 13 }}><b>Start Date:</b> {formatDate(a.startDate)}</p>
+                                                                        <p style={{ margin: '3px 0', fontSize: 13 }}><b>End Date:</b> {formatDate(a.endDate)}</p>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* 3-Installment Schedule */}
+                                                                <div>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+                                                                        <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
+                                                                            3-Installment Payment Schedule
+                                                                        </h4>
+                                                                        {canManagePayments && (
+                                                                            <button
+                                                                                type="button"
+                                                                                className="secondary"
+                                                                                style={{ padding: '3px 10px', fontSize: 11 }}
+                                                                                onClick={() => {
+                                                                                    setConfigureInstallmentData(a);
+                                                                                    setInstallmentsForm({
+                                                                                        inst1: details.installments[0]?.planned || '',
+                                                                                        inst2: details.installments[1]?.planned || '',
+                                                                                        inst3: details.installments[2]?.planned || ''
+                                                                                    });
+                                                                                }}
+                                                                            >
+                                                                                Configure Planned Amounts
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="table-responsive">
+                                                                        <table style={{ width: '100%', fontSize: 13 }}>
+                                                                            <thead>
+                                                                                <tr style={{ background: '#f1f5f9' }}>
+                                                                                    <th>Installment</th>
+                                                                                    <th>Planned Amount</th>
+                                                                                    <th>Paid Amount</th>
+                                                                                    <th>Remaining</th>
+                                                                                    <th>Last Payment Date</th>
+                                                                                    <th>Status</th>
+                                                                                    <th>Action</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody>
+                                                                                {details.installments.map((inst) => (
+                                                                                    <tr key={inst.number}>
+                                                                                        <td><b>Installment {inst.number}</b></td>
+                                                                                        <td>₹{inst.planned.toLocaleString()}</td>
+                                                                                        <td><b style={{ color: inst.paid > 0 ? '#16a34a' : 'inherit' }}>₹{inst.paid.toLocaleString()}</b></td>
+                                                                                        <td><b style={{ color: inst.remaining > 0 ? '#dc2626' : '#16a34a' }}>₹{inst.remaining.toLocaleString()}</b></td>
+                                                                                        <td>{formatDate(inst.lastPaymentDate)}</td>
+                                                                                        <td>
+                                                                                            <span className="badge" style={{
+                                                                                                background: inst.status === 'PAID' ? '#dcfce7' : inst.status === 'PARTIAL' ? '#fef3c7' : '#fee2e2',
+                                                                                                color: inst.status === 'PAID' ? '#15803d' : inst.status === 'PARTIAL' ? '#b45309' : '#991b1b',
+                                                                                                padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700
+                                                                                            }}>
+                                                                                                {inst.status === 'PAID' ? '✓ Paid' : inst.status === 'PARTIAL' ? 'Partially Paid' : 'Pending'}
+                                                                                            </span>
+                                                                                        </td>
+                                                                                        <td>
+                                                                                            {inst.remaining > 0 && canManagePayments ? (
+                                                                                                <button
+                                                                                                    type="button"
+                                                                                                    className="primary"
+                                                                                                    style={{ padding: '3px 8px', fontSize: 11 }}
+                                                                                                    onClick={() => {
+                                                                                                        setPaymentModalData({
+                                                                                                            admission: a,
+                                                                                                            installmentNumber: inst.number,
+                                                                                                            plannedAmount: inst.planned,
+                                                                                                            paidAmount: inst.paid,
+                                                                                                            remainingAmount: inst.remaining
+                                                                                                        });
+                                                                                                        setPaymentForm({
+                                                                                                            amount: inst.remaining,
+                                                                                                            paymentMethod: 'UPI',
+                                                                                                            transactionReference: '',
+                                                                                                            notes: ''
+                                                                                                        });
+                                                                                                    }}
+                                                                                                >
+                                                                                                    + Add Payment
+                                                                                                </button>
+                                                                                            ) : (
+                                                                                                <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                                                                                                    {inst.remaining === 0 ? 'Completed ✓' : 'View Only'}
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                ))}
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
+                                        );
+                                    })}
                             </tbody>
                         </table>
                     </div>
@@ -2972,6 +3365,132 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
                         payments={safePayments}
                         onOpenWhatsApp={onOpenWhatsApp}
                     />
+                )}
+                {/* Modal for Recording Installment Payment */}
+                {paymentModalData && (
+                    <div className="modal-backdrop">
+                        <form className="panel" onSubmit={handleRecordPaymentSubmit} style={{ maxWidth: 450 }}>
+                            <h3>Record Installment Payment</h3>
+                            <p style={{ margin: '0 0 12px', fontSize: 13, color: '#64748b' }}>
+                                Recording payment for <b>Installment {paymentModalData.installmentNumber}</b> (Admission: {paymentModalData.admission.admissionNumber})
+                            </p>
+                            {paymentError && (
+                                <div style={{ background: '#fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
+                                    {paymentError}
+                                </div>
+                            )}
+                            <label>
+                                Payment Amount (₹)
+                                <input
+                                    type="number"
+                                    value={paymentForm.amount}
+                                    onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                                    max={paymentModalData.remainingAmount}
+                                    required
+                                />
+                                <span style={{ fontSize: 11, color: '#64748b' }}>
+                                    Max remaining for Installment {paymentModalData.installmentNumber}: ₹{paymentModalData.remainingAmount.toLocaleString()}
+                                </span>
+                            </label>
+                            <label>
+                                Payment Method
+                                <select
+                                    value={paymentForm.paymentMethod}
+                                    onChange={(e) => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
+                                    required
+                                >
+                                    <option value="UPI">UPI</option>
+                                    <option value="CASH">Cash</option>
+                                    <option value="BANK_TRANSFER">Bank Transfer</option>
+                                    <option value="CARD">Card</option>
+                                    <option value="CHEQUE">Cheque</option>
+                                    <option value="ONLINE">Online</option>
+                                    <option value="OTHER">Other</option>
+                                </select>
+                            </label>
+                            <label>
+                                Transaction / Reference ID (Optional)
+                                <input
+                                    type="text"
+                                    value={paymentForm.transactionReference}
+                                    onChange={(e) => setPaymentForm({ ...paymentForm, transactionReference: e.target.value })}
+                                    placeholder="e.g. UPI-99882211"
+                                />
+                            </label>
+                            <label>
+                                Notes / Remarks (Optional)
+                                <input
+                                    type="text"
+                                    value={paymentForm.notes}
+                                    onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                                    placeholder="Payment notes"
+                                />
+                            </label>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+                                <button type="button" className="secondary" onClick={() => setPaymentModalData(null)} disabled={paymentSubmitting}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="primary" disabled={paymentSubmitting}>
+                                    {paymentSubmitting ? 'Recording...' : 'Save Payment'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                )}
+
+                {/* Modal for Configuring 3-Installment Planned Amounts */}
+                {configureInstallmentData && (
+                    <div className="modal-backdrop">
+                        <form className="panel" onSubmit={handleConfigureInstallmentsSubmit} style={{ maxWidth: 450 }}>
+                            <h3>Configure 3-Installment Plan</h3>
+                            <p style={{ margin: '0 0 12px', fontSize: 13, color: '#64748b' }}>
+                                Set planned targets for <b>{configureInstallmentData.admissionNumber}</b>. Total Fee: <b>₹{Number(configureInstallmentData.finalFee).toLocaleString()}</b>
+                            </p>
+                            {installmentsError && (
+                                <div style={{ background: '#fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: 8, fontSize: 13, marginBottom: 12 }}>
+                                    {installmentsError}
+                                </div>
+                            )}
+                            <label>
+                                Installment 1 Target (₹)
+                                <input
+                                    type="number"
+                                    value={installmentsForm.inst1}
+                                    onChange={(e) => setInstallmentsForm({ ...installmentsForm, inst1: e.target.value })}
+                                    required
+                                />
+                            </label>
+                            <label>
+                                Installment 2 Target (₹)
+                                <input
+                                    type="number"
+                                    value={installmentsForm.inst2}
+                                    onChange={(e) => setInstallmentsForm({ ...installmentsForm, inst2: e.target.value })}
+                                    required
+                                />
+                            </label>
+                            <label>
+                                Installment 3 Target (₹)
+                                <input
+                                    type="number"
+                                    value={installmentsForm.inst3}
+                                    onChange={(e) => setInstallmentsForm({ ...installmentsForm, inst3: e.target.value })}
+                                    required
+                                />
+                            </label>
+                            <p style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>
+                                Total Planned: <b>₹{((Number(installmentsForm.inst1) || 0) + (Number(installmentsForm.inst2) || 0) + (Number(installmentsForm.inst3) || 0)).toLocaleString()}</b> / ₹{Number(configureInstallmentData.finalFee).toLocaleString()}
+                            </p>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+                                <button type="button" className="secondary" onClick={() => setConfigureInstallmentData(null)} disabled={installmentsSubmitting}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="primary" disabled={installmentsSubmitting}>
+                                    {installmentsSubmitting ? 'Saving...' : 'Save Plan'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 )}
             </div>
         </div>

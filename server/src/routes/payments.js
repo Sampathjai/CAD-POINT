@@ -52,37 +52,61 @@ router.get('/', authenticate, authorize(...PAYMENT_ROLES), async (req, res) => {
   }
 });
 
-// POST /api/payments
+// POST /api/payments - Record payment against an installment
 router.post('/', authenticate, authorize(...PAYMENT_ROLES), async (req, res) => {
   try {
     const schema = z.object({
       admissionId: z.string().uuid(),
-      receiptNumber: z.string().min(1),
-      amount: z.number(),
-      paymentMethod: z.string().min(1),
-      transactionReference: z.string().optional(),
+      receiptNumber: z.string().optional().or(z.literal('')),
+      amount: z.number().min(1, 'Payment amount must be greater than 0'),
+      paymentMethod: z.string().min(1, 'Payment method is required'),
+      installmentNumber: z.number().int().min(1).max(3).optional().default(1),
+      transactionReference: z.string().optional().or(z.literal('')).nullable(),
+      notes: z.string().optional().or(z.literal('')).nullable(),
       branchId: z.string().optional()
     });
 
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ success: false, message: parsed.error.message });
+      const issue = parsed.error.issues[0];
+      return res.status(400).json({ success: false, message: `${issue.path.join('.')}: ${issue.message}` });
     }
 
-    let { admissionId, receiptNumber, amount, paymentMethod, transactionReference, branchId } = parsed.data;
+    let { admissionId, receiptNumber, amount, paymentMethod, installmentNumber, transactionReference, notes, branchId } = parsed.data;
+
+    // Fetch admission to validate overpayment
+    const admission = await prisma.admission.findUnique({
+      where: { id: admissionId },
+      include: { payments: true, course: true, student: true }
+    });
+
+    if (!admission) {
+      return res.status(404).json({ success: false, message: 'Admission record not found' });
+    }
+
+    const finalFee = Number(admission.finalFee) || 0;
+    const existingTotalPaid = admission.payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const remainingAdmissionFee = Math.max(0, finalFee - existingTotalPaid);
+
+    if (amount > remainingAdmissionFee) {
+      return res.status(400).json({
+        success: false,
+        message: `Payment amount (₹${amount.toLocaleString()}) cannot exceed the remaining admission fee (₹${remainingAdmissionFee.toLocaleString()}).`
+      });
+    }
+
+    // Generate receiptNumber if missing
+    if (!receiptNumber || !receiptNumber.trim()) {
+      receiptNumber = `REC-${Date.now().toString(36).toUpperCase()}`;
+    }
 
     // Resolve branch ID if provided
-    let finalBranchId = branchId;
+    let finalBranchId = branchId || admission.branchId;
     if (finalBranchId) {
       const b = await prisma.branch.findFirst({
         where: { OR: [{ id: finalBranchId }, { code: finalBranchId.toLowerCase() }] }
       });
       if (b) finalBranchId = b.id;
-    }
-
-    if (!finalBranchId) {
-      const admission = await prisma.admission.findUnique({ where: { id: admissionId }, select: { branchId: true } });
-      if (admission) finalBranchId = admission.branchId;
     }
 
     if (!finalBranchId) {
@@ -95,18 +119,20 @@ router.post('/', authenticate, authorize(...PAYMENT_ROLES), async (req, res) => 
         admissionId,
         receiptNumber,
         amount,
-        paymentMethod,
+        paymentMethod: paymentMethod.toUpperCase(),
+        installmentNumber: installmentNumber || 1,
         transactionReference: transactionReference || null,
+        notes: notes || null,
         branchId: finalBranchId,
         createdById: req.user?.id || null
       },
       include: {
-        admission: { include: { student: true, course: true } },
+        admission: { include: { student: true, course: true, payments: true } },
         branch: true
       }
     });
 
-    res.status(201).json({ success: true, data: payment });
+    res.status(201).json({ success: true, data: payment, message: 'Payment recorded successfully' });
   } catch (err) {
     console.error('payments.create', err);
     res.status(500).json({ success: false, message: err.message });
