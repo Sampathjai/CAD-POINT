@@ -133,3 +133,4 @@ if (batchA.admissions.length === 0 && admission2.batchId === null) {
 }
 
 console.log('\n🎉 ALL BATCH ↔ ADMISSION SYNCHRONIZATION TESTS PASSED 100%!');
+

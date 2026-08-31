@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import { hasPermission, getDefaultPageForRole } from './permissions';
 import {
     LayoutDashboard,
+    Users,
     Users as UsersIcon,
     CalendarDays,
     BookOpen,
@@ -3805,11 +3806,24 @@ ${instituteName}`;
                         </button>
                         {page === 'Batches' && (
                             <button
-                                className="secondary"
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 600, background: '#f1f5f9', color: '#0f172a', borderColor: '#cbd5e1' }}
+                                type="button"
+                                className="primary"
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    fontWeight: 700,
+                                    background: '#2563eb',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    padding: '8px 16px',
+                                    borderRadius: 8,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 1px 3px 0 rgba(37, 99, 235, 0.3)'
+                                }}
                                 onClick={() => onOpenAssignBatchModal && onOpenAssignBatchModal()}
                             >
-                                <Users size={16} /> Assign Batch
+                                <Users size={17} /> Assign Batch
                             </button>
                         )}
                     </div>
