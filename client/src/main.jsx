@@ -634,11 +634,46 @@ function App() {
             if (!j.success) return alert(formatErrorMessage(j.message) || 'Create student failed');
             fetchAllData();
             setShowAddStudent(false);
-            setAddStudentForm({ studentCode: '', firstName: '', lastName: '', phone: '', email: '' });
+            const createdStudentCode = j.data?.studentCode || addStudentForm.studentCode;
+            setAddStudentForm({ studentCode: '', leadId: '', firstName: '', parentName: '', dateOfBirth: '', address: '', phone: '', email: '', passportNumber: '', photoUrl: '' });
+            if (window.confirm(`✓ Student created successfully (ID: ${createdStudentCode})!\n✓ Follow-up marked as Converted.\n\nWould you like to view the new student in the Students tab?`)) {
+                setPage('Students');
+                setFilterText(createdStudentCode);
+            }
         } catch (e) {
             console.error(e);
             alert('Create student failed');
         }
+    }
+
+    function openAdmitFromFollowup(f) {
+        const lead = f?.lead;
+        if (!lead) return alert('Lead information not available for this follow-up.');
+
+        // Check if a student already exists for this lead or phone number
+        const existingStudent = students.find(s => s.leadId === lead.id || (s.phone && lead.phone && s.phone === lead.phone));
+        if (existingStudent) {
+            if (window.confirm(`An existing student was found for this lead:\n\nStudent: ${existingStudent.firstName} (ID: ${existingStudent.studentCode})\nPhone: ${existingStudent.phone}\n\nWould you like to view this student in the Students tab?`)) {
+                setPage('Students');
+                setFilterText(existingStudent.studentCode);
+            }
+            return;
+        }
+
+        // Pre-fill Add Student form with lead information
+        setAddStudentForm({
+            studentCode: getNextCode('STU', students, 'studentCode'),
+            leadId: lead.id,
+            firstName: `${lead.firstName || ''} ${lead.lastName || ''}`.trim(),
+            parentName: '',
+            dateOfBirth: '',
+            address: lead.city || '',
+            phone: lead.phone || '',
+            email: lead.email || '',
+            passportNumber: '',
+            photoUrl: ''
+        });
+        setShowAddStudent(true);
     }
 
     async function deleteStudent(id, studentName) {
@@ -690,38 +725,6 @@ function App() {
             console.error(e);
             alert('Create admission failed');
         }
-    }
-
-    function openAdmitFromFollowup(f) {
-        const lead = f?.lead;
-        if (!lead) return alert('Lead information not available for this follow-up.');
-
-        const existingAdm = lead.admission || admissions.find(a => a.leadId === lead.id);
-        if (existingAdm) {
-            alert(`This lead is already converted to Admission #${existingAdm.admissionNumber}.`);
-            setExpandedAdmissionId(existingAdm.id);
-            return;
-        }
-
-        const matchedCourse = courses.find(c => (c.name || '').toLowerCase() === (lead.interestedCourse || '').toLowerCase());
-        const existingStudent = students.find(s => s.phone && lead.phone && s.phone === lead.phone);
-
-        setAddAdmissionForm({
-            admissionNumber: '',
-            leadId: lead.id,
-            studentId: existingStudent ? existingStudent.id : '',
-            studentName: `${lead.firstName || ''} ${lead.lastName || ''}`.trim(),
-            studentPhone: lead.phone || '',
-            studentEmail: lead.email || '',
-            studentAddress: lead.city || '',
-            courseId: matchedCourse ? matchedCourse.id : '',
-            batchId: '',
-            startDate: new Date().toISOString().slice(0, 10),
-            endDate: '',
-            agreedFee: matchedCourse ? matchedCourse.standardFee : '',
-            finalFee: matchedCourse ? matchedCourse.standardFee : ''
-        });
-        setShowAddAdmission(true);
     }
 
     async function deleteAdmission(id, admissionNumber) {
@@ -3325,13 +3328,19 @@ ${instituteName}`;
                                 .filter((f) => !lowerFilter || (f.notes || '' + f.type).toLowerCase().includes(lowerFilter))
                                 .map((f) => {
                                     const linkedAdmission = f.lead?.admission || safeAdmissions.find(a => a.leadId === f.leadId);
-                                    const isConverted = !!linkedAdmission || (f.lead?.status || '').toUpperCase() === 'CONVERTED' || (f.lead?.status || '').toUpperCase() === 'ADMISSION';
+                                    const linkedStudent = safeStudents.find(s => s.leadId === f.leadId || (s.phone && f.lead?.phone && s.phone === f.lead.phone));
+                                    const isConverted = !!linkedStudent || !!linkedAdmission || (f.lead?.status || '').toUpperCase() === 'CONVERTED' || (f.lead?.status || '').toUpperCase() === 'ADMISSION';
 
                                     return (
                                         <tr key={f.id}>
                                             <td>{formatDateTime(f.scheduledAt)}</td>
                                             <td>
                                                 <b>{f.lead ? `${f.lead.firstName} ${f.lead.lastName || ''}`.trim() : f.leadId}</b>
+                                                {linkedStudent && (
+                                                    <div style={{ fontSize: 11, color: '#0284c7', fontWeight: 600 }}>
+                                                        Student: #{linkedStudent.studentCode}
+                                                    </div>
+                                                )}
                                                 {linkedAdmission && (
                                                     <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>
                                                         Adm: #{linkedAdmission.admissionNumber}
@@ -3360,11 +3369,20 @@ ${instituteName}`;
                                                     {isConverted ? (
                                                         <button
                                                             className="secondary"
-                                                            style={{ padding: '4px 8px', fontSize: 11, color: '#16a34a', borderColor: '#86efac', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                            onClick={() => linkedAdmission && setExpandedAdmissionId(linkedAdmission.id)}
-                                                            title={linkedAdmission ? `View Admission #${linkedAdmission.admissionNumber}` : 'View Admission'}
+                                                            style={{ padding: '4px 8px', fontSize: 11, color: '#0284c7', borderColor: '#7dd3fc', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                            onClick={() => {
+                                                                const s = linkedStudent || safeStudents.find(st => st.phone && f.lead?.phone && st.phone === f.lead.phone);
+                                                                if (s) {
+                                                                    setPage('Students');
+                                                                    setFilterText(s.studentCode);
+                                                                } else if (linkedAdmission) {
+                                                                    setPage('Admissions');
+                                                                    setFilterText(linkedAdmission.admissionNumber);
+                                                                }
+                                                            }}
+                                                            title="View Student"
                                                         >
-                                                            <Eye size={12} /> {linkedAdmission ? `#${linkedAdmission.admissionNumber}` : 'View Admission'}
+                                                            <Eye size={12} /> {linkedStudent ? `Student: #${linkedStudent.studentCode}` : linkedAdmission ? `Adm: #${linkedAdmission.admissionNumber}` : 'View Student'}
                                                         </button>
                                                     ) : (
                                                         <>
@@ -3377,9 +3395,9 @@ ${instituteName}`;
                                                                 className="primary"
                                                                 style={{ padding: '4px 8px', fontSize: 11, background: '#16a34a', borderColor: '#16a34a', color: '#ffffff', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                                                                 onClick={() => openAdmitFromFollowup(f)}
-                                                                title="Convert lead to admission"
+                                                                title="Admit student from follow-up"
                                                             >
-                                                                <GraduationCap size={13} /> Convert & Admit
+                                                                <GraduationCap size={13} /> Admit
                                                             </button>
                                                         </>
                                                     )}

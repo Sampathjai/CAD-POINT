@@ -35,6 +35,7 @@ router.get('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =>
       take: limit ? Math.min(250, parseInt(limit, 10)) : 100,
       include: {
         branch: true,
+        lead: true,
         admissions: { include: { course: true, batch: true, payments: true, certificate: true } },
         certificates: true
       },
@@ -52,6 +53,7 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
   try {
     const schema = z.object({
       studentCode: z.string().optional().or(z.literal('')),
+      leadId: z.string().optional().or(z.literal('')).nullable(),
       firstName: z.string().min(1, 'Name with initial is required'),
       parentName: z.string().optional().or(z.literal('')).nullable(),
       dateOfBirth: z.string().optional().or(z.literal('')).nullable(),
@@ -70,7 +72,15 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
       return res.status(400).json({ success: false, message: `${issue.path.join('.')}: ${issue.message}` });
     }
 
-    let { studentCode, firstName, parentName, dateOfBirth, address, lastName, phone, email, passportNumber, photoUrl, branchId } = parsed.data;
+    let { studentCode, leadId, firstName, parentName, dateOfBirth, address, lastName, phone, email, passportNumber, photoUrl, branchId } = parsed.data;
+
+    // Check for duplicate student creation for the same lead
+    if (leadId) {
+      const existingLeadStudent = await prisma.student.findFirst({ where: { leadId } });
+      if (existingLeadStudent) {
+        return res.status(400).json({ success: false, message: `A student has already been created for this lead (Student ID: ${existingLeadStudent.studentCode}).` });
+      }
+    }
 
     if (!studentCode || !studentCode.trim()) {
       const count = await prisma.student.count();
@@ -93,6 +103,7 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
     const student = await prisma.student.create({
       data: {
         studentCode,
+        leadId: leadId || null,
         firstName,
         parentName: parentName || null,
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
@@ -105,9 +116,23 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
         branchId: finalBranchId
       },
       include: {
-        branch: true
+        branch: true,
+        lead: true
       }
     });
+
+    // Mark Lead as CONVERTED and complete all related followups
+    if (leadId) {
+      await prisma.lead.update({
+        where: { id: leadId },
+        data: { status: 'CONVERTED' }
+      }).catch(e => console.error('Error updating lead status to CONVERTED', e));
+
+      await prisma.followUp.updateMany({
+        where: { leadId, status: 'PENDING' },
+        data: { status: 'COMPLETED', completedAt: new Date(), outcome: `Converted to Student #${student.studentCode}` }
+      }).catch(e => console.error('Error completing followups on conversion', e));
+    }
 
     res.status(201).json({ success: true, data: student });
   } catch (err) {

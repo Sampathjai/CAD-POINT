@@ -51,3 +51,4 @@ if (
   console.error('   ❌ Field structure check failed');
   process.exit(1);
 }
+

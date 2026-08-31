@@ -180,6 +180,7 @@ model Lead {
   followUps            FollowUp[]
   statusHistory        LeadStatusHistory[]
   admission            Admission?
+  student              Student?
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
 
@@ -224,6 +225,8 @@ model LeadStatusHistory {
 model Student {
   id                    String        @id @default(uuid())
   studentCode           String        @unique
+  leadId                String?       @unique
+  lead                  Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
   firstName             String
   lastName              String?
   phone                 String
