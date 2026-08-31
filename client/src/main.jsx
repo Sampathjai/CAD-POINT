@@ -4938,7 +4938,7 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
                         <b style={{ fontSize: 16, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 8 }}>
                             <AlertCircle size={18} /> Monthly Outstanding Fee Breakdown
                         </b>
-                        <span style={{ fontSize: 12, color: '#64748b' }}>Students with pending fee balances for {selectedMonth === 'ALL' ? 'all months' : selectedMonth}</span>
+                        <span style={{ fontSize: 12, color: '#64748b' }}>Students with pending fee balances for the selected date range ({fromDate || 'Start'} to {toDate || 'Today'})</span>
                     </div>
                     <span className="badge" style={{ background: '#fee2e2', color: '#b91c1c', padding: '4px 10px', fontSize: 12, fontWeight: 700 }}>
                         Total Pending: ₹{totalFilteredPending.toLocaleString()}
