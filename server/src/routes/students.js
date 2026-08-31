@@ -100,7 +100,7 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
 router.put('/:id', authenticate, authorize(...ADMISSION_ROLES), async (req, res) => {
   try {
     const { id } = req.params;
-    const { firstName, lastName, phone, email, photoUrl, branchId } = req.body;
+    const { studentCode, firstName, lastName, phone, email, photoUrl, branchId } = req.body;
 
     let finalBranchId = branchId;
     if (finalBranchId) {
@@ -113,6 +113,7 @@ router.put('/:id', authenticate, authorize(...ADMISSION_ROLES), async (req, res)
     const updated = await prisma.student.update({
       where: { id },
       data: {
+        ...(studentCode ? { studentCode: studentCode.trim() } : {}),
         firstName,
         lastName: lastName || null,
         phone,

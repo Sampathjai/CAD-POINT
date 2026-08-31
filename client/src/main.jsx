@@ -232,6 +232,8 @@ function App() {
     const [editCourseForm, setEditCourseForm] = useState({ id: '', courseCode: '', name: '', description: '', standardFee: '', isActive: true });
     const [editingBatch, setEditingBatch] = useState(null);
     const [editBatchForm, setEditBatchForm] = useState({ id: '', batchCode: '', name: '', courseId: '', startDate: '', endDate: '', capacity: 25 });
+    const [editingStudent, setEditingStudent] = useState(null);
+    const [editStudentForm, setEditStudentForm] = useState({ id: '', studentCode: '', firstName: '', lastName: '', phone: '', email: '', photoUrl: '' });
 
     const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -653,6 +655,23 @@ function App() {
         }
     }
 
+    async function updateStudentSubmit() {
+        try {
+            const res = await fetch(API_BASE + '/students/' + editStudentForm.id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify(editStudentForm)
+            });
+            const j = await res.json();
+            if (!j.success) return alert(formatErrorMessage(j.message) || 'Update student failed');
+            fetchAllData();
+            setEditingStudent(null);
+        } catch (e) {
+            console.error(e);
+            alert('Update student failed');
+        }
+    }
+
     async function createAdmission() {
         try {
             const res = await fetch(API_BASE + '/admissions', {
@@ -801,6 +820,19 @@ function App() {
     function openEditBatch(b) {
         setEditingBatch(b);
         setEditBatchForm({ id: b.id, batchCode: b.batchCode, name: b.name, courseId: b.courseId, startDate: b.startDate ? b.startDate.slice(0, 10) : '', endDate: b.endDate ? b.endDate.slice(0, 10) : '', capacity: b.capacity });
+    }
+
+    function openEditStudent(s) {
+        setEditingStudent(s);
+        setEditStudentForm({
+            id: s.id,
+            studentCode: s.studentCode || '',
+            firstName: s.firstName || '',
+            lastName: s.lastName || '',
+            phone: s.phone || '',
+            email: s.email || '',
+            photoUrl: s.photoUrl || ''
+        });
     }
 
     function getNextCode(prefix, list, key) {
@@ -1094,6 +1126,7 @@ function App() {
                             onDeleteCourse={deleteCourse}
                             onEditBatch={openEditBatch}
                             onDeleteBatch={deleteBatch}
+                            onEditStudent={openEditStudent}
                             onDeleteStudent={deleteStudent}
                             onDeleteAdmission={deleteAdmission}
                             onOpenEditProgress={openEditProgress}
@@ -1641,6 +1674,76 @@ function App() {
                         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                             <button className="primary" type="submit">Create Student</button>
                             <button type="button" onClick={() => setShowAddStudent(false)}>Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {editingStudent && (
+                <div className="modal">
+                    <form
+                        className="panel"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            updateStudentSubmit();
+                        }}
+                    >
+                        <h3>Edit Student</h3>
+                        <label>
+                            ID
+                            <input value={editStudentForm.studentCode} onChange={(e) => setEditStudentForm({ ...editStudentForm, studentCode: e.target.value })} placeholder="STU-1001" required />
+                        </label>
+                        <label>
+                            First Name
+                            <input value={editStudentForm.firstName} onChange={(e) => setEditStudentForm({ ...editStudentForm, firstName: e.target.value })} required />
+                        </label>
+                        <label>
+                            Address
+                            <input value={editStudentForm.lastName} onChange={(e) => setEditStudentForm({ ...editStudentForm, lastName: e.target.value })} placeholder="Address" />
+                        </label>
+                        <label>
+                            Phone
+                            <input value={editStudentForm.phone} onChange={(e) => setEditStudentForm({ ...editStudentForm, phone: e.target.value })} required />
+                        </label>
+                        <label>
+                            Email
+                            <input type="email" value={editStudentForm.email} onChange={(e) => setEditStudentForm({ ...editStudentForm, email: e.target.value })} />
+                        </label>
+                        <label>
+                            Student Photo <span style={{ fontSize: 11, color: '#64748b', fontWeight: 400 }}>(Photo image only: JPG, PNG, WebP)</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
+                                {editStudentForm.photoUrl ? (
+                                    <img src={editStudentForm.photoUrl} alt="Student Preview" style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: '2px solid #3b82f6' }} />
+                                ) : (
+                                    <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#e2e8f0', display: 'grid', placeItems: 'center', color: '#64748b', fontSize: 18, fontWeight: 700 }}>
+                                        📷
+                                    </div>
+                                )}
+                                <input
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onload = (evt) => {
+                                                setEditStudentForm(prev => ({ ...prev, photoUrl: evt.target.result }));
+                                            };
+                                            reader.readAsDataURL(file);
+                                        }
+                                    }}
+                                    style={{ fontSize: 12, flex: 1 }}
+                                />
+                                {editStudentForm.photoUrl && (
+                                    <button type="button" className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => setEditStudentForm(prev => ({ ...prev, photoUrl: '' }))}>
+                                        Remove Photo
+                                    </button>
+                                )}
+                            </div>
+                        </label>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                            <button className="primary" type="submit">Save Changes</button>
+                            <button type="button" onClick={() => setEditingStudent(null)}>Cancel</button>
                         </div>
                     </form>
                 </div>
@@ -2567,7 +2670,7 @@ function Dashboard({ user, token, leads = [], followups = [], admissions = [], p
     );
 }
 
-function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onDeleteStudent, onDeleteAdmission, onOpenEditProgress, currentUserId, userRole, user, token, theme, toggleTheme, refreshData }) {
+function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onCompleteFollowup, onOpenWhatsApp, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onEditStudent, onDeleteStudent, onDeleteAdmission, onOpenEditProgress, currentUserId, userRole, user, token, theme, toggleTheme, refreshData }) {
     const itemSingular = page === 'Batches' ? 'Batch' : (page.endsWith('es') ? page.slice(0, -2) : (page.endsWith('s') ? page.slice(0, -1) : page));
     const [filterText, setFilterText] = useState('');
     const [paymentFromDate, setPaymentFromDate] = useState('');
@@ -3113,9 +3216,20 @@ ${instituteName}`;
                                             <td>{s.email || '-'}</td>
                                             <td>{formatDate(s.createdAt)}</td>
                                             <td>
-                                                <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => onDeleteStudent(s.id, `${s.firstName} ${s.lastName || ''}`.trim())}>
-                                                    <Trash2 size={13} /> Delete
-                                                </button>
+                                                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                                    <button
+                                                        type="button"
+                                                        className="secondary"
+                                                        style={{ padding: '4px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                        onClick={() => onEditStudent && onEditStudent(s)}
+                                                        title="Edit Student"
+                                                    >
+                                                        <Edit size={13} /> Edit
+                                                    </button>
+                                                    <button className="secondary" style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => onDeleteStudent(s.id, `${s.firstName} ${s.lastName || ''}`.trim())}>
+                                                        <Trash2 size={13} /> Delete
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                 ))}
