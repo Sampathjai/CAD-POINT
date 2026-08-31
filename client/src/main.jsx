@@ -3583,7 +3583,7 @@ function SettingsView({ token, theme, toggleTheme, sourcesList = [], refreshSour
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
                             {(branches && branches.length > 0 ? branches : [
                                 { id: 'gandhipuram', name: 'Gandhipuram', code: 'gandhipuram' },
-                                { id: 'saravanampatti', name: 'Saravanampatti', code: 'saravanampatti' }
+                                { id: 'saravanapatti', name: 'Saravanapatti', code: 'saravanapatti' }
                             ]).map((b) => {
                                 const bWa = waConfig?.branches?.find(wb => wb.branchId === b.id)?.integration || b.whatsAppIntegration;
                                 const isConnected = Boolean(bWa && bWa.status === 'CONNECTED');

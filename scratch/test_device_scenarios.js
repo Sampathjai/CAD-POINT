@@ -6,17 +6,17 @@ async function testDeviceLimits() {
 
   // 1. Resolve Gandhipuram and Saravanampatti branches
   let gandhipuram = await prisma.branch.findFirst({ where: { code: 'gandhipuram' } });
-  let saravanampatti = await prisma.branch.findFirst({ where: { code: 'saravanampatti' } });
+  let saravanapatti = await prisma.branch.findFirst({ where: { code: 'saravanapatti' } });
 
   if (!gandhipuram) {
     gandhipuram = await prisma.branch.create({ data: { name: 'Gandhipuram', code: 'gandhipuram' } });
   }
-  if (!saravanampatti) {
-    saravanampatti = await prisma.branch.create({ data: { name: 'Saravanampatti', code: 'saravanampatti' } });
+  if (!saravanapatti) {
+    saravanapatti = await prisma.branch.create({ data: { name: 'Saravanapatti', code: 'saravanapatti' } });
   }
 
   console.log(`Branch 1: ${gandhipuram.name} (${gandhipuram.id})`);
-  console.log(`Branch 2: ${saravanampatti.name} (${saravanampatti.id})`);
+  console.log(`Branch 2: ${saravanapatti.name} (${saravanapatti.id})`);
 
   // Clean up test devices
   await prisma.device.deleteMany({
@@ -61,24 +61,24 @@ async function testDeviceLimits() {
     console.log(`✅ 10-Device Limit rule triggered: Registration for 11th device blocked on ${gandhipuram.name}!`);
   }
 
-  // Test 3: Verify Saravanampatti branch is independent (can still register devices even if Gandhipuram is at 10)
-  console.log('\nTest 3: Verifying Saravanampatti independent device registration...');
+  // Test 3: Verify Saravanapatti branch is independent (can still register devices even if Gandhipuram is at 10)
+  console.log('\nTest 3: Verifying Saravanapatti independent device registration...');
   const devS1 = await prisma.device.create({
     data: {
       deviceId: 'test-device-s-1',
-      deviceName: 'Saravanampatti Primary PC',
+      deviceName: 'Saravanapatti Primary PC',
       deviceType: 'DESKTOP',
       deviceRole: 'PRIMARY',
-      branchId: saravanampatti.id,
+      branchId: saravanapatti.id,
       status: 'ACTIVE'
     }
   });
-  console.log(`✅ Registered Independent Primary Device for ${saravanampatti.name}: ${devS1.deviceName}`);
+  console.log(`✅ Registered Independent Primary Device for ${saravanapatti.name}: ${devS1.deviceName}`);
 
   const countS = await prisma.device.count({
-    where: { branchId: saravanampatti.id, status: 'ACTIVE' }
+    where: { branchId: saravanapatti.id, status: 'ACTIVE' }
   });
-  console.log(`✅ ${saravanampatti.name} Active Device Count: ${countS} / 10`);
+  console.log(`✅ ${saravanapatti.name} Active Device Count: ${countS} / 10`);
 
   // Clean up test devices
   await prisma.device.deleteMany({
@@ -93,3 +93,4 @@ testDeviceLimits().catch(e => {
   console.error(e);
   process.exit(1);
 });
+
