@@ -43,7 +43,6 @@ export const ROLE_PERMISSIONS = {
     'followups',
     'courses',
     'batches',
-    'admissions',
     'settings',
     'settings.profile',
     'settings.appearance'

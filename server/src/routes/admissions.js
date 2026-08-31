@@ -4,8 +4,8 @@ const prisma = require('../config/prisma');
 const { authenticate, authorize } = require('../middleware/auth');
 const { z } = require('zod');
 
-// Student Admissions Module Roles: SUPER_ADMIN, ADMIN, COUNSELLOR
-const ADMISSION_ROLES = ['SUPER_ADMIN', 'ADMIN', 'COUNSELLOR'];
+// Student Admissions Module Roles: SUPER_ADMIN, ADMIN
+const ADMISSION_ROLES = ['SUPER_ADMIN', 'ADMIN'];
 
 // GET /api/admissions
 router.get('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) => {
@@ -188,7 +188,7 @@ router.post('/', authenticate, authorize(...ADMISSION_ROLES), async (req, res) =
 });
 
 // PATCH /api/admissions/:id/installments - Configure custom installment plan
-router.patch('/:id/installments', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'COUNSELLOR', 'ACCOUNTS', 'ACCOUNTANT'), async (req, res) => {
+router.patch('/:id/installments', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'ACCOUNTS', 'ACCOUNTANT'), async (req, res) => {
   try {
     const { id } = req.params;
     const { installmentPlan } = req.body;
@@ -248,8 +248,8 @@ router.patch('/:id/installments', authenticate, authorize('SUPER_ADMIN', 'ADMIN'
   }
 });
 
-// PATCH /api/admissions/:id/progress - Update progress & certificate info (Trainers, Counsellors, Admins)
-router.patch('/:id/progress', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'COUNSELLOR', 'TRAINER'), async (req, res) => {
+// PATCH /api/admissions/:id/progress - Update progress & certificate info (Trainers, Admins)
+router.patch('/:id/progress', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'TRAINER'), async (req, res) => {
   try {
     const { id } = req.params;
     const { startDate, endDate, completionPct, certificateStatus, issueDate } = req.body;
