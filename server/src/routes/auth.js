@@ -12,67 +12,61 @@ const loginSchema = z.object({
 
 router.post('/login', async (req, res) => {
   const tStart = Date.now();
-  console.log(`[PERF BACKEND] 🚀 Login request received at ${new Date().toISOString()}`);
+  console.log(`[LOGIN] 🚀 Request received at ${new Date().toISOString()}`);
 
   try {
-    const tZodStart = Date.now();
     const data = loginSchema.parse(req.body);
-    const tZodEnd = Date.now();
+    console.log(`[LOGIN] 🔍 User lookup started for: ${data.email}`);
 
     const tDbStart = Date.now();
-    // Select ONLY fields required for authentication
     const user = await prisma.user.findUnique({
       where: { email: data.email },
       select: { id: true, name: true, email: true, role: true, isActive: true, passwordHash: true }
     });
     const tDbEnd = Date.now();
+    console.log(`[LOGIN] 👤 User lookup completed in ${tDbEnd - tDbStart}ms`);
 
     if (!user) {
-      console.log(`[PERF BACKEND] ❌ User not found (${tDbEnd - tDbStart}ms)`);
+      console.log(`[LOGIN ERROR] ❌ User not found`);
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
     if (!user.isActive) {
-      console.log(`[PERF BACKEND] ❌ User inactive`);
-      return res.status(403).json({ success: false, message: 'User is inactive' });
+      console.log(`[LOGIN ERROR] ❌ User inactive`);
+      return res.status(403).json({ success: false, message: 'User account is inactive' });
     }
 
+    console.log(`[LOGIN] 🔐 Password verification started`);
     const tBcryptStart = Date.now();
     const ok = await bcrypt.compare(data.password, user.passwordHash);
     const tBcryptEnd = Date.now();
+    console.log(`[LOGIN] 🔐 Password verification completed in ${tBcryptEnd - tBcryptStart}ms`);
 
     if (!ok) {
-      console.log(`[PERF BACKEND] ❌ Password mismatch (${tBcryptEnd - tBcryptStart}ms)`);
+      console.log(`[LOGIN ERROR] ❌ Password mismatch`);
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    const tJwtStart = Date.now();
     const secret = process.env.JWT_SECRET || 'cadpoint_super_secret_jwt_key_2026_coimbatore';
     const token = jwt.sign(
       { id: user.id, role: user.role, email: user.email, name: user.name },
       secret,
       { expiresIn: '8h' }
     );
-    const tJwtEnd = Date.now();
 
     const safeUser = { id: user.id, name: user.name, email: user.email, role: user.role, isActive: user.isActive };
     const tTotal = Date.now() - tStart;
-
-    console.log(`[PERF BACKEND] ✅ LOGIN SUCCESS TIMINGS:
-- Zod Validation: ${tZodEnd - tZodStart}ms
-- Prisma DB Query: ${tDbEnd - tDbStart}ms
-- Bcrypt Compare: ${tBcryptEnd - tBcryptStart}ms
-- JWT Signing: ${tJwtEnd - tJwtStart}ms
-- TOTAL BACKEND TIME: ${tTotal}ms`);
+    console.log(`[LOGIN SUCCESS] ✅ Authenticated user ${user.id} (${user.role}) in ${tTotal}ms`);
 
     res.json({ success: true, data: { token, user: safeUser }, _perf: { totalMs: tTotal, dbMs: tDbEnd - tDbStart, bcryptMs: tBcryptEnd - tBcryptStart } });
   } catch (err) {
     if (err.name === 'ZodError') {
       const msg = err.errors.map((e) => e.message || 'Invalid input').join(', ');
+      console.log(`[LOGIN ERROR] ⚠️ Input validation failed: ${msg}`);
       return res.status(400).json({ success: false, message: msg || 'Please enter valid email and password' });
     }
-    console.error('Login error', err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('[LOGIN ERROR] 💥 Unhandled authentication error:', err);
+    res.status(500).json({ success: false, message: 'Server error during authentication' });
   }
 });
 

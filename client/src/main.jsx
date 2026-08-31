@@ -224,6 +224,7 @@ function App() {
     const [token, setToken] = useState(() => localStorage.getItem('cadpoint_token') || '');
     const [user, setUser] = useState(null);
     const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+    const [isLoggingIn, setIsLoggingIn] = useState(false);
     const [theme, setTheme] = useState(() => localStorage.getItem('cadpoint_theme') || 'light');
 
     useEffect(() => {
@@ -401,6 +402,8 @@ function App() {
     }
 
     async function doLogin() {
+        if (isLoggingIn) return;
+
         const cleanEmail = (loginForm.email || '').trim();
         const cleanPassword = (loginForm.password || '').trim();
 
@@ -411,41 +414,24 @@ function App() {
             return alert('Please enter your password');
         }
 
+        setIsLoggingIn(true);
         const tStart = performance.now();
-        console.log('[PERF FRONTEND] 🚀 Login request sent to API...');
+        console.log('[LOGIN FRONTEND] 🚀 Submitting credentials to:', API_BASE + '/auth/login');
 
-        const payload = { email: cleanEmail, password: cleanPassword };
-
-        async function attemptFetch(url) {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout for cold start
-            try {
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-                return res;
-            } catch (e) {
-                clearTimeout(timeoutId);
-                throw e;
-            }
-        }
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s single timeout
 
         try {
-            let res;
-            try {
-                res = await attemptFetch(API_BASE + '/auth/login');
-            } catch (fetchErr) {
-                console.warn('Initial login fetch failed, retrying once...', fetchErr);
-                // Retry once in case of serverless cold-start or temporary network glitch
-                res = await attemptFetch(API_BASE + '/auth/login');
-            }
+            const res = await fetch(API_BASE + '/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: cleanEmail, password: cleanPassword }),
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
 
             const tHttp = performance.now();
-            console.log(`[PERF FRONTEND] HTTP response received in ${(tHttp - tStart).toFixed(1)}ms (Status: ${res.status})`);
+            console.log(`[LOGIN FRONTEND] Response received in ${(tHttp - tStart).toFixed(1)}ms (HTTP ${res.status})`);
 
             const contentType = res.headers.get('content-type') || '';
             let j = null;
@@ -455,13 +441,15 @@ function App() {
             } else {
                 const rawText = await res.text();
                 console.error(`Non-JSON server response (HTTP ${res.status}):`, rawText);
+                setIsLoggingIn(false);
                 if (res.status === 504 || res.status === 502 || res.status === 503) {
-                    return alert(`Server is waking up (HTTP ${res.status}). Please click Sign In again.`);
+                    return alert(`Server is initializing (HTTP ${res.status}). Please try again in a few seconds.`);
                 }
-                return alert(`Server error (HTTP ${res.status}). Please try logging in again.`);
+                return alert(`Server error (HTTP ${res.status}). Please try again.`);
             }
 
             if (!res.ok || !j.success) {
+                setIsLoggingIn(false);
                 return alert(formatErrorMessage(j.message) || 'Invalid email or password. Please try again.');
             }
 
@@ -470,14 +458,17 @@ function App() {
             setToken(j.data.token);
             const defaultPage = getDefaultPageForRole(j.data.user?.role);
             setPage(defaultPage);
+            setIsLoggingIn(false);
 
-            console.log(`[PERF FRONTEND] ✅ Dashboard redirected in ${(performance.now() - tStart).toFixed(1)}ms (Server handling: ${j._perf?.totalMs || 'N/A'}ms)`);
+            console.log(`[LOGIN FRONTEND] ✅ Authenticated & redirected to ${defaultPage}`);
         } catch (err) {
+            clearTimeout(timeoutId);
+            setIsLoggingIn(false);
             console.error('Login error', err);
             if (err.name === 'AbortError') {
-                alert('Login request timed out while connecting to the server. Please try again.');
+                alert('Login request timed out while connecting to the server. Please check your network or try again.');
             } else {
-                alert(`Unable to connect to login server (${err.message || 'Network error'}). Please verify your connection and try again.`);
+                alert(`Unable to connect to login server (${err.message || 'Network error'}). Please try again.`);
             }
         }
     }
@@ -1103,8 +1094,13 @@ function App() {
                             Password
                             <input type="password" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} placeholder="••••••••" required />
                         </label>
-                        <button className="primary wide" type="submit">
-                            Sign in
+                        <button
+                            className="primary wide"
+                            type="submit"
+                            disabled={isLoggingIn}
+                            style={{ opacity: isLoggingIn ? 0.7 : 1, cursor: isLoggingIn ? 'wait' : 'pointer' }}
+                        >
+                            {isLoggingIn ? 'Signing in...' : 'Sign in'}
                         </button>
                     </form>
                 </div>
