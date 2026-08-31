@@ -41,7 +41,10 @@ router.post('/', authenticate, authorize(...BATCH_ROLES), async (req, res) => {
       certificateStatus: z.string().optional()
     });
     const parsed = schema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ success: false, message: parsed.error.message });
+    if (!parsed.success) {
+      const msg = parsed.error.errors ? parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ') : parsed.error.message;
+      return res.status(400).json({ success: false, message: msg || 'Invalid batch data provided' });
+    }
     const { batchCode, name, courseId, trainerId, startDate, endDate, capacity, progress, syllabusProgress, certificateStatus } = parsed.data;
 
     const created = await prisma.batch.create({
