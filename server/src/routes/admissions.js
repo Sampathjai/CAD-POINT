@@ -278,20 +278,19 @@ router.patch('/:id/progress', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'C
       }
     });
 
+    const targetCertStatus = certificateStatus || (validPct === 100 ? 'COMPLETED' : validPct > 0 ? 'IN_PROGRESS' : 'NOT_STARTED');
+
     const certificate = await prisma.certificate.upsert({
       where: { admissionId: id },
       create: {
         admissionId: id,
         studentId: admission.studentId,
-        courseId: admission.courseId,
         certificateNumber: `CERT-${Date.now().toString(36).toUpperCase()}`,
-        completionPct: validPct,
-        status: certificateStatus || (validPct === 100 ? 'COMPLETED' : validPct > 0 ? 'IN_PROGRESS' : 'NOT_STARTED'),
+        status: targetCertStatus,
         issueDate: issueDate ? new Date(issueDate) : null
       },
       update: {
-        completionPct: validPct,
-        status: certificateStatus || (validPct === 100 ? 'COMPLETED' : validPct > 0 ? 'IN_PROGRESS' : 'NOT_STARTED'),
+        status: targetCertStatus,
         issueDate: issueDate ? new Date(issueDate) : null
       }
     });
