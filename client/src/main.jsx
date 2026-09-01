@@ -4367,9 +4367,12 @@ ${instituteName}`;
 
                                     return (
                                         <React.Fragment key={b.id}>
-                                            <tr style={{ background: isExpanded ? 'rgba(59, 130, 246, 0.05)' : 'transparent' }}>
+                                            <tr 
+                                                style={{ cursor: 'pointer', background: isExpanded ? 'rgba(59, 130, 246, 0.05)' : 'transparent' }}
+                                                onClick={() => setExpandedBatchId(isExpanded ? null : b.id)}
+                                            >
                                                 <td><b>{b.batchCode}</b></td>
-                                                <td>{b.name}</td>
+                                                <td><b>{b.name}</b></td>
                                                 <td>{b.course?.name || '-'}</td>
                                                 <td><b>{b.trainer?.name || '-'}</b></td>
                                                 <td>
@@ -4394,13 +4397,16 @@ ${instituteName}`;
                                                     <span style={{ fontSize: 12, fontWeight: 600 }}>{assignedCount} / {capacity}</span>
                                                     <span style={{ fontSize: 11, color: available > 0 ? '#16a34a' : '#dc2626', marginLeft: 4 }}>({available} left)</span>
                                                 </td>
-                                                <td>
+                                                <td onClick={(e) => e.stopPropagation()}>
                                                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                                                         <button
                                                             type="button"
                                                             className="secondary"
                                                             style={{ padding: '4px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                            onClick={() => setExpandedBatchId(isExpanded ? null : b.id)}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setExpandedBatchId(isExpanded ? null : b.id);
+                                                            }}
                                                             title="Toggle Batch Details & Assigned Students"
                                                         >
                                                             <Eye size={13} /> {isExpanded ? 'Hide' : 'View'}
@@ -4409,7 +4415,10 @@ ${instituteName}`;
                                                             type="button"
                                                             className="secondary"
                                                             style={{ padding: '4px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                            onClick={() => onEditBatch(b)}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onEditBatch(b);
+                                                            }}
                                                             title="Edit Batch Details"
                                                         >
                                                             <Edit size={13} /> Edit
@@ -4418,7 +4427,10 @@ ${instituteName}`;
                                                             type="button"
                                                             className="secondary"
                                                             style={{ padding: '4px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                            onClick={() => onDeleteBatch(b.id, b.name)}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onDeleteBatch(b.id, b.name);
+                                                            }}
                                                             title="Delete Batch"
                                                         >
                                                             <Trash2 size={13} /> Delete
