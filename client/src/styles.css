@@ -3374,3 +3374,178 @@ button, select, input[type="text"], input[type="email"], input[type="tel"], inpu
     from { transform: translateY(100%); }
     to { transform: translateY(0); }
 }
+
+/* --- GLOBAL LOADING & SKELETON SYSTEM --- */
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+@keyframes cpPulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
+    70% { transform: scale(1.05); box-shadow: 0 0 0 16px rgba(37, 99, 235, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+
+@keyframes dotBounce {
+    0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+    40% { transform: scale(1); opacity: 1; }
+}
+
+.global-loader-wrap {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #0f172a;
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    padding: 24px;
+    box-sizing: border-box;
+    font-family: inherit;
+    animation: fadeIn 0.25s ease-out;
+}
+
+.global-loader-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    max-width: 360px;
+}
+
+.global-loader-logo {
+    width: 72px;
+    height: 72px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    color: #ffffff;
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 12px 32px rgba(37, 99, 235, 0.4);
+    animation: cpPulse 2s infinite ease-in-out;
+    margin-bottom: 20px;
+}
+
+.global-loader-brand {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    color: #ffffff;
+    margin-bottom: 4px;
+}
+
+.global-loader-sub {
+    font-size: 13px;
+    color: #94a3b8;
+    font-weight: 500;
+    margin-bottom: 24px;
+}
+
+.global-loader-dots {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.global-loader-dots span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #3b82f6;
+    display: inline-block;
+    animation: dotBounce 1.4s infinite ease-in-out both;
+}
+
+.global-loader-dots span:nth-child(1) { animation-delay: -0.32s; }
+.global-loader-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+/* Skeleton Loaders */
+.skeleton-box {
+    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 37%, #f1f5f9 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+    border-radius: 8px;
+}
+
+[data-theme="dark"] .skeleton-box {
+    background: linear-gradient(90deg, #1e293b 25%, #334155 37%, #1e293b 63%);
+    background-size: 400% 100%;
+}
+
+.skeleton-card {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 16px;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="dark"] .skeleton-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+/* CRM Error & Empty States */
+.crm-state-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+    background: #ffffff;
+    border-radius: 16px;
+    border: 1px dashed #cbd5e1;
+    margin: 16px 0;
+}
+
+[data-theme="dark"] .crm-state-wrap {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.crm-state-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+}
+
+.crm-state-icon.error { background: #fee2e2; color: #dc2626; }
+.crm-state-icon.empty { background: #e0f2fe; color: #0284c7; }
+
+.crm-state-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 6px;
+}
+
+[data-theme="dark"] .crm-state-title { color: #f8fafc; }
+
+.crm-state-desc {
+    font-size: 13px;
+    color: #64748b;
+    max-width: 320px;
+    margin-bottom: 16px;
+}
+
+[data-theme="dark"] .crm-state-desc { color: #94a3b8; }

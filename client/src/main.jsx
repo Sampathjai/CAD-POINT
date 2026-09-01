@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useCallback, Component } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as XLSX from 'xlsx';
+import { GlobalLoader } from './components/GlobalLoader';
+import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
+import { CardSkeleton, TableSkeleton, DashboardSkeleton } from './components/SkeletonLoader';
+import { CRMStateView } from './components/CRMStateView';
 import { hasPermission, getDefaultPageForRole } from './permissions';
 import {
     LayoutDashboard,
@@ -334,8 +338,11 @@ function App() {
         reader.readAsDataURL(file);
     }
 
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
+
     useEffect(() => {
-        if (!token || user) return;
+        if (!token) return;
+        if (user) return;
         fetch(API_BASE + '/auth/me', { headers: { Authorization: 'Bearer ' + token } })
             .then((r) => r.json())
             .then((j) => {
@@ -347,7 +354,10 @@ function App() {
 
     // High Performance Parallel Data Fetching
     const fetchAllData = useCallback(async () => {
-        if (!token) return;
+        if (!token) {
+            setIsInitialLoading(false);
+            return;
+        }
         const deviceInfo = getOrGenerateDeviceId();
         const headers = {
             Authorization: 'Bearer ' + token,
@@ -381,6 +391,8 @@ function App() {
             if (sourcesR.status === 'fulfilled' && sourcesR.value.success) setSourcesList(sourcesR.value.data || []);
         } catch (e) {
             console.error('fetchAllData error', e);
+        } finally {
+            setIsInitialLoading(false);
         }
     }, [token, activeBranch]);
 
@@ -1129,6 +1141,14 @@ function App() {
                 </div>
             </div>
         );
+
+    if (token && !user) {
+        return <GlobalLoader message="Restoring session..." subtext="Verifying credentials & workspace..." />;
+    }
+
+    if (isInitialLoading) {
+        return <GlobalLoader message="Loading CADPOINT CRM..." subtext="Loading records, branches & workspace..." />;
+    }
 
     const allNavItems = [
         ['Dashboard', LayoutDashboard],
@@ -7270,8 +7290,8 @@ function SettingsView({ userRole, user, token, theme, toggleTheme, sourcesList =
 const rootElement = document.getElementById('root');
 if (rootElement) {
     createRoot(rootElement).render(
-        <ErrorBoundary>
+        <GlobalErrorBoundary>
             <App />
-        </ErrorBoundary>
+        </GlobalErrorBoundary>
     );
 }
