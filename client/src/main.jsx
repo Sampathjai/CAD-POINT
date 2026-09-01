@@ -1560,6 +1560,8 @@ function App() {
                             onDeletePayment={deletePayment}
                             onPreviewPhoto={(url) => setPreviewPhotoUrl(url)}
                             onOpenEditProgress={openEditProgress}
+                            setPage={setPage}
+                            setFilterText={setFilterText}
                             currentUserId={user?.id}
                             userRole={user?.role}
                             user={user}
@@ -3839,7 +3841,7 @@ function Dashboard({ user, token, leads = [], followups = [], admissions = [], p
     );
 }
 
-function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onOpenAssignBatchModal, onUnassignStudentFromBatch, onCompleteFollowup, onOpenWhatsApp, onAdmitFromFollowup, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onEditStudent, onDeleteStudent, onDeleteAdmission, onEditPayment, onDeletePayment, onPreviewPhoto, onOpenEditProgress, currentUserId, userRole, user, token, theme, toggleTheme, refreshData }) {
+function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onOpenAssignBatchModal, onUnassignStudentFromBatch, onCompleteFollowup, onOpenWhatsApp, onAdmitFromFollowup, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onEditStudent, onDeleteStudent, onDeleteAdmission, onEditPayment, onDeletePayment, onPreviewPhoto, onOpenEditProgress, setPage, setFilterText: setParentFilterText, currentUserId, userRole, user, token, theme, toggleTheme, refreshData }) {
     const itemSingular = page === 'Batches' ? 'Batch' : (page.endsWith('es') ? page.slice(0, -2) : (page.endsWith('s') ? page.slice(0, -1) : page));
     const [filterText, setFilterText] = useState('');
     const [paymentFromDate, setPaymentFromDate] = useState('');
@@ -4571,7 +4573,7 @@ ${instituteName}`;
                                                                                                         onClick={(e) => {
                                                                                                             e.preventDefault();
                                                                                                             e.stopPropagation();
-                                                                                                            openEditProgress(fullAdm);
+                                                                                                            onOpenEditProgress && onOpenEditProgress(fullAdm);
                                                                                                         }}
                                                                                                         title="Update Student Course Completion % & Mode"
                                                                                                     >
@@ -4584,8 +4586,8 @@ ${instituteName}`;
                                                                                                         onClick={(e) => {
                                                                                                             e.preventDefault();
                                                                                                             e.stopPropagation();
-                                                                                                            setPage('Students');
-                                                                                                            setFilterText(adm.student?.studentCode || adm.student?.firstName || '');
+                                                                                                            if (setPage) setPage('Students');
+                                                                                                            if (setParentFilterText) setParentFilterText(adm.student?.studentCode || adm.student?.firstName || '');
                                                                                                         }}
                                                                                                         title="View Student Profile"
                                                                                                     >
@@ -4600,6 +4602,7 @@ ${instituteName}`;
                                                                                                             e.stopPropagation();
                                                                                                             onUnassignStudentFromBatch && onUnassignStudentFromBatch(b.id, adm.studentId, adm.student?.firstName || 'Student');
                                                                                                         }}
+                                                                                                        title="Remove Student from Batch"
                                                                                                     >
                                                                                                         Remove
                                                                                                     </button>
