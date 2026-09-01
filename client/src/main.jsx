@@ -8135,7 +8135,9 @@ function SettingsView({ userRole, user, token, theme, toggleTheme, sourcesList =
                     </div>
 
                     {/* Dynamic WhatsApp Templates Manager Card */}
-                    <WhatsAppTemplatesManager token={token} userRole={safeUserRole} />
+                    <GlobalErrorBoundary>
+                        <WhatsAppTemplatesManager token={token} userRole={safeUserRole} />
+                    </GlobalErrorBoundary>
                 </div>
             )}
 
