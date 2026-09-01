@@ -1466,14 +1466,17 @@ td {
     margin-top: 14px;
 }
 
-@media (max-width: 767px) {
+@media (max-width: 1023px) {
     aside {
         display: none !important;
         width: 0 !important;
         min-width: 0 !important;
+        max-width: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
         border: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
     }
     .app {
         display: block !important;

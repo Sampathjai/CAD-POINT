@@ -3,31 +3,33 @@ import { useState, useEffect } from 'react';
 /**
  * Custom hook to detect window dimensions and viewport device type.
  * Breakpoints:
- * - Mobile: <= 767px
- * - Tablet: 768px - 1023px
- * - Desktop: >= 1024px
+ * - Mobile / Touch Device: < 1024px or Mobile UserAgent (Renders MobileLayout, NO sidebar)
+ * - Desktop: >= 1024px and Non-Mobile UserAgent (Renders Existing DesktopLayout with sidebar)
  */
 export function useResponsive() {
   const [windowWidth, setWindowWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1200));
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
 
   useEffect(() => {
-    function handleResize() {
-      setWindowWidth(window.innerWidth);
+    function checkResponsive() {
+      const width = typeof window !== 'undefined' ? window.innerWidth : 1200;
+      setWindowWidth(width);
+      const isTouchOrMobile = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      setIsMobileDevice(isTouchOrMobile);
     }
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    checkResponsive();
+    window.addEventListener('resize', checkResponsive);
+    return () => window.removeEventListener('resize', checkResponsive);
   }, []);
 
-  const isMobile = windowWidth <= 767;
-  const isTablet = windowWidth >= 768 && windowWidth <= 1023;
-  const isDesktop = windowWidth >= 1024;
+  const isMobile = windowWidth < 1024 || isMobileDevice;
+  const isDesktop = windowWidth >= 1024 && !isMobileDevice;
 
   return {
     windowWidth,
     isMobile,
-    isTablet,
     isDesktop,
-    screenType: isMobile ? 'mobile' : isTablet ? 'tablet' : 'desktop'
+    screenType: isMobile ? 'mobile' : 'desktop'
   };
 }
