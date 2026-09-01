@@ -42,36 +42,40 @@ export function MobileFollowupsView({
 
   return (
     <div className="mobile-followups-view">
-      {/* Top Header & Schedule Button */}
-      <div className="mobile-view-header">
+      {/* Top Header & Compact Schedule Action Button */}
+      <div className="mobile-view-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h2>Follow-ups</h2>
-          <span>Schedule & track lead conversations</span>
+          <h2 style={{ margin: 0 }}>Follow-ups</h2>
+          <span style={{ fontSize: 12, color: '#64748b' }}>Schedule & track lead conversations</span>
         </div>
-        <button className="mobile-btn-primary" onClick={() => onOpenAddModal('Follow-ups')}>
-          <Plus size={16} /> Schedule
+        <button 
+          className="mobile-btn-primary" 
+          onClick={() => onOpenAddModal('Follow-ups')}
+          style={{ minHeight: 38, padding: '6px 14px', borderRadius: 10, fontSize: 13 }}
+        >
+          <Plus size={14} /> Schedule
         </button>
       </div>
 
-      {/* Segmented Control Tabs Row */}
-      <div className="mobile-tabs-row">
+      {/* Modern iOS/SaaS Segmented Control Tabs */}
+      <div className="mobile-segmented-control">
         <button 
-          className={`mobile-tab-btn ${tab === 'TODAY' ? 'active' : ''}`}
+          className={`mobile-segment-tab ${tab === 'TODAY' ? 'active' : ''}`}
           onClick={() => setTab('TODAY')}
         >
-          Today ({pendingToday.length})
+          Today <span className="mobile-tab-badge">{pendingToday.length}</span>
         </button>
         <button 
-          className={`mobile-tab-btn ${tab === 'UPCOMING' ? 'active' : ''}`}
+          className={`mobile-segment-tab ${tab === 'UPCOMING' ? 'active' : ''}`}
           onClick={() => setTab('UPCOMING')}
         >
-          Upcoming ({pendingUpcoming.length})
+          Upcoming <span className="mobile-tab-badge">{pendingUpcoming.length}</span>
         </button>
         <button 
-          className={`mobile-tab-btn ${tab === 'COMPLETED' ? 'active' : ''}`}
+          className={`mobile-segment-tab ${tab === 'COMPLETED' ? 'active' : ''}`}
           onClick={() => setTab('COMPLETED')}
         >
-          Done ({completed.length})
+          Done <span className="mobile-tab-badge">{completed.length}</span>
         </button>
       </div>
 
@@ -98,7 +102,7 @@ export function MobileFollowupsView({
                   <div>
                     <h3 className="mobile-card-title">{leadName}</h3>
                     <div className="mobile-card-subinfo">
-                      <BookOpen size={12} /> {courseName}
+                      <BookOpen size={13} style={{ flexShrink: 0 }} /> <span>{courseName}</span>
                     </div>
                   </div>
                   <div className="mobile-followup-time-badge">
@@ -110,7 +114,7 @@ export function MobileFollowupsView({
                 {f.notes && <p className="mobile-card-notes">"{f.notes}"</p>}
 
                 {f.status === 'COMPLETED' ? (
-                  <div className="mobile-completed-tag">
+                  <div className="mobile-completed-tag" style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#166534', background: '#f0fdf4', padding: '6px 10px', borderRadius: 8 }}>
                     <CheckCircle2 size={14} /> Completed on {f.completedAt ? new Date(f.completedAt).toLocaleDateString() : 'N/A'}
                   </div>
                 ) : (
