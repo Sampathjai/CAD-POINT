@@ -1287,6 +1287,7 @@ function App() {
                             payments={payments}
                             token={token}
                             API_BASE={API_BASE}
+                            onExportExcel={exportAdmissionsToExcel}
                         />
                     ) : (
                         <Module
@@ -5728,21 +5729,122 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
     };
 
     const exportAdmissionsToExcel = () => {
-        const dataToExport = filteredAdmissions.map((a, idx) => ({
-            'S.No': idx + 1,
-            'Admission #': a.admissionNumber,
-            'Student ID': a.student?.studentCode || '-',
-            'Student Name': a.student ? `${a.student.firstName} ${a.student.lastName || ''}`.trim() : '-',
-            'Phone': a.student?.phone || '',
-            'Course': a.course?.name || '-',
-            'Batch': a.batch?.name || '-',
-            'Admission Date': a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '-',
-            'Total Fee (₹)': Number(a.finalFee) || 0
-        }));
+        let grandTotalFee = 0;
+        let grandTotalPaid = 0;
+        let grandTotalPending = 0;
+
+        const dataToExport = filteredAdmissions.map((a, idx) => {
+            const totalFee = Number(a.finalFee || a.agreedFee) || 0;
+            const admissionPayments = safePayments.filter(p => p.admissionId === a.id);
+            const paidFee = admissionPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+            const pendingFee = Math.max(0, totalFee - paidFee);
+            const paymentStatus = pendingFee === 0 ? 'FULLY_PAID' : (paidFee > 0 ? 'PARTIAL' : 'UNPAID');
+
+            grandTotalFee += totalFee;
+            grandTotalPaid += paidFee;
+            grandTotalPending += pendingFee;
+
+            return {
+                'S.No': idx + 1,
+                'Admission #': a.admissionNumber || '-',
+                'Student ID': a.student?.studentCode || '-',
+                'Student Name': a.student ? `${a.student.firstName} ${a.student.lastName || ''}`.trim() : (a.studentName || '-'),
+                'Phone Number': a.student?.phone || a.studentPhone || '',
+                'Course': a.course?.name || '-',
+                'Batch': a.batch?.name || '-',
+                'Branch': a.branch?.name || 'Gandhipuram',
+                'Admission Date': a.createdAt ? new Date(a.createdAt).toLocaleDateString() : (a.startDate || '-'),
+                'Total Fees (₹)': totalFee,
+                'Paid Fees (₹)': paidFee,
+                'Outstanding / Pending Fees (₹)': pendingFee,
+                'Payment Status': paymentStatus
+            };
+        });
+
+        // Summary Total Row
+        dataToExport.push({
+            'S.No': '',
+            'Admission #': 'TOTAL',
+            'Student ID': '',
+            'Student Name': 'SUMMARY TOTALS',
+            'Phone Number': '',
+            'Course': '',
+            'Batch': '',
+            'Branch': '',
+            'Admission Date': '',
+            'Total Fees (₹)': grandTotalFee,
+            'Paid Fees (₹)': grandTotalPaid,
+            'Outstanding / Pending Fees (₹)': grandTotalPending,
+            'Payment Status': ''
+        });
+
         const ws = XLSX.utils.json_to_sheet(dataToExport);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Admissions');
-        XLSX.writeFile(wb, `CADPOINT_Admissions_Data_${fromDate || 'Start'}_to_${toDate || 'Today'}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, 'Admissions & Fees');
+        XLSX.writeFile(wb, `CADPOINT_Admissions_Fee_Report_${fromDate || 'Start'}_to_${toDate || 'Today'}.xlsx`);
+    };
+
+    const exportOutstandingFeesToExcel = () => {
+        let grandTotalFee = 0;
+        let grandTotalPaid = 0;
+        let grandTotalPending = 0;
+
+        const pendingAdmissions = filteredAdmissions.filter(a => {
+            const totalFee = Number(a.finalFee || a.agreedFee) || 0;
+            const admissionPayments = safePayments.filter(p => p.admissionId === a.id);
+            const paidFee = admissionPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+            return Math.max(0, totalFee - paidFee) > 0;
+        });
+
+        const dataToExport = pendingAdmissions.map((a, idx) => {
+            const totalFee = Number(a.finalFee || a.agreedFee) || 0;
+            const admissionPayments = safePayments.filter(p => p.admissionId === a.id);
+            const paidFee = admissionPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+            const pendingFee = Math.max(0, totalFee - paidFee);
+            const paymentStatus = paidFee > 0 ? 'PARTIAL' : 'UNPAID';
+
+            grandTotalFee += totalFee;
+            grandTotalPaid += paidFee;
+            grandTotalPending += pendingFee;
+
+            return {
+                'S.No': idx + 1,
+                'Admission #': a.admissionNumber || '-',
+                'Student ID': a.student?.studentCode || '-',
+                'Student Name': a.student ? `${a.student.firstName} ${a.student.lastName || ''}`.trim() : (a.studentName || '-'),
+                'Phone Number': a.student?.phone || a.studentPhone || '',
+                'Course': a.course?.name || '-',
+                'Batch': a.batch?.name || '-',
+                'Branch': a.branch?.name || 'Gandhipuram',
+                'Admission Date': a.createdAt ? new Date(a.createdAt).toLocaleDateString() : (a.startDate || '-'),
+                'Total Fees (₹)': totalFee,
+                'Paid Fees (₹)': paidFee,
+                'Outstanding / Pending Fees (₹)': pendingFee,
+                'Payment Status': paymentStatus
+            };
+        });
+
+        // Summary Total Row
+        dataToExport.push({
+            'S.No': '',
+            'Admission #': 'TOTAL',
+            'Student ID': '',
+            'Student Name': 'SUMMARY TOTALS',
+            'Phone Number': '',
+            'Course': '',
+            'Batch': '',
+            'Branch': '',
+            'Admission Date': '',
+            'Total Fees (₹)': grandTotalFee,
+            'Paid Fees (₹)': grandTotalPaid,
+            'Outstanding / Pending Fees (₹)': grandTotalPending,
+            'Payment Status': ''
+        });
+
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Outstanding Fees');
+        XLSX.writeFile(wb, `CADPOINT_Outstanding_Pending_Fees_${fromDate || 'Start'}_to_${toDate || 'Today'}.xlsx`);
     };
 
     const exportPaymentsToExcel = () => {
@@ -5770,11 +5872,14 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                     <div>
                         <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a', fontWeight: 800 }}>CADPOINT COIMBATORE — Custom Date Reports & Excel Data Center</h3>
-                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Filter metrics by custom date range and download full Excel exports for Students, Leads, Admissions & Payments.</p>
+                        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Filter metrics by custom date range and download full Excel exports for Students, Leads, Admissions, Payments & Outstanding Fees.</p>
                     </div>
 
                     {/* EXCEL EXPORT BUTTONS */}
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button className="primary" onClick={exportOutstandingFeesToExcel} style={{ background: '#dc2626', borderColor: '#dc2626', fontSize: 12, padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: 6 }} title="Download Outstanding Pending Fees Excel">
+                            <Download size={15} /> Export Outstanding Fees (Excel)
+                        </button>
                         <button className="primary" onClick={exportStudentsToExcel} style={{ background: '#15803d', borderColor: '#15803d', fontSize: 12, padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: 6 }} title="Download Students Excel">
                             <Download size={15} /> Export Students (Excel)
                         </button>

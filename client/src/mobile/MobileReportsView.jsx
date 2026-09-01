@@ -19,7 +19,8 @@ export function MobileReportsView({
   admissions = [],
   payments = [],
   token,
-  API_BASE
+  API_BASE,
+  onExportExcel
 }) {
   const [period, setPeriod] = useState('6_months');
 
@@ -49,6 +50,14 @@ export function MobileReportsView({
     courseRevenueMap[courseName] = (courseRevenueMap[courseName] || 0) + fee;
   });
 
+  const handleExport = () => {
+    if (typeof onExportExcel === 'function') {
+      onExportExcel();
+    } else {
+      alert('📊 Exporting Revenue Summary Excel Report...');
+    }
+  };
+
   return (
     <div className="mobile-reports-view">
       <div className="mobile-view-header">
@@ -56,8 +65,8 @@ export function MobileReportsView({
           <h2>Analytics & Reports</h2>
           <span>Performance summaries & revenue metrics</span>
         </div>
-        <button className="mobile-add-btn secondary" onClick={() => alert('📊 Exporting Revenue Summary PDF...')}>
-          <Download size={14} /> Export
+        <button className="mobile-add-btn secondary" onClick={handleExport}>
+          <Download size={14} /> Export Excel
         </button>
       </div>
 
