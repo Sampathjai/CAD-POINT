@@ -1157,7 +1157,7 @@ function App() {
 
     function openEditUser(u) {
         setEditingUser(u);
-        const userPerms = Array.isArray(u.customPermissions) && u.customPermissions.length > 0
+        const userPerms = Array.isArray(u.customPermissions)
             ? u.customPermissions
             : (ROLE_PERMISSIONS[u.role] || []);
         setEditUserForm({
@@ -1310,7 +1310,7 @@ function App() {
         hasPermission(user, 'reports') && ['Reports', BarChart3],
         hasPermission(user, 'userControl') && ['Users', UserCheck],
         hasPermission(user, 'adminSettings') && ['Admin Settings', Settings],
-        hasPermission(user, 'userSettings') && !hasPermission(user, 'adminSettings') && ['Settings', Settings]
+        hasPermission(user, 'restrictedSettings') && !hasPermission(user, 'adminSettings') && ['Restricted Settings', Settings]
     ].filter(Boolean);
 
     const nav = allNavItems;
@@ -7596,7 +7596,7 @@ function SettingsView({ userRole, user, token, theme, toggleTheme, sourcesList =
     const safeUsers = Array.isArray(usersList) ? usersList : [];
 
     const hasAdminSettings = hasPermission(user || safeUserRole, 'adminSettings');
-    const hasUserSettings = hasPermission(user || safeUserRole, 'userSettings');
+    const hasRestrictedSettings = hasPermission(user || safeUserRole, 'restrictedSettings');
 
     const allTabs = [
         { id: 'Profile', label: 'Institute Profile', icon: ShieldCheck, adminOnly: true },
@@ -7611,7 +7611,7 @@ function SettingsView({ userRole, user, token, theme, toggleTheme, sourcesList =
 
     const tabs = allTabs.filter((t) => {
         if (t.adminOnly) return hasAdminSettings;
-        return hasUserSettings || hasAdminSettings;
+        return hasRestrictedSettings || hasAdminSettings;
     });
 
     useEffect(() => {

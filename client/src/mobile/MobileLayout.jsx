@@ -64,7 +64,7 @@ export function MobileLayout({
     hasPermission(user, 'reports') && { name: 'Reports', label: 'Reports', icon: BarChart3 },
     hasPermission(user, 'userControl') && { name: 'Users', label: 'Users', icon: UserCheck },
     hasPermission(user, 'adminSettings') && { name: 'Admin Settings', label: 'Admin Settings', icon: Settings },
-    hasPermission(user, 'userSettings') && !hasPermission(user, 'adminSettings') && { name: 'Settings', label: 'Settings', icon: Settings }
+    hasPermission(user, 'restrictedSettings') && !hasPermission(user, 'adminSettings') && { name: 'Restricted Settings', label: 'Restricted Settings', icon: Settings }
   ].filter(Boolean);
 
   const allowedNavItems = allNavItems;

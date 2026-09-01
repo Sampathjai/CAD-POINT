@@ -17,7 +17,7 @@ const ROLE_PERMISSIONS = {
     'whatsapp',
     'userControl',
     'adminSettings',
-    'userSettings'
+    'restrictedSettings'
   ],
   ADMIN: [
     'adminDashboard',
@@ -32,7 +32,7 @@ const ROLE_PERMISSIONS = {
     'reports',
     'whatsapp',
     'adminSettings',
-    'userSettings'
+    'restrictedSettings'
   ],
   COUNSELLOR: [
     'leadsDashboard',
@@ -42,25 +42,25 @@ const ROLE_PERMISSIONS = {
     'batches',
     'students',
     'admissions',
-    'userSettings'
+    'restrictedSettings'
   ],
   TRAINER: [
     'courses',
     'batches',
     'students',
-    'userSettings'
+    'restrictedSettings'
   ],
   ACCOUNTANT: [
     'adminDashboard',
     'payments',
     'reports',
-    'userSettings'
+    'restrictedSettings'
   ],
   ACCOUNTS: [
     'adminDashboard',
     'payments',
     'reports',
-    'userSettings'
+    'restrictedSettings'
   ],
   RECEPTIONIST: [
     'leadsDashboard',
@@ -68,7 +68,7 @@ const ROLE_PERMISSIONS = {
     'followups',
     'batches',
     'students',
-    'userSettings'
+    'restrictedSettings'
   ]
 };
 
@@ -103,9 +103,11 @@ const PAGE_TO_PERMISSION_KEY = {
   Settings: 'adminSettings',
   'Admin Settings': 'adminSettings',
   adminSettings: 'adminSettings',
-  'Normal User Settings': 'userSettings',
-  'User Settings': 'userSettings',
-  userSettings: 'userSettings'
+  'Restricted Settings': 'restrictedSettings',
+  'Normal User Settings': 'restrictedSettings',
+  'User Settings': 'restrictedSettings',
+  restrictedSettings: 'restrictedSettings',
+  userSettings: 'restrictedSettings'
 };
 
 const ALL_CRM_MODULES = [
@@ -122,7 +124,7 @@ const ALL_CRM_MODULES = [
   { key: 'reports', label: 'Reports', group: 'REPORTS' },
   { key: 'userControl', label: 'Users', group: 'ADMINISTRATION' },
   { key: 'adminSettings', label: 'Admin Settings', group: 'ADMINISTRATION' },
-  { key: 'userSettings', label: 'Normal User Settings', group: 'ADMINISTRATION' }
+  { key: 'restrictedSettings', label: 'Restricted Settings', group: 'ADMINISTRATION' }
 ];
 
 function normalizeRole(role) {
@@ -152,11 +154,11 @@ function hasPermission(roleOrUser, permissionKey) {
     if (!Array.isArray(permArray)) return false;
     if (permArray.includes(targetKey) || permArray.includes(permissionKey)) return true;
     if ((targetKey === 'adminDashboard' || targetKey === 'leadsDashboard') && permArray.includes('dashboard')) return true;
-    if ((targetKey === 'adminSettings' || targetKey === 'userSettings') && permArray.includes('settings')) return true;
+    if ((targetKey === 'adminSettings' || targetKey === 'restrictedSettings') && (permArray.includes('settings') || permArray.includes('userSettings'))) return true;
     return false;
   };
 
-  if (Array.isArray(customPermissions) && customPermissions.length > 0) {
+  if (Array.isArray(customPermissions)) {
     return checkPerm(customPermissions);
   }
 
