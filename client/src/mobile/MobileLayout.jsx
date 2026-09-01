@@ -234,60 +234,78 @@ export function MobileLayout({
           {hasPermission(user?.role, 'Leads') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Leads')}>
               <div className="mobile-quick-add-icon bg-blue">
-                <UsersIcon size={22} />
+                <UsersIcon size={20} />
               </div>
-              <b>+ Add New Lead</b>
-              <span>Register new prospect</span>
+              <div className="mobile-quick-add-text">
+                <b>Add New Lead</b>
+                <span>Register new prospect</span>
+              </div>
+              <ChevronRight size={18} className="mobile-quick-add-chevron" />
             </button>
           )}
 
           {hasPermission(user?.role, 'Follow-ups') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Follow-ups')}>
               <div className="mobile-quick-add-icon bg-purple">
-                <CalendarDays size={22} />
+                <CalendarDays size={20} />
               </div>
-              <b>+ Schedule Follow-up</b>
-              <span>Set call or meeting</span>
+              <div className="mobile-quick-add-text">
+                <b>Schedule Follow-up</b>
+                <span>Set call or meeting</span>
+              </div>
+              <ChevronRight size={18} className="mobile-quick-add-chevron" />
             </button>
           )}
 
           {hasPermission(user?.role, 'Students') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Students')}>
               <div className="mobile-quick-add-icon bg-emerald">
-                <GraduationCap size={22} />
+                <GraduationCap size={20} />
               </div>
-              <b>+ Register Student</b>
-              <span>New student record</span>
+              <div className="mobile-quick-add-text">
+                <b>Register Student</b>
+                <span>New student record</span>
+              </div>
+              <ChevronRight size={18} className="mobile-quick-add-chevron" />
             </button>
           )}
 
           {hasPermission(user?.role, 'Admissions') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Admissions')}>
               <div className="mobile-quick-add-icon bg-amber">
-                <ArrowUpRight size={22} />
+                <ArrowUpRight size={20} />
               </div>
-              <b>+ Create Admission</b>
-              <span>Enroll student to course</span>
+              <div className="mobile-quick-add-text">
+                <b>Create Admission</b>
+                <span>Enroll student to course</span>
+              </div>
+              <ChevronRight size={18} className="mobile-quick-add-chevron" />
             </button>
           )}
 
           {hasPermission(user?.role, 'Payments') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Payments')}>
               <div className="mobile-quick-add-icon bg-teal">
-                <WalletCards size={22} />
+                <WalletCards size={20} />
               </div>
-              <b>+ Record Payment</b>
-              <span>Collect fee payment</span>
+              <div className="mobile-quick-add-text">
+                <b>Record Payment</b>
+                <span>Collect fee payment</span>
+              </div>
+              <ChevronRight size={18} className="mobile-quick-add-chevron" />
             </button>
           )}
 
           {hasPermission(user?.role, 'Batches') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Batches')}>
               <div className="mobile-quick-add-icon bg-indigo">
-                <CalendarDays size={22} />
+                <CalendarDays size={20} />
               </div>
-              <b>+ Create Batch</b>
-              <span>New class schedule</span>
+              <div className="mobile-quick-add-text">
+                <b>Create Batch</b>
+                <span>New class schedule</span>
+              </div>
+              <ChevronRight size={18} className="mobile-quick-add-chevron" />
             </button>
           )}
         </div>
