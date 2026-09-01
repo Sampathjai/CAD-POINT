@@ -1146,170 +1146,168 @@ function App() {
 
     const nav = allNavItems.filter(([pageName]) => hasPermission(user?.role, pageName));
 
-    if (isMobile) {
-        return (
-            <MobileLayout
-                page={page}
-                setPage={setPage}
-                user={user}
-                token={token}
-                activeBranch={activeBranch}
-                setActiveBranch={setActiveBranch}
-                branchesList={branchesList}
-                theme={theme}
-                toggleTheme={toggleTheme}
-                logout={logout}
-                leadsCount={leads.length}
-                followupsCount={followups.length}
-                notifications={notifications}
-                onOpenAddModal={(p) => openAddModalForPage(p)}
-                onOpenSearch={() => setShowSearchModal(true)}
-            >
-                {page === 'Dashboard' ? (
-                    <MobileDashboard
-                        user={user}
-                        leads={leads}
-                        followups={followups}
-                        admissions={admissions}
-                        payments={payments}
-                        onAddLead={() => setShowAddLead(true)}
-                        onSchedule={() => setShowSchedule(true)}
-                        onCompleteFollowup={completeFollowup}
-                        onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
-                        onNavigate={(targetPage) => setPage(targetPage)}
-                    />
-                ) : page === 'Leads' ? (
-                    <MobileLeadsView
-                        leads={leads}
-                        followups={followups}
-                        sourcesList={sourcesList}
-                        usersList={usersList}
-                        onOpenAddModal={openAddModalForPage}
-                        onSchedule={() => setShowSchedule(true)}
-                        onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
-                        onAdmitFromFollowup={openAdmitFromFollowup}
-                        onEditLead={(l) => openAddModalForPage('Leads')}
-                    />
-                ) : page === 'Follow-ups' ? (
-                    <MobileFollowupsView
-                        followups={followups}
-                        onOpenAddModal={openAddModalForPage}
-                        onCompleteFollowup={completeFollowup}
-                        onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
-                    />
-                ) : page === 'Admissions' ? (
-                    <MobileAdmissionsView
-                        admissions={admissions}
-                        onOpenAddModal={openAddModalForPage}
-                        onOpenEditProgress={openEditProgress}
-                        onDeleteAdmission={deleteAdmission}
-                    />
-                ) : page === 'Courses' ? (
-                    <MobileCoursesView
-                        courses={courses}
-                        onOpenAddModal={openAddModalForPage}
-                        onEditCourse={openEditCourse}
-                        onDeleteCourse={deleteCourse}
-                    />
-                ) : page === 'Batches' ? (
-                    <MobileBatchesView
-                        batches={batches}
-                        onOpenAddModal={openAddModalForPage}
-                        onOpenAssignBatchModal={() => setShowAssignBatchModal(true)}
-                        onEditBatch={openEditBatch}
-                        onDeleteBatch={deleteBatch}
-                    />
-                ) : page === 'Students' ? (
-                    <MobileStudentsView
-                        students={students}
-                        onOpenAddModal={openAddModalForPage}
-                        onEditStudent={openEditStudent}
-                        onDeleteStudent={deleteStudent}
-                    />
-                ) : page === 'Payments' ? (
-                    <MobilePaymentsView
-                        payments={payments}
-                        onOpenAddModal={openAddModalForPage}
-                        onEditPayment={openEditPayment}
-                        onDeletePayment={deletePayment}
-                    />
-                ) : page === 'Users' ? (
-                    <MobileUsersView
-                        usersList={usersList}
-                        onOpenAddModal={openAddModalForPage}
-                        onEditUser={openEditUser}
-                        onDeleteUser={deleteUser}
-                    />
-                ) : page === 'Settings' ? (
-                    <MobileSettingsView
-                        userRole={user?.role}
-                        user={user}
-                        token={token}
-                        theme={theme}
-                        toggleTheme={toggleTheme}
-                        sourcesList={sourcesList}
-                        refreshSources={() => fetchAllData()}
-                        usersList={usersList}
-                        currentUserId={user?.id}
-                        onOpenAddModal={openAddModalForPage}
-                        onEditUser={openEditUser}
-                        onDeleteUser={deleteUser}
-                        API_BASE={API_BASE}
-                    />
-                ) : page === 'Reports' ? (
-                    <MobileReportsView
-                        leads={leads}
-                        admissions={admissions}
-                        payments={payments}
-                        token={token}
-                        API_BASE={API_BASE}
-                    />
-                ) : (
-                    <Module
-                        page={page}
-                        leads={leads}
-                        followups={followups}
-                        courses={courses}
-                        batches={batches}
-                        students={students}
-                        admissions={admissions}
-                        payments={payments}
-                        usersList={usersList}
-                        sourcesList={sourcesList}
-                        onOpenAddModal={() => openAddModalForPage(page)}
-                        onOpenAssignBatchModal={() => setShowAssignBatchModal(true)}
-                        onUnassignStudentFromBatch={unassignStudentFromBatch}
-                        onCompleteFollowup={completeFollowup}
-                        onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
-                        onAdmitFromFollowup={openAdmitFromFollowup}
-                        onEditUser={openEditUser}
-                        onDeleteUser={deleteUser}
-                        onEditCourse={openEditCourse}
-                        onDeleteCourse={deleteCourse}
-                        onEditBatch={openEditBatch}
-                        onDeleteBatch={deleteBatch}
-                        onEditStudent={openEditStudent}
-                        onDeleteStudent={deleteStudent}
-                        onDeleteAdmission={deleteAdmission}
-                        onEditPayment={openEditPayment}
-                        onDeletePayment={deletePayment}
-                        onPreviewPhoto={(url) => setPreviewPhotoUrl(url)}
-                        onOpenEditProgress={openEditProgress}
-                        currentUserId={user?.id}
-                        userRole={user?.role}
-                        user={user}
-                        token={token}
-                        theme={theme}
-                        toggleTheme={toggleTheme}
-                        refreshData={() => fetchAllData()}
-                    />
-                )}
-            </MobileLayout>
-        );
-    }
-
     return (
-        <div className="app">
+        <>
+            {isMobile ? (
+                <MobileLayout
+                    page={page}
+                    setPage={setPage}
+                    user={user}
+                    token={token}
+                    activeBranch={activeBranch}
+                    setActiveBranch={setActiveBranch}
+                    branchesList={branchesList}
+                    theme={theme}
+                    toggleTheme={toggleTheme}
+                    logout={logout}
+                    leadsCount={leads.length}
+                    followupsCount={followups.length}
+                    notifications={notifications}
+                    onOpenAddModal={(p) => openAddModalForPage(p)}
+                    onOpenSearch={() => setShowSearchModal(true)}
+                >
+                    {page === 'Dashboard' ? (
+                        <MobileDashboard
+                            user={user}
+                            leads={leads}
+                            followups={followups}
+                            admissions={admissions}
+                            payments={payments}
+                            onAddLead={() => setShowAddLead(true)}
+                            onSchedule={() => setShowSchedule(true)}
+                            onCompleteFollowup={completeFollowup}
+                            onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
+                            onNavigate={(targetPage) => setPage(targetPage)}
+                        />
+                    ) : page === 'Leads' ? (
+                        <MobileLeadsView
+                            leads={leads}
+                            followups={followups}
+                            sourcesList={sourcesList}
+                            usersList={usersList}
+                            onOpenAddModal={openAddModalForPage}
+                            onSchedule={() => setShowSchedule(true)}
+                            onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
+                            onAdmitFromFollowup={openAdmitFromFollowup}
+                            onEditLead={(l) => openAddModalForPage('Leads')}
+                        />
+                    ) : page === 'Follow-ups' ? (
+                        <MobileFollowupsView
+                            followups={followups}
+                            onOpenAddModal={openAddModalForPage}
+                            onCompleteFollowup={completeFollowup}
+                            onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
+                        />
+                    ) : page === 'Admissions' ? (
+                        <MobileAdmissionsView
+                            admissions={admissions}
+                            onOpenAddModal={openAddModalForPage}
+                            onOpenEditProgress={openEditProgress}
+                            onDeleteAdmission={deleteAdmission}
+                        />
+                    ) : page === 'Courses' ? (
+                        <MobileCoursesView
+                            courses={courses}
+                            onOpenAddModal={openAddModalForPage}
+                            onEditCourse={openEditCourse}
+                            onDeleteCourse={deleteCourse}
+                        />
+                    ) : page === 'Batches' ? (
+                        <MobileBatchesView
+                            batches={batches}
+                            onOpenAddModal={openAddModalForPage}
+                            onOpenAssignBatchModal={() => setShowAssignBatchModal(true)}
+                            onEditBatch={openEditBatch}
+                            onDeleteBatch={deleteBatch}
+                        />
+                    ) : page === 'Students' ? (
+                        <MobileStudentsView
+                            students={students}
+                            onOpenAddModal={openAddModalForPage}
+                            onEditStudent={openEditStudent}
+                            onDeleteStudent={deleteStudent}
+                        />
+                    ) : page === 'Payments' ? (
+                        <MobilePaymentsView
+                            payments={payments}
+                            onOpenAddModal={openAddModalForPage}
+                            onEditPayment={openEditPayment}
+                            onDeletePayment={deletePayment}
+                        />
+                    ) : page === 'Users' ? (
+                        <MobileUsersView
+                            usersList={usersList}
+                            onOpenAddModal={openAddModalForPage}
+                            onEditUser={openEditUser}
+                            onDeleteUser={deleteUser}
+                        />
+                    ) : page === 'Settings' ? (
+                        <MobileSettingsView
+                            userRole={user?.role}
+                            user={user}
+                            token={token}
+                            theme={theme}
+                            toggleTheme={toggleTheme}
+                            sourcesList={sourcesList}
+                            refreshSources={() => fetchAllData()}
+                            usersList={usersList}
+                            currentUserId={user?.id}
+                            onOpenAddModal={openAddModalForPage}
+                            onEditUser={openEditUser}
+                            onDeleteUser={deleteUser}
+                            API_BASE={API_BASE}
+                        />
+                    ) : page === 'Reports' ? (
+                        <MobileReportsView
+                            leads={leads}
+                            admissions={admissions}
+                            payments={payments}
+                            token={token}
+                            API_BASE={API_BASE}
+                        />
+                    ) : (
+                        <Module
+                            page={page}
+                            leads={leads}
+                            followups={followups}
+                            courses={courses}
+                            batches={batches}
+                            students={students}
+                            admissions={admissions}
+                            payments={payments}
+                            usersList={usersList}
+                            sourcesList={sourcesList}
+                            onOpenAddModal={() => openAddModalForPage(page)}
+                            onOpenAssignBatchModal={() => setShowAssignBatchModal(true)}
+                            onUnassignStudentFromBatch={unassignStudentFromBatch}
+                            onCompleteFollowup={completeFollowup}
+                            onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
+                            onAdmitFromFollowup={openAdmitFromFollowup}
+                            onEditUser={openEditUser}
+                            onDeleteUser={deleteUser}
+                            onEditCourse={openEditCourse}
+                            onDeleteCourse={deleteCourse}
+                            onEditBatch={openEditBatch}
+                            onDeleteBatch={deleteBatch}
+                            onEditStudent={openEditStudent}
+                            onDeleteStudent={deleteStudent}
+                            onDeleteAdmission={deleteAdmission}
+                            onEditPayment={openEditPayment}
+                            onDeletePayment={deletePayment}
+                            onPreviewPhoto={(url) => setPreviewPhotoUrl(url)}
+                            onOpenEditProgress={openEditProgress}
+                            currentUserId={user?.id}
+                            userRole={user?.role}
+                            user={user}
+                            token={token}
+                            theme={theme}
+                            toggleTheme={toggleTheme}
+                            refreshData={() => fetchAllData()}
+                        />
+                    )}
+                </MobileLayout>
+            ) : (
+                <div className="app">
             <aside>
                 <div className="brand">
                     <div className="logo">CP</div>
@@ -1538,6 +1536,8 @@ function App() {
                     )}
                 </ErrorBoundary>
             </main>
+        </div>
+    )}
 
             {/* WhatsApp Messaging Modal */}
             {whatsAppModalData && (
@@ -3043,7 +3043,7 @@ function App() {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 }
 
