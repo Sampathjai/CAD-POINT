@@ -356,68 +356,186 @@ router.post('/test', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req
   }
 });
 
-// 5. POST /api/whatsapp/send - Send outgoing message using the Lead's / Branch's specific WhatsApp
+// 5. POST /api/whatsapp/send - Send outgoing message strictly using the entity's branch WhatsApp
 router.post('/send', authenticate, async (req, res) => {
   try {
     const organizationId = req.user?.organizationId || 'org_default';
-    const { leadId, branchId, recipientPhone, message } = req.body;
+    const { leadId, studentId, admissionId, branchId, recipientPhone, message } = req.body;
 
     if (!recipientPhone || !message) {
-      return res.status(400).json({ success: false, message: 'recipientPhone and message are required.' });
+      return res.status(400).json({ success: false, message: 'Recipient phone and message text are required.' });
     }
 
-    let targetBranchId = branchId;
-    if (!targetBranchId && leadId) {
-      const lead = await prisma.lead.findUnique({ where: { id: leadId }, select: { branchId: true } });
-      if (lead) targetBranchId = lead.branchId;
-    }
+    // Step A: Determine target branchId strictly from entity or prop
+    let targetBranchId = branchId || null;
+    let targetBranchName = 'Branch';
 
-    let integration = null;
-    if (targetBranchId) {
-      integration = await prisma.whatsAppIntegration.findFirst({
-        where: { organizationId, branchId: targetBranchId, status: 'CONNECTED' }
-      });
-    }
-
-    if (!integration) {
-      integration = await prisma.whatsAppIntegration.findFirst({
-        where: { organizationId, status: 'CONNECTED' },
-        orderBy: { updatedAt: 'desc' }
-      });
-    }
-
-    const targetPhone = recipientPhone.replace(/[^0-9]/g, '');
-    const formattedPhone = targetPhone.length === 10 ? '91' + targetPhone : targetPhone;
-
-    if (integration && integration.accessTokenEncrypted) {
-      const accessToken = decryptToken(integration.accessTokenEncrypted);
-      const sendUrl = `${META_GRAPH_BASE_URL}/${integration.phoneNumberId}/messages`;
-      const metaRes = await fetchMetaApi(sendUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to: formattedPhone,
-          type: 'text',
-          text: { body: message }
-        })
-      });
-
-      if (metaRes.ok) {
-        return res.json({ success: true, mode: 'API', data: metaRes.data });
+    if (!targetBranchId && studentId) {
+      const student = await prisma.student.findUnique({ where: { id: studentId }, select: { branchId: true, branch: { select: { name: true } } } });
+      if (student?.branchId) {
+        targetBranchId = student.branchId;
+        targetBranchName = student.branch?.name || targetBranchName;
       }
     }
 
-    res.json({
-      success: true,
-      mode: 'WEB_FALLBACK',
-      waUrl: `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`
+    if (!targetBranchId && leadId) {
+      const lead = await prisma.lead.findUnique({ where: { id: leadId }, select: { branchId: true, branch: { select: { name: true } } } });
+      if (lead?.branchId) {
+        targetBranchId = lead.branchId;
+        targetBranchName = lead.branch?.name || targetBranchName;
+      }
+    }
+
+    if (!targetBranchId && admissionId) {
+      const admission = await prisma.admission.findUnique({ where: { id: admissionId }, select: { branchId: true, branch: { select: { name: true } } } });
+      if (admission?.branchId) {
+        targetBranchId = admission.branchId;
+        targetBranchName = admission.branch?.name || targetBranchName;
+      }
+    }
+
+    if (targetBranchId && targetBranchName === 'Branch') {
+      const b = await prisma.branch.findUnique({ where: { id: targetBranchId }, select: { name: true } });
+      if (b) targetBranchName = b.name;
+    }
+
+    // Step B: Validate branch assignment
+    if (!targetBranchId) {
+      return res.status(400).json({
+        success: false,
+        message: 'WhatsApp account cannot be determined because this record is not assigned to a branch.'
+      });
+    }
+
+    // Step C: Look up branch's WhatsApp integration strictly (NO wrong-branch fallback)
+    const integration = await prisma.whatsAppIntegration.findFirst({
+      where: { organizationId, branchId: targetBranchId, status: 'CONNECTED' },
+      include: { branch: true }
     });
+
+    if (!integration || !integration.accessTokenEncrypted || !integration.phoneNumberId) {
+      return res.status(400).json({
+        success: false,
+        message: `${targetBranchName} WhatsApp is not connected. Please connect the WhatsApp Business account in Settings.`
+      });
+    }
+
+    // Step D: Format phone number
+    const cleanPhone = recipientPhone.replace(/[^0-9]/g, '');
+    const formattedPhone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
+
+    if (!formattedPhone || formattedPhone.length < 10) {
+      return res.status(400).json({ success: false, message: 'Invalid recipient phone number format.' });
+    }
+
+    const accessToken = decryptToken(integration.accessTokenEncrypted);
+    const sendUrl = `${META_GRAPH_BASE_URL}/${integration.phoneNumberId}/messages`;
+
+    const metaRes = await fetchMetaApi(sendUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: formattedPhone,
+        type: 'text',
+        text: { body: message }
+      })
+    });
+
+    if (metaRes.ok && metaRes.data?.messages?.[0]?.id) {
+      const wamid = metaRes.data.messages[0].id;
+
+      // Log outbound message to database
+      const msgRecord = await prisma.whatsAppMessage.create({
+        data: {
+          branchId: targetBranchId,
+          userId: req.user?.id || null,
+          leadId: leadId || null,
+          studentId: studentId || null,
+          phoneNumberId: integration.phoneNumberId,
+          recipientPhone: formattedPhone,
+          message,
+          direction: 'OUTBOUND',
+          status: 'SENT',
+          wamid
+        }
+      });
+
+      return res.json({
+        success: true,
+        message: `✅ Message delivered via ${integration.branch?.name || targetBranchName} WhatsApp!`,
+        data: {
+          id: msgRecord.id,
+          wamid,
+          status: 'SENT',
+          senderBranch: integration.branch?.name || targetBranchName,
+          senderPhone: integration.displayPhoneNumber || integration.phoneNumber
+        }
+      });
+    }
+
+    // Meta API returned error
+    const errDetail = metaRes.data?.error?.message || 'Meta WhatsApp API error';
+    await prisma.whatsAppMessage.create({
+      data: {
+        branchId: targetBranchId,
+        userId: req.user?.id || null,
+        leadId: leadId || null,
+        studentId: studentId || null,
+        phoneNumberId: integration.phoneNumberId,
+        recipientPhone: formattedPhone,
+        message,
+        direction: 'OUTBOUND',
+        status: 'FAILED',
+        errorMessage: errDetail
+      }
+    });
+
+    return res.status(400).json({
+      success: false,
+      message: `Failed to send WhatsApp message via ${integration.branch?.name || targetBranchName} WhatsApp: ${errDetail}`
+    });
+
   } catch (err) {
     console.error('whatsapp.send', err);
+    res.status(500).json({ success: false, message: 'Server error sending WhatsApp message: ' + err.message });
+  }
+});
+
+// 5b. GET /api/whatsapp/messages - Fetch message history for student/lead
+router.get('/messages', authenticate, async (req, res) => {
+  try {
+    const { leadId, studentId, recipientPhone } = req.query;
+
+    const whereClause = {};
+    if (studentId) whereClause.studentId = studentId;
+    if (leadId) whereClause.leadId = leadId;
+    if (recipientPhone) {
+      const cleanPhone = recipientPhone.replace(/[^0-9]/g, '');
+      const phone10 = cleanPhone.slice(-10);
+      whereClause.recipientPhone = { contains: phone10 };
+    }
+
+    if (!studentId && !leadId && !recipientPhone) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const messages = await prisma.whatsAppMessage.findMany({
+      where: whereClause,
+      include: {
+        user: { select: { id: true, name: true, role: true } },
+        branch: { select: { id: true, name: true } }
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 100
+    });
+
+    res.json({ success: true, data: messages });
+  } catch (err) {
+    console.error('whatsapp.messages', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -466,7 +584,7 @@ router.get('/webhook', (req, res) => {
   res.status(403).send('Forbidden: Webhook verification token mismatch');
 });
 
-// 8. POST /api/whatsapp/webhook - Branch-Aware Incoming WhatsApp Webhook & Lead Creation
+// 8. POST /api/whatsapp/webhook - Branch-Aware Incoming WhatsApp Webhook & Status Updates
 router.post('/webhook', async (req, res) => {
   res.status(200).send('EVENT_RECEIVED'); // Always respond 200 immediately to Meta
 
@@ -476,17 +594,36 @@ router.post('/webhook', async (req, res) => {
 
     for (const entry of (body.entry || [])) {
       for (const change of (entry.changes || [])) {
-        if (change.value && change.value.messages && change.value.messages.length > 0) {
-          const messageObj = change.value.messages[0];
+        const val = change.value;
+        if (!val) continue;
+
+        // Process Delivery / Read / Sent / Failed Status Updates
+        if (val.statuses && val.statuses.length > 0) {
+          for (const statusObj of val.statuses) {
+            const wamid = statusObj.id;
+            const statusVal = (statusObj.status || '').toUpperCase();
+            if (wamid && statusVal) {
+              await prisma.whatsAppMessage.updateMany({
+                where: { wamid },
+                data: { status: statusVal, updatedAt: new Date() }
+              });
+            }
+          }
+        }
+
+        // Process Incoming WhatsApp Messages
+        if (val.messages && val.messages.length > 0) {
+          const messageObj = val.messages[0];
           const senderPhoneRaw = messageObj.from || '';
-          const messageText = messageObj.text?.body || 'WhatsApp Enquiry';
-          const senderName = change.value.contacts?.[0]?.profile?.name || 'WhatsApp Lead';
-          const phoneNumberId = change.value.metadata?.phone_number_id || '';
+          const messageText = messageObj.text?.body || 'WhatsApp Message';
+          const senderName = val.contacts?.[0]?.profile?.name || 'WhatsApp Contact';
+          const phoneNumberId = val.metadata?.phone_number_id || '';
           const wabaId = entry.id || '';
+          const wamid = messageObj.id || null;
 
           if (!senderPhoneRaw) continue;
 
-          // Multi-Branch Event Routing: Find matching WhatsAppIntegration by phoneNumberId or wabaId
+          // Find matching WhatsAppIntegration by phoneNumberId or wabaId
           let integration = await prisma.whatsAppIntegration.findFirst({
             where: {
               OR: [
@@ -512,8 +649,31 @@ router.post('/webhook', async (req, res) => {
             }
           });
 
+          let existingStudent = await prisma.student.findFirst({
+            where: {
+              OR: [
+                { phone: { contains: phone10 } },
+                { whatsappNumber: { contains: phone10 } }
+              ]
+            }
+          });
+
+          // Log inbound message in WhatsAppMessage table
+          await prisma.whatsAppMessage.create({
+            data: {
+              branchId: resolvedBranchId,
+              leadId: existingLead?.id || null,
+              studentId: existingStudent?.id || null,
+              phoneNumberId,
+              recipientPhone: cleanPhone,
+              message: messageText,
+              direction: 'INBOUND',
+              status: 'DELIVERED',
+              wamid
+            }
+          });
+
           if (existingLead) {
-            // Log follow-up entry for existing lead
             await prisma.followUp.create({
               data: {
                 leadId: existingLead.id,
@@ -525,7 +685,7 @@ router.post('/webhook', async (req, res) => {
                 outcome: 'Message Received'
               }
             });
-          } else {
+          } else if (!existingStudent) {
             // Auto-create new Enquiry/Lead bound to the specific Branch!
             let whatsappSource = await prisma.enquirySource.findFirst({
               where: { name: { equals: 'WhatsApp', mode: 'insensitive' } }
@@ -536,7 +696,6 @@ router.post('/webhook', async (req, res) => {
               });
             }
 
-            // Auto-assign active counsellor for this specific Branch
             let branchCounsellor = null;
             if (resolvedBranchId) {
               branchCounsellor = await prisma.user.findFirst({

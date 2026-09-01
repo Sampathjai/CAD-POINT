@@ -120,6 +120,7 @@ model Branch {
   batches     Batch[]
   devices             Device[]
   whatsAppIntegration WhatsAppIntegration?
+  whatsAppMessages    WhatsAppMessage[]
   createdAt           DateTime             @default(now())
   updatedAt   DateTime    @updatedAt
 }
@@ -143,6 +144,7 @@ model User {
   files         FileMetadata[]
   desktopAgents DesktopAgent[]
   devices       Device[]
+  whatsAppMessages WhatsAppMessage[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -181,6 +183,7 @@ model Lead {
   statusHistory        LeadStatusHistory[]
   admission            Admission?
   student              Student?
+  whatsAppMessages     WhatsAppMessage[]
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
 
@@ -248,6 +251,7 @@ model Student {
   admissions            Admission[]
   attendance            Attendance[]
   certificates          Certificate[]
+  whatsAppMessages      WhatsAppMessage[]
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
 
@@ -513,5 +517,32 @@ model WhatsAppIntegration {
   @@index([branchId])
   @@index([phoneNumberId])
   @@index([wabaId])
+}
+
+model WhatsAppMessage {
+  id             String   @id @default(uuid())
+  branchId       String?
+  branch         Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  leadId         String?
+  lead           Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  studentId      String?
+  student        Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  phoneNumberId String?
+  recipientPhone String
+  message        String
+  direction      String   @default("OUTBOUND")
+  status         String   @default("SENT")
+  wamid          String?  @unique
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([branchId])
+  @@index([studentId])
+  @@index([leadId])
+  @@index([recipientPhone])
+  @@index([wamid])
 }
 

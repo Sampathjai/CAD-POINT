@@ -3115,54 +3115,225 @@ function App() {
 
 function WhatsAppModal({ data, onClose, token }) {
     if (!data) return null;
-    const { lead, followup } = data;
-    const targetLead = lead || followup?.lead;
-    const leadName = targetLead ? `${targetLead.firstName || ''} ${targetLead.lastName || ''}`.trim() || 'Valued Prospect' : 'Valued Prospect';
-    const rawPhone = targetLead?.phone || followup?.lead?.phone || '';
+
+    // Resolve target entity & recipient details
+    const lead = data.lead || data.followup?.lead || null;
+    const student = data.student || data.admission?.student || (data.firstName ? data : null);
+    const admission = data.admission || null;
+    const followup = data.followup || null;
+
+    const recipientName = data.recipientName ||
+        (student ? `${student.firstName || ''} ${student.lastName || ''}`.trim() :
+         lead ? `${lead.firstName || ''} ${lead.lastName || ''}`.trim() :
+         data.firstName ? `${data.firstName} ${data.lastName || ''}`.trim() : 'Valued Client');
+
+    const rawPhone = data.recipientPhone || data.phone || student?.whatsappNumber || student?.phone || lead?.whatsappNumber || lead?.phone || '';
     const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
     const phone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
-    const courseName = targetLead?.interestedCourse || 'our CAD/BIM courses';
-    const courseFee = targetLead?.estimatedValue ? `₹${Number(targetLead.estimatedValue).toLocaleString()}` : 'our standard course fee';
+
+    const branchId = data.branchId || student?.branchId || lead?.branchId || admission?.branchId || null;
+    const leadId = data.leadId || lead?.id || followup?.leadId || null;
+    const studentId = data.studentId || student?.id || admission?.studentId || null;
+    const admissionId = data.admissionId || admission?.id || null;
+
+    const courseName = data.interestedCourse || lead?.interestedCourse || admission?.course?.name || 'CAD/BIM Courses';
+    const courseFee = data.estimatedValue ? `₹${Number(data.estimatedValue).toLocaleString()}` : 'standard fee';
+
+    const defaultMsg = data.defaultMessage || data.message || `Hello ${recipientName}! Thank you for contacting CADPOINT COIMBATORE. How can we assist your training goals today?`;
 
     const templates = {
-        WELCOME: `Hello ${leadName}! Thank you for contacting CADPOINT COIMBATORE. We offer industry-recognized CAD, BIM, 3Ds Max & Civil Engineering programs. How can we assist your training goals today?`,
-        COURSE_FEE: `Hi ${leadName}! Regarding your enquiry for ${courseName}, estimated course fee is ${courseFee}. Our upcoming batches offer flexible morning & evening schedules. Would you like to reserve a seat?`,
-        FOLLOWUP: `Hello ${leadName}, this is a gentle follow-up from CADPOINT COIMBATORE regarding your course enquiry. Are you available for a brief discussion or demo session today?`,
-        DEMO_INVITE: `Hi ${leadName}! We invite you to attend a free live demo session at CADPOINT COIMBATORE. Please reply with your convenient time slot!`
+        DEFAULT: defaultMsg,
+        WELCOME: `Hello ${recipientName}! Thank you for contacting CADPOINT COIMBATORE. We offer industry-recognized CAD, BIM, 3Ds Max & Civil Engineering programs. How can we assist your training goals today?`,
+        COURSE_FEE: `Hi ${recipientName}! Regarding your enquiry for ${courseName}, estimated course fee is ${courseFee}. Our upcoming batches offer flexible morning & evening schedules. Would you like to reserve a seat?`,
+        FOLLOWUP: `Hello ${recipientName}, this is a gentle follow-up from CADPOINT COIMBATORE regarding your course enquiry. Are you available for a brief discussion or demo session today?`,
+        DEMO_INVITE: `Hi ${recipientName}! We invite you to attend a free live demo session at CADPOINT COIMBATORE. Please reply with your convenient time slot!`
     };
 
-    const [selectedTemplateKey, setSelectedTemplateKey] = useState('WELCOME');
-    const [messageText, setMessageText] = useState(templates.WELCOME);
+    const [selectedTemplateKey, setSelectedTemplateKey] = useState(data.defaultMessage ? 'DEFAULT' : 'WELCOME');
+    const [messageText, setMessageText] = useState(defaultMsg);
+
+    const [statusData, setStatusData] = useState({ loading: true, isConnected: false, branchName: 'Branch', displayPhoneNumber: '', errorMessage: '' });
+    const [messages, setMessages] = useState([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
+    const [isSending, setIsSending] = useState(false);
+    const [sendError, setSendError] = useState('');
+    const [sendSuccess, setSendSuccess] = useState('');
+    const [showHistory, setShowHistory] = useState(false);
+
+    // 1. Fetch Branch Connection Status
+    useEffect(() => {
+        let isMounted = true;
+        async function fetchStatus() {
+            try {
+                const url = branchId ? `${API_BASE}/whatsapp/status?branchId=${branchId}` : `${API_BASE}/whatsapp/status`;
+                const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+                const json = await res.json();
+                if (isMounted) {
+                    if (json.success && json.isConnected && json.integration) {
+                        setStatusData({
+                            loading: false,
+                            isConnected: true,
+                            branchName: json.integration.branchName || 'Branch',
+                            displayPhoneNumber: json.integration.displayPhoneNumber || json.integration.phoneNumber || '',
+                            phoneNumberId: json.integration.phoneNumberId,
+                            errorMessage: ''
+                        });
+                    } else {
+                        setStatusData({
+                            loading: false,
+                            isConnected: false,
+                            branchName: json.integration?.branchName || 'Branch',
+                            displayPhoneNumber: '',
+                            errorMessage: json.message || 'WhatsApp Business account is not connected for this branch.'
+                        });
+                    }
+                }
+            } catch (err) {
+                if (isMounted) {
+                    setStatusData({ loading: false, isConnected: false, branchName: 'Branch', displayPhoneNumber: '', errorMessage: err.message });
+                }
+            }
+        }
+        fetchStatus();
+        return () => { isMounted = false; };
+    }, [branchId, token]);
+
+    // 2. Fetch Message History
+    const fetchHistory = useCallback(async () => {
+        if (!studentId && !leadId && !cleanPhone) return;
+        setLoadingHistory(true);
+        try {
+            const params = new URLSearchParams();
+            if (studentId) params.append('studentId', studentId);
+            if (leadId) params.append('leadId', leadId);
+            if (cleanPhone) params.append('recipientPhone', cleanPhone);
+            const res = await fetch(`${API_BASE}/whatsapp/messages?${params.toString()}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const json = await res.json();
+            if (json.success) {
+                setMessages(json.data || []);
+            }
+        } catch (e) {
+            console.error('Failed to fetch WhatsApp history:', e);
+        } finally {
+            setLoadingHistory(false);
+        }
+    }, [studentId, leadId, cleanPhone, token]);
+
+    useEffect(() => {
+        fetchHistory();
+    }, [fetchHistory]);
 
     function handleTemplateChange(key) {
         setSelectedTemplateKey(key);
         setMessageText(templates[key] || '');
     }
 
-    function openDirectWhatsApp() {
-        if (!rawPhone) return alert('No phone number recorded for this lead.');
-        const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(messageText)}`;
-        window.open(waUrl, '_blank');
-        onClose();
+    async function handleSendMessage() {
+        if (!messageText.trim()) return alert('Please enter a message text.');
+        if (!cleanPhone) return alert('No valid recipient phone number available.');
+        if (!statusData.isConnected) {
+            return alert(`Cannot send message: ${statusData.branchName} WhatsApp is disconnected. Please connect the WhatsApp Business account in Settings.`);
+        }
+
+        setIsSending(true);
+        setSendError('');
+        setSendSuccess('');
+
+        try {
+            const payload = {
+                leadId,
+                studentId,
+                admissionId,
+                branchId,
+                recipientPhone: phone,
+                message: messageText.trim()
+            };
+
+            const res = await fetch(`${API_BASE}/whatsapp/send`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const json = await res.json();
+
+            if (!res.ok || !json.success) {
+                throw new Error(json.message || 'Failed to send WhatsApp message via Meta Cloud API.');
+            }
+
+            setSendSuccess(json.message || `✅ Message sent successfully via ${statusData.branchName} WhatsApp!`);
+            fetchHistory();
+            setTimeout(() => {
+                onClose();
+            }, 1800);
+        } catch (err) {
+            setSendError(err.message || 'Failed to send WhatsApp message.');
+        } finally {
+            setIsSending(false);
+        }
     }
 
     return (
         <div className="modal" style={{ zIndex: 1100 }}>
-            <div className="panel" style={{ maxWidth: 540 }}>
+            <div className="panel" style={{ maxWidth: 560, width: '92%' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#16a34a', color: '#fff', display: 'grid', placeItems: 'center' }}>
-                            <MessageCircle size={20} />
+                        <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#16a34a', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                            <MessageCircle size={22} />
                         </div>
                         <div>
-                            <h3 style={{ margin: 0, fontSize: 16, color: '#0f172a' }}>Send WhatsApp Message</h3>
-                            <span style={{ fontSize: 12, color: '#64748b' }}>Recipient: <b>{leadName}</b> ({rawPhone || 'No phone recorded'})</span>
+                            <h3 style={{ margin: 0, fontSize: 17, color: '#0f172a', fontWeight: 700 }}>Centralized WhatsApp API</h3>
+                            <span style={{ fontSize: 12, color: '#64748b' }}>Recipient: <b>{recipientName}</b> ({rawPhone || 'No phone recorded'})</span>
                         </div>
                     </div>
                     <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
-                        <X size={18} />
+                        <X size={20} />
                     </button>
                 </div>
+
+                {/* SENDER BRANCH WHATSAPP STATUS BANNER */}
+                <div style={{
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    marginBottom: 16,
+                    fontSize: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justify: 'space-between',
+                    gap: 8,
+                    background: statusData.loading ? '#f1f5f9' : statusData.isConnected ? '#f0fdf4' : '#fef2f2',
+                    border: `1px solid ${statusData.loading ? '#cbd5e1' : statusData.isConnected ? '#86efac' : '#fca5a5'}`,
+                    color: statusData.loading ? '#475569' : statusData.isConnected ? '#15803d' : '#991b1b'
+                }}>
+                    {statusData.loading ? (
+                        <span>Checking branch WhatsApp connection...</span>
+                    ) : statusData.isConnected ? (
+                        <span>
+                            <b>🟢 Connected:</b> Sending via <b>{statusData.branchName} Branch WhatsApp</b> ({statusData.displayPhoneNumber || 'Meta Cloud API'})
+                        </span>
+                    ) : (
+                        <span>
+                            <b>🔴 Disconnected:</b> {statusData.branchName} WhatsApp is not connected. Connect in Settings.
+                        </span>
+                    )}
+                </div>
+
+                {sendError && (
+                    <div style={{ padding: '10px 14px', borderRadius: 8, background: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b', fontSize: 13, marginBottom: 14 }}>
+                        ⚠️ {sendError}
+                    </div>
+                )}
+
+                {sendSuccess && (
+                    <div style={{ padding: '10px 14px', borderRadius: 8, background: '#f0fdf4', border: '1px solid #86efac', color: '#15803d', fontSize: 13, marginBottom: 14, fontWeight: 600 }}>
+                        {sendSuccess}
+                    </div>
+                )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <div>
@@ -3174,6 +3345,7 @@ function WhatsAppModal({ data, onClose, token }) {
                             onChange={(e) => handleTemplateChange(e.target.value)}
                             style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13 }}
                         >
+                            {data.defaultMessage && <option value="DEFAULT">📋 Current Custom Message / Reminder</option>}
                             <option value="WELCOME">💬 Enquiry Welcome & Overview</option>
                             <option value="COURSE_FEE">🎓 Course Fee & Batch Info</option>
                             <option value="FOLLOWUP">⏰ Follow-up Reminder</option>
@@ -3182,22 +3354,82 @@ function WhatsAppModal({ data, onClose, token }) {
                     </div>
 
                     <div>
-                        <label style={{ fontSize: 12, fontWeight: 600, color: '#334155', display: 'block', marginBottom: 6 }}>
-                            Message Content (Editable)
-                        </label>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <label style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
+                                Message Content (Server-Sent)
+                            </label>
+                            <span style={{ fontSize: 11, color: '#64748b' }}>{messageText.length} chars</span>
+                        </div>
                         <textarea
-                            rows={5}
+                            rows={4}
                             value={messageText}
                             onChange={(e) => setMessageText(e.target.value)}
+                            placeholder="Type WhatsApp message..."
                             style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, resize: 'vertical' }}
                         />
                     </div>
 
-                    <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                        <button className="primary" onClick={openDirectWhatsApp} style={{ flex: 1, background: '#16a34a', borderColor: '#16a34a', color: '#ffffff', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
-                            <MessageCircle size={16} /> Open in WhatsApp Web / App
+                    {/* MESSAGE HISTORY SECTION */}
+                    <div>
+                        <button
+                            type="button"
+                            onClick={() => setShowHistory(!showHistory)}
+                            style={{ background: 'none', border: 'none', padding: 0, color: '#2563eb', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                            {showHistory ? '▲ Hide Message History' : `▼ View Message History (${messages.length})`}
                         </button>
-                        <button className="secondary" onClick={onClose}>
+
+                        {showHistory && (
+                            <div style={{ marginTop: 8, maxHeight: 180, overflowY: 'auto', background: '#f8fafc', padding: 10, borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }}>
+                                {loadingHistory ? (
+                                    <div style={{ color: '#64748b', textAlign: 'center', padding: 8 }}>Loading history...</div>
+                                ) : messages.length === 0 ? (
+                                    <div style={{ color: '#64748b', textAlign: 'center', padding: 8 }}>No previous WhatsApp messages logged.</div>
+                                ) : (
+                                    messages.map((m) => (
+                                        <div key={m.id} style={{
+                                            marginBottom: 8,
+                                            padding: '6px 10px',
+                                            borderRadius: 6,
+                                            background: m.direction === 'OUTBOUND' ? '#dcfce7' : '#ffffff',
+                                            border: '1px solid #e2e8f0',
+                                            marginLeft: m.direction === 'OUTBOUND' ? 20 : 0,
+                                            marginRight: m.direction === 'OUTBOUND' ? 0 : 20
+                                        }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#64748b', marginBottom: 2 }}>
+                                                <span><b>{m.direction === 'OUTBOUND' ? 'Outbound (CRM)' : 'Inbound'}</b> {m.user?.name ? `by ${m.user.name}` : ''}</span>
+                                                <span>{formatDateTime(m.createdAt)} ({m.status})</span>
+                                            </div>
+                                            <div style={{ fontSize: 12, color: '#1e293b' }}>{m.message}</div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                        <button
+                            type="button"
+                            className="primary"
+                            onClick={handleSendMessage}
+                            disabled={isSending || statusData.loading || !statusData.isConnected || !cleanPhone}
+                            style={{
+                                flex: 1,
+                                background: !statusData.isConnected || !cleanPhone ? '#94a3b8' : '#16a34a',
+                                borderColor: !statusData.isConnected || !cleanPhone ? '#94a3b8' : '#16a34a',
+                                color: '#ffffff',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                gap: 8,
+                                opacity: isSending ? 0.7 : 1,
+                                cursor: isSending || !statusData.isConnected ? 'not-allowed' : 'pointer'
+                            }}
+                        >
+                            <MessageCircle size={16} /> {isSending ? 'Sending via API...' : 'Send WhatsApp Message'}
+                        </button>
+                        <button type="button" className="secondary" onClick={onClose} disabled={isSending}>
                             Cancel
                         </button>
                     </div>
@@ -3975,7 +4207,6 @@ function Module({ page, leads = [], followups = [], courses = [], batches = [], 
     const generateWhatsAppReminder = (admission, pendingAmount, totalPaid) => {
         const studentName = admission.student ? `${admission.student.firstName} ${admission.student.lastName || ''}`.trim() : 'Student';
         const courseName = admission.course?.name || 'Course';
-        const phone = admission.student?.whatsappNumber || admission.student?.phone || '';
         const finalFee = Number(admission.finalFee) || 0;
         const instituteName = 'CAD POINT';
 
@@ -3993,8 +4224,9 @@ Kindly complete the pending payment at your earliest convenience.
 Thank you,
 ${instituteName}`;
 
-        const waUrl = `https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(text)}`;
-        window.open(waUrl, '_blank');
+        if (onOpenWhatsApp) {
+            onOpenWhatsApp(admission, { defaultMessage: text });
+        }
     };
 
     const handleRecordPaymentSubmit = async (e) => {
