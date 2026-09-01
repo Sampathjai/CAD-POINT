@@ -48,3 +48,4 @@ testAdmissionCustomFee().catch(err => {
   console.error('💥 Error testing custom fee admission:', err);
   process.exit(1);
 });
+
