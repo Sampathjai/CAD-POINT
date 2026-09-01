@@ -6764,7 +6764,7 @@ function SettingsView({ userRole, user, token, theme, toggleTheme, sourcesList =
                     }, 1000);
                 } else {
                     setWaConnecting(false);
-                    alert('Meta App ID is not configured. Please set META_APP_ID in server environment settings.');
+                    alert('Meta App ID is missing or invalid in Render backend environment settings. Please set a valid numeric META_APP_ID in your Render environment settings.');
                 }
             }
         } catch (e) {
@@ -7421,6 +7421,25 @@ function SettingsView({ userRole, user, token, theme, toggleTheme, sourcesList =
                                 <p>Connect individual WhatsApp Business Accounts & phone numbers for each CAD POINT branch via Meta OAuth.</p>
                             </div>
                         </div>
+
+                        {!waConfig?.appIdConfigured && (
+                            <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: 16, marginTop: 16 }}>
+                                <b style={{ color: '#b91c1c', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                    <AlertCircle size={18} /> Meta WhatsApp Business API Configuration Required
+                                </b>
+                                <p style={{ margin: '0 0 10px', fontSize: 13, color: '#7f1d1d', lineHeight: 1.5 }}>
+                                    To enable 1-click WhatsApp Embedded Signup for your branches, configure your numeric Meta Developer App ID in Render environment settings:
+                                </p>
+                                <div style={{ background: '#ffffff', padding: 12, borderRadius: 8, border: '1px solid #fecaca', fontSize: 12, fontFamily: 'monospace', color: '#991b1b' }}>
+                                    META_APP_ID=&lt;Your_Numeric_Meta_App_ID&gt;<br />
+                                    META_APP_SECRET=&lt;Your_Meta_App_Secret&gt;<br />
+                                    META_CONFIG_ID=&lt;Your_Embedded_Signup_Config_ID&gt;
+                                </div>
+                                <small style={{ display: 'block', marginTop: 8, color: '#991b1b' }}>
+                                    Find your numeric App ID in <b>Meta Developer Console → My Apps → Settings → Basic</b>.
+                                </small>
+                            </div>
+                        )}
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
                             {(branches && branches.length > 0 ? branches : [

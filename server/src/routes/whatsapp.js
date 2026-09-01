@@ -27,6 +27,10 @@ router.get('/config', authenticate, async (req, res) => {
       if (b) targetBranchId = b.id;
     }
 
+    const rawAppId = (process.env.META_APP_ID || '').trim();
+    const isNumericAppId = /^\d{10,20}$/.test(rawAppId);
+    console.log('[Meta Config Diagnostic]', { appIdConfigured: isNumericAppId, appIdLength: rawAppId.length });
+
     if (targetBranchId) {
       const integration = await prisma.whatsAppIntegration.findFirst({
         where: { organizationId, branchId: targetBranchId, status: 'CONNECTED' },
@@ -36,8 +40,9 @@ router.get('/config', authenticate, async (req, res) => {
       return res.json({
         success: true,
         data: {
-          appId: process.env.META_APP_ID || '9662422233860000',
-          configId: process.env.META_CONFIG_ID || '109283746590',
+          appId: isNumericAppId ? rawAppId : '',
+          appIdConfigured: isNumericAppId,
+          configId: (process.env.META_CONFIG_ID || '').trim(),
           apiVersion: META_GRAPH_VERSION,
           isConnected: Boolean(integration),
           integration: integration ? {
@@ -87,8 +92,9 @@ router.get('/config', authenticate, async (req, res) => {
     res.json({
       success: true,
       data: {
-        appId: process.env.META_APP_ID || '9662422233860000',
-        configId: process.env.META_CONFIG_ID || '109283746590',
+        appId: isNumericAppId ? rawAppId : '',
+        appIdConfigured: isNumericAppId,
+        configId: (process.env.META_CONFIG_ID || '').trim(),
         apiVersion: META_GRAPH_VERSION,
         isConnected: globalConnected,
         branches: branchIntegrations
@@ -142,7 +148,7 @@ router.post('/connect', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (
     if (!systemAccessToken) {
       return res.status(400).json({
         success: false,
-        message: 'Could not obtain valid Meta WhatsApp Access Token. Please verify Meta App credentials.'
+        message: 'Could not obtain valid Meta WhatsApp Access Token. Please verify Meta App credentials in Render environment.'
       });
     }
 
@@ -150,7 +156,7 @@ router.post('/connect', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (
     if (systemAccessToken) {
       try {
         if (!wabaId) {
-          const debugUrl = `${META_GRAPH_BASE_URL}/debug_token?input_token=${encodeURIComponent(systemAccessToken)}&access_token=${encodeURIComponent(appId ? `${appId}|${appSecret}` : systemAccessToken)}`;
+          const debugUrl = `${META_GRAPH_BASE_URL}/debug_token?input_token=${encodeURIComponent(systemAccessToken)}&access_token=${encodeURIComponent(appId && appSecret ? `${appId}|${appSecret}` : systemAccessToken)}`;
           const debugRes = await fetchMetaApi(debugUrl);
           if (debugRes.ok && debugRes.data?.data?.granular_scopes) {
             const wabaScope = debugRes.data.data.granular_scopes.find(s => s.scope === 'whatsapp_business_management');
@@ -176,8 +182,10 @@ router.post('/connect', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (
     }
 
     if (!wabaId || !phoneNumberId) {
-      wabaId = wabaId || `WABA-${targetBranch.code.toUpperCase()}-${Date.now()}`;
-      phoneNumberId = phoneNumberId || `PNID-${targetBranch.code.toUpperCase()}-${Date.now()}`;
+      return res.status(400).json({
+        success: false,
+        message: 'Could not retrieve valid WhatsApp Business Account (WABA) or Phone Number ID from Meta. Please ensure your Meta App has whatsapp_business_management permissions.'
+      });
     }
 
     const encryptedToken = encryptToken(systemAccessToken);
