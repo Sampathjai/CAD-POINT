@@ -22,7 +22,8 @@ import {
   ShieldCheck,
   Building,
   Check,
-  ChevronDown
+  ChevronDown,
+  Layers
 } from 'lucide-react';
 import { MobileBottomSheet } from './MobileBottomSheet';
 import { hasPermission, getDefaultPageForRole } from '../permissions';
@@ -51,12 +52,12 @@ export function MobileLayout({
   const [showBranchSheet, setShowBranchSheet] = useState(false);
 
   const allNavItems = [
-    { name: 'Dashboard', label: 'Home', icon: LayoutDashboard, primary: true },
-    { name: 'Leads', label: 'Leads', icon: UsersIcon, primary: true, badge: leadsCount },
-    { name: 'Follow-ups', label: 'Follow-ups', icon: CalendarDays, primary: true, badge: followupsCount },
-    { name: 'Students', label: 'Students', icon: GraduationCap, primary: true },
+    { name: 'Dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { name: 'Leads', label: 'Leads', icon: UsersIcon, badge: leadsCount },
+    { name: 'Follow-ups', label: 'Follow-ups', icon: CalendarDays, badge: followupsCount },
     { name: 'Courses', label: 'Courses', icon: BookOpen },
     { name: 'Batches', label: 'Batches', icon: CalendarDays },
+    { name: 'Students', label: 'Students', icon: GraduationCap },
     { name: 'Admissions', label: 'Admissions', icon: ArrowUpRight },
     { name: 'Payments', label: 'Payments', icon: WalletCards },
     { name: 'Reports', label: 'Reports', icon: BarChart3 },
@@ -99,6 +100,11 @@ export function MobileLayout({
         </div>
 
         <div className="mobile-header-right">
+          {/* Quick Add Button */}
+          <button className="mobile-header-btn text-emerald" onClick={() => setShowQuickAddSheet(true)} aria-label="Quick Add">
+            <Plus size={20} />
+          </button>
+
           {/* Search Button */}
           <button className="mobile-header-btn" onClick={onOpenSearch} aria-label="Search">
             <Search size={18} />
@@ -144,68 +150,27 @@ export function MobileLayout({
         )}
       </main>
 
-      {/* Safe-Area Aware Mobile Bottom Navigation */}
-      <nav className="mobile-bottom-nav">
-        <button 
-          className={`mobile-nav-item ${page === 'Dashboard' ? 'active' : ''}`}
-          onClick={() => handleNavigate('Dashboard')}
-        >
-          <LayoutDashboard size={20} />
-          <span>Home</span>
-        </button>
-
-        {hasPermission(user?.role, 'Leads') && (
-          <button 
-            className={`mobile-nav-item ${page === 'Leads' ? 'active' : ''}`}
-            onClick={() => handleNavigate('Leads')}
-          >
-            <div className="mobile-nav-icon-wrap">
-              <UsersIcon size={20} />
-              {leadsCount > 0 && <span className="mobile-nav-badge">{leadsCount}</span>}
-            </div>
-            <span>Leads</span>
-          </button>
-        )}
-
-        {/* Center Floating Quick Add Action Button */}
-        <button 
-          className="mobile-nav-add-btn"
-          onClick={() => setShowQuickAddSheet(true)}
-          aria-label="Quick Add"
-        >
-          <Plus size={24} />
-        </button>
-
-        {hasPermission(user?.role, 'Follow-ups') && (
-          <button 
-            className={`mobile-nav-item ${page === 'Follow-ups' ? 'active' : ''}`}
-            onClick={() => handleNavigate('Follow-ups')}
-          >
-            <div className="mobile-nav-icon-wrap">
-              <CalendarDays size={20} />
-              {followupsCount > 0 && <span className="mobile-nav-badge">{followupsCount}</span>}
-            </div>
-            <span>Follow-ups</span>
-          </button>
-        )}
-
-        {hasPermission(user?.role, 'Students') && (
-          <button 
-            className={`mobile-nav-item ${page === 'Students' ? 'active' : ''}`}
-            onClick={() => handleNavigate('Students')}
-          >
-            <GraduationCap size={20} />
-            <span>Students</span>
-          </button>
-        )}
-
-        <button 
-          className={`mobile-nav-item ${showMoreMenu || !['Dashboard', 'Leads', 'Follow-ups', 'Students'].includes(page) ? 'active' : ''}`}
-          onClick={() => setShowMoreMenu(true)}
-        >
-          <Menu size={20} />
-          <span>More</span>
-        </button>
+      {/* Horizontally Scrollable Safe-Area Mobile Bottom Navigation Bar */}
+      <nav className="mobile-bottom-nav scrollable">
+        {allowedNavItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = page === item.name;
+          return (
+            <button 
+              key={item.name}
+              className={`mobile-nav-item ${isActive ? 'active' : ''}`}
+              onClick={() => handleNavigate(item.name)}
+            >
+              <div className="mobile-nav-icon-wrap">
+                <Icon size={19} />
+                {item.badge !== undefined && item.badge > 0 && (
+                  <span className="mobile-nav-badge">{item.badge}</span>
+                )}
+              </div>
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
       </nav>
 
       {/* Branch Selection Bottom Sheet */}
@@ -332,7 +297,7 @@ export function MobileLayout({
       <MobileBottomSheet
         isOpen={showMoreMenu}
         onClose={() => setShowMoreMenu(false)}
-        title="CRM Navigation"
+        title="Account & Preferences"
         maxHeight="90vh"
       >
         <div className="mobile-user-profile-card">
@@ -346,34 +311,7 @@ export function MobileLayout({
           </button>
         </div>
 
-        <div className="mobile-menu-section-title">WORKSPACE MODULES</div>
-
-        <div className="mobile-menu-list">
-          {allowedNavItems.map((item) => {
-            const Icon = item.icon;
-            const isCurrent = page === item.name;
-            return (
-              <button
-                key={item.name}
-                className={`mobile-menu-item ${isCurrent ? 'active' : ''}`}
-                onClick={() => handleNavigate(item.name)}
-              >
-                <div className="mobile-menu-item-left">
-                  <Icon size={18} />
-                  <span>{item.name}</span>
-                </div>
-                <div className="mobile-menu-item-right">
-                  {item.badge !== undefined && item.badge > 0 && (
-                    <span className="mobile-menu-badge">{item.badge}</span>
-                  )}
-                  <ChevronRight size={16} />
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="mobile-menu-section-title" style={{ marginTop: 16 }}>SYSTEM & THEME</div>
+        <div className="mobile-menu-section-title">SYSTEM & THEME</div>
         <div className="mobile-menu-list">
           <button className="mobile-menu-item" onClick={toggleTheme}>
             <div className="mobile-menu-item-left">

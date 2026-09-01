@@ -2516,6 +2516,27 @@ button, select, input[type="text"], input[type="email"], input[type="tel"], inpu
     justify-content: space-around;
 }
 
+.mobile-bottom-nav.scrollable {
+    justify-content: flex-start;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    gap: 2px;
+    padding-left: 6px;
+    padding-right: 6px;
+}
+
+.mobile-bottom-nav.scrollable::-webkit-scrollbar {
+    display: none;
+}
+
+.mobile-bottom-nav.scrollable .mobile-nav-item {
+    flex: 0 0 auto;
+    min-width: 66px;
+    scroll-snap-align: start;
+    padding: 4px 6px;
+}
+
 [data-theme="dark"] .mobile-bottom-nav {
     background: rgba(15, 23, 42, 0.96);
     border-top-color: rgba(255, 255, 255, 0.08);
