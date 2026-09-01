@@ -31,3 +31,4 @@ export function useResponsive() {
     screenType: isMobile ? 'mobile' : isTablet ? 'tablet' : 'desktop'
   };
 }
+

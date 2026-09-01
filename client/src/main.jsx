@@ -225,6 +225,7 @@ function CertificateBadge({ status, issueDate }) {
 }
 
 function App() {
+    const { isMobile } = useResponsive();
     const [page, setPage] = useState('Dashboard');
     const [activeBranch, setActiveBranch] = useState(() => localStorage.getItem('cadpoint_branch') || 'gandhipuram');
     const [branchesList, setBranchesList] = useState([]);
@@ -1141,7 +1142,6 @@ function App() {
         ['Settings', Settings]
     ];
 
-    const { isMobile } = useResponsive();
     const nav = allNavItems.filter(([pageName]) => hasPermission(user?.role, pageName));
 
     if (isMobile) {

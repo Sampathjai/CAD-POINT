@@ -290,3 +290,4 @@ export function MobileUsersView({ usersList = [], onOpenAddModal, onEditUser, on
     </div>
   );
 }
+
