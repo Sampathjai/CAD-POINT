@@ -2899,6 +2899,27 @@ button, select, input[type="text"], input[type="email"], input[type="tel"], inpu
     color: #cbd5e1;
 }
 
+/* Utility Color Classes */
+.text-emerald { color: #059669 !important; }
+[data-theme="dark"] .text-emerald { color: #34d399 !important; }
+.text-blue { color: #2563eb !important; }
+[data-theme="dark"] .text-blue { color: #60a5fa !important; }
+.text-purple { color: #7c3aed !important; }
+[data-theme="dark"] .text-purple { color: #a78bfa !important; }
+.text-amber { color: #d97706 !important; }
+[data-theme="dark"] .text-amber { color: #fbbf24 !important; }
+.text-teal { color: #0d9488 !important; }
+[data-theme="dark"] .text-teal { color: #2dd4bf !important; }
+.text-indigo { color: #4f46e5 !important; }
+[data-theme="dark"] .text-indigo { color: #818cf8 !important; }
+.text-rose { color: #e11d48 !important; }
+[data-theme="dark"] .text-rose { color: #fb7185 !important; }
+
+.bg-emerald { background-color: #10b981 !important; }
+.bg-blue { background-color: #2563eb !important; }
+.bg-purple { background-color: #8b5cf6 !important; }
+.bg-amber { background-color: #f59e0b !important; }
+
 /* --- Business Revenue Section CSS --- */
 .mobile-revenue-stats-grid {
     display: flex;
@@ -2908,25 +2929,44 @@ button, select, input[type="text"], input[type="email"], input[type="tel"], inpu
 }
 
 .mobile-revenue-stat-card {
-    background: #f8fafc;
-    border-radius: 12px;
-    padding: 12px 14px;
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 14px 16px;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+    color: #0f172a;
 }
 
 [data-theme="dark"] .mobile-revenue-stat-card {
-    background: #0f172a;
+    background: #1e293b;
+    border-color: #334155;
+    color: #f8fafc;
 }
 
-.mobile-revenue-stat-card span { font-size: 11px; color: #64748b; font-weight: 600; }
-.mobile-revenue-stat-card b { font-size: 22px; font-weight: 800; }
-.mobile-revenue-stat-card small { font-size: 10px; color: #94a3b8; font-weight: 500; }
+.mobile-revenue-stat-card span { font-size: 12px; color: #64748b; font-weight: 600; }
+[data-theme="dark"] .mobile-revenue-stat-card span { color: #94a3b8; }
 
-.mobile-revenue-stat-card.primary { border-left: 4px solid #10b981; }
-.mobile-revenue-stat-card.secondary { border-left: 4px solid #2563eb; }
-.mobile-revenue-stat-card.warning { border-left: 4px solid #f59e0b; }
+.mobile-revenue-stat-card b { font-size: 24px; font-weight: 800; color: #0f172a; }
+[data-theme="dark"] .mobile-revenue-stat-card b { color: #f8fafc; }
+
+.mobile-revenue-stat-card small { font-size: 11px; color: #64748b; font-weight: 500; }
+[data-theme="dark"] .mobile-revenue-stat-card small { color: #94a3b8; }
+
+.mobile-revenue-stat-card.card-collected { border-left: 5px solid #10b981; }
+.mobile-revenue-stat-card.card-total { border-left: 5px solid #2563eb; }
+.mobile-revenue-stat-card.card-pending { border-left: 5px solid #f59e0b; }
+
+.progress-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
 
 .mobile-method-breakdown-list,
 .mobile-course-revenue-list {

@@ -101,19 +101,19 @@ export function MobileReportsView({
         </div>
 
         <div className="mobile-revenue-stats-grid">
-          <div className="mobile-revenue-stat-card primary">
+          <div className="mobile-revenue-stat-card card-collected">
             <span>Collected Revenue</span>
             <b className="text-emerald">₹{collectedRevenue.toLocaleString()}</b>
             <small>{collectionRate}% of agreed fees collected</small>
           </div>
 
-          <div className="mobile-revenue-stat-card secondary">
+          <div className="mobile-revenue-stat-card card-total">
             <span>Total Business Value</span>
-            <b>₹{totalBusinessValue.toLocaleString()}</b>
+            <b className="text-blue">₹{totalBusinessValue.toLocaleString()}</b>
             <small>Agreed fees across admissions</small>
           </div>
 
-          <div className="mobile-revenue-stat-card warning">
+          <div className="mobile-revenue-stat-card card-pending">
             <span>Pending Revenue</span>
             <b className="text-amber">₹{pendingRevenue.toLocaleString()}</b>
             <small>Outstanding balances</small>
@@ -124,7 +124,7 @@ export function MobileReportsView({
         <div className="mobile-progress-block" style={{ marginTop: 16 }}>
           <div className="progress-label-row">
             <span>Overall Collection Progress</span>
-            <b>{collectionRate}%</b>
+            <b className="text-emerald">{collectionRate}%</b>
           </div>
           <div className="progress-track">
             <div className="progress-fill bg-emerald" style={{ width: `${Math.min(100, collectionRate)}%` }}></div>
