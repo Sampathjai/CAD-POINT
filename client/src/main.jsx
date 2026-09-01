@@ -235,6 +235,7 @@ function App() {
     const { isMobile } = useResponsive();
     const [page, setPage] = useState('Dashboard');
     const [filterText, setFilterText] = useState('');
+    const [tempStudentFilter, setTempStudentFilter] = useState('');
     const [activeBranch, setActiveBranch] = useState(() => localStorage.getItem('cadpoint_branch') || 'gandhipuram');
     const [branchesList, setBranchesList] = useState([]);
     const [sourcesList, setSourcesList] = useState([]);
@@ -242,6 +243,16 @@ function App() {
     const [newSourceName, setNewSourceName] = useState('');
     const [editingAdmissionProgress, setEditingAdmissionProgress] = useState(null);
     const [progressForm, setProgressForm] = useState({ id: '', startDate: '', endDate: '', completionPct: 0, certificateStatus: 'NOT_STARTED', issueDate: '' });
+
+    function handleNavigate(targetPage) {
+        setTempStudentFilter('');
+        setPage(targetPage);
+    }
+
+    function handleViewStudentProfile(studentCode) {
+        setTempStudentFilter(studentCode || '');
+        setPage('Students');
+    }
 
     const [token, setToken] = useState(() => localStorage.getItem('cadpoint_token') || '');
     const [user, setUser] = useState(null);
@@ -815,8 +826,7 @@ function App() {
             const createdStudentCode = j.data?.studentCode || addStudentForm.studentCode;
             setAddStudentForm({ studentCode: '', leadId: '', firstName: '', parentName: '', dateOfBirth: '', address: '', phone: '', email: '', passportNumber: '', photoUrl: '' });
             if (window.confirm(`✓ Student created successfully (ID: ${createdStudentCode})!\n✓ Follow-up marked as Converted.\n\nWould you like to view the new student in the Students tab?`)) {
-                setPage('Students');
-                setFilterText(createdStudentCode);
+                handleViewStudentProfile(createdStudentCode);
             }
         } catch (e) {
             console.error(e);
@@ -834,8 +844,7 @@ function App() {
         const existingStudent = safeStudentList.find(s => s.leadId === lead.id || (s.phone && lead.phone && s.phone === lead.phone));
         if (existingStudent) {
             if (window.confirm(`An existing student was found for this lead:\n\nStudent: ${existingStudent.firstName} (ID: ${existingStudent.studentCode})\nPhone: ${existingStudent.phone}\n\nWould you like to view this student in the Students tab?`)) {
-                setPage('Students');
-                setFilterText(existingStudent.studentCode);
+                handleViewStudentProfile(existingStudent.studentCode);
             }
             return;
         }
@@ -1371,7 +1380,7 @@ function App() {
                 </div>
                 <div className="section">WORKSPACE</div>
                 {nav.map(([n, I]) => (
-                    <button key={n} className={page === n ? 'nav active' : 'nav'} onClick={() => setPage(n)}>
+                    <button key={n} className={page === n ? 'nav active' : 'nav'} onClick={() => handleNavigate(n)}>
                         <I size={18} />
                         <span>{n}</span>
                         {n === 'Leads' && <em>{leads.length}</em>}
@@ -1402,11 +1411,6 @@ function App() {
 
             <main>
                 <header>
-                    <div>
-                        <span className="crumb">Workspace / </span>
-                        <b>{page}</b>
-                        <h1>{page === 'Dashboard' ? `CADPOINT COIMBATORE 👋` : page}</h1>
-                    </div>
                     <div className="headright">
                         <div className="search" style={{ position: 'relative' }}>
                             <Search size={17} />
@@ -1545,7 +1549,7 @@ function App() {
                             onSchedule={() => setShowSchedule(true)}
                             onCompleteFollowup={completeFollowup}
                             onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
-                            onNavigate={(targetPage) => setPage(targetPage)}
+                            onNavigate={(targetPage) => handleNavigate(targetPage)}
                         />
                     ) : (
                         <Module
@@ -1578,9 +1582,10 @@ function App() {
                             onDeletePayment={deletePayment}
                             onPreviewPhoto={(url) => setPreviewPhotoUrl(url)}
                             onOpenEditProgress={openEditProgress}
-                            setPage={setPage}
-                            initialFilterText={filterText}
+                            setPage={handleNavigate}
+                            initialFilterText={tempStudentFilter || filterText}
                             setFilterText={setFilterText}
+                            onViewStudentProfile={handleViewStudentProfile}
                             currentUserId={user?.id}
                             userRole={user?.role}
                             user={user}
@@ -4135,7 +4140,7 @@ function Dashboard({ user, token, leads = [], followups = [], admissions = [], p
     );
 }
 
-function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onOpenAssignBatchModal, onUnassignStudentFromBatch, onCompleteFollowup, onOpenWhatsApp, onAdmitFromFollowup, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onEditStudent, onDeleteStudent, onDeleteAdmission, onEditPayment, onDeletePayment, onPreviewPhoto, onOpenEditProgress, setPage, initialFilterText = '', setFilterText: setParentFilterText, currentUserId, userRole, user, token, theme, toggleTheme, refreshData }) {
+function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onOpenAssignBatchModal, onUnassignStudentFromBatch, onCompleteFollowup, onOpenWhatsApp, onAdmitFromFollowup, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onEditStudent, onDeleteStudent, onDeleteAdmission, onEditPayment, onDeletePayment, onPreviewPhoto, onOpenEditProgress, setPage, initialFilterText = '', setFilterText: setParentFilterText, onViewStudentProfile, currentUserId, userRole, user, token, theme, toggleTheme, refreshData }) {
     const itemSingular = page === 'Batches' ? 'Batch' : (page.endsWith('es') ? page.slice(0, -2) : (page.endsWith('s') ? page.slice(0, -1) : page));
     const [filterText, setFilterText] = useState(initialFilterText || '');
 
@@ -4547,8 +4552,12 @@ ${instituteName}`;
                                                             onClick={() => {
                                                                 const s = linkedStudent || safeStudents.find(st => st.phone && f.lead?.phone && st.phone === f.lead.phone);
                                                                 if (s) {
-                                                                    setPage('Students');
-                                                                    setFilterText(s.studentCode);
+                                                                    if (onViewStudentProfile) {
+                                                                        onViewStudentProfile(s.studentCode);
+                                                                    } else {
+                                                                        setPage('Students');
+                                                                        setFilterText(s.studentCode);
+                                                                    }
                                                                 } else if (linkedAdmission) {
                                                                     setPage('Admissions');
                                                                     setFilterText(linkedAdmission.admissionNumber);
@@ -4884,8 +4893,13 @@ ${instituteName}`;
                                                                                                         onClick={(e) => {
                                                                                                             e.preventDefault();
                                                                                                             e.stopPropagation();
-                                                                                                            if (setPage) setPage('Students');
-                                                                                                            if (setParentFilterText) setParentFilterText(adm.student?.studentCode || adm.student?.firstName || '');
+                                                                                                            const code = adm.student?.studentCode || adm.student?.firstName || '';
+                                                                                                            if (onViewStudentProfile) {
+                                                                                                                onViewStudentProfile(code);
+                                                                                                            } else {
+                                                                                                                if (setPage) setPage('Students');
+                                                                                                                if (setParentFilterText) setParentFilterText(code);
+                                                                                                            }
                                                                                                         }}
                                                                                                         title="View Student Profile"
                                                                                                     >
