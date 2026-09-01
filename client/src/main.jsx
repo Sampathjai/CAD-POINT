@@ -5,7 +5,7 @@ import { GlobalLoader } from './components/GlobalLoader';
 import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
 import { CardSkeleton, TableSkeleton, DashboardSkeleton } from './components/SkeletonLoader';
 import { CRMStateView } from './components/CRMStateView';
-import { hasPermission, getDefaultPageForRole, ALL_CRM_MODULES, ROLE_PERMISSIONS } from './permissions';
+import { hasPermission, getDefaultPageForRole } from './permissions';
 import {
     LayoutDashboard,
     Users,
@@ -231,104 +231,6 @@ function CertificateBadge({ status, issueDate }) {
   );
 }
 
-function UserPermissionsSelector({ selectedPermissions = [], onChange }) {
-    const groups = ['DASHBOARDS', 'CORE', 'OPERATIONS', 'COMMUNICATION', 'REPORTS', 'ADMINISTRATION'];
-
-    const handleToggle = (key) => {
-        if (selectedPermissions.includes(key)) {
-            onChange(selectedPermissions.filter((k) => k !== key));
-        } else {
-            onChange([...selectedPermissions, key]);
-        }
-    };
-
-    const handleSelectAll = () => {
-        const allKeys = (ALL_CRM_MODULES || []).map((m) => m.key);
-        onChange(allKeys);
-    };
-
-    const handleClearAll = () => {
-        onChange([]);
-    };
-
-    return (
-        <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border-color, #cbd5e1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
-                <div>
-                    <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary, #0f172a)', margin: 0, display: 'block' }}>
-                        Access / Give Access To
-                    </label>
-                    <span style={{ fontSize: 11, color: '#64748b', display: 'block' }}>
-                        Select granular module permissions for this user.
-                    </span>
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                    <button
-                        type="button"
-                        className="secondary"
-                        style={{ padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}
-                        onClick={handleSelectAll}
-                    >
-                        ✓ Select All
-                    </button>
-                    <button
-                        type="button"
-                        className="secondary"
-                        style={{ padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}
-                        onClick={handleClearAll}
-                    >
-                        ✕ Clear All
-                    </button>
-                </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--bg-surface, #f8fafc)', padding: 12, borderRadius: 8, border: '1px solid var(--border-color, #e2e8f0)' }}>
-                {groups.map((group) => {
-                    const modulesInGroup = (ALL_CRM_MODULES || []).filter((m) => m.group === group);
-                    if (modulesInGroup.length === 0) return null;
-                    return (
-                        <div key={group} style={{ marginBottom: 4 }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
-                                {group}
-                            </span>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 6 }}>
-                                {modulesInGroup.map((m) => {
-                                    const checked = selectedPermissions.includes(m.key);
-                                    return (
-                                        <label
-                                            key={m.key}
-                                            style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: 6,
-                                                fontSize: 12,
-                                                cursor: 'pointer',
-                                                background: checked ? 'rgba(34, 197, 94, 0.1)' : 'var(--bg-card, #ffffff)',
-                                                padding: '4px 8px',
-                                                borderRadius: 6,
-                                                border: `1px solid ${checked ? '#86efac' : '#cbd5e1'}`,
-                                                color: checked ? '#166534' : 'var(--text-primary, #334155)',
-                                                fontWeight: checked ? 600 : 400
-                                            }}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={checked}
-                                                onChange={() => handleToggle(m.key)}
-                                            />
-                                            {m.label}
-                                        </label>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-}
-
 function App() {
     const { isMobile } = useResponsive();
     const [page, setPage] = useState('Dashboard');
@@ -390,7 +292,7 @@ function App() {
     const [showAddPayment, setShowAddPayment] = useState(false);
     const [showAddUser, setShowAddUser] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
-    const [editUserForm, setEditUserForm] = useState({ id: '', name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true, customPermissions: ROLE_PERMISSIONS['COUNSELLOR'] || [] });
+    const [editUserForm, setEditUserForm] = useState({ id: '', name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true });
     const [editingCourse, setEditingCourse] = useState(null);
     const [editCourseForm, setEditCourseForm] = useState({ id: '', courseCode: '', name: '', description: '', standardFee: '', isActive: true });
     const [editingBatch, setEditingBatch] = useState(null);
@@ -424,7 +326,7 @@ function App() {
     const [studentSearchQuery, setStudentSearchQuery] = useState('');
     const [showStudentDropdown, setShowStudentDropdown] = useState(false);
     const [addPaymentForm, setAddPaymentForm] = useState({ admissionId: '', receiptNumber: '', amount: '', paymentMethod: 'UPI', transactionReference: '', remarks: '' });
-    const [addUserForm, setAddUserForm] = useState({ name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true, customPermissions: ROLE_PERMISSIONS['COUNSELLOR'] || [] });
+    const [addUserForm, setAddUserForm] = useState({ name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true });
 
 
     function handleStudentPhotoUpload(e) {
@@ -1106,22 +1008,16 @@ function App() {
 
     async function createUserSubmit() {
         try {
-            const payload = {
-                ...addUserForm,
-                customPermissions: Array.isArray(addUserForm.customPermissions) && addUserForm.customPermissions.length === 0
-                    ? ['NONE']
-                    : addUserForm.customPermissions
-            };
             const res = await fetch(API_BASE + '/users', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(addUserForm)
             });
             const j = await res.json();
             if (!j.success) return alert(j.message || 'Create user failed');
             fetchAllData();
             setShowAddUser(false);
-            setAddUserForm({ name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true, customPermissions: ROLE_PERMISSIONS['COUNSELLOR'] || [] });
+            setAddUserForm({ name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true });
         } catch (e) {
             console.error(e);
             alert('Create user failed');
@@ -1130,16 +1026,10 @@ function App() {
 
     async function updateUserSubmit() {
         try {
-            const payload = {
-                ...editUserForm,
-                customPermissions: Array.isArray(editUserForm.customPermissions) && editUserForm.customPermissions.length === 0
-                    ? ['NONE']
-                    : editUserForm.customPermissions
-            };
             const res = await fetch(API_BASE + '/users/' + editUserForm.id, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(editUserForm)
             });
             const j = await res.json();
             if (!j.success) return alert(j.message || 'Update user failed');
@@ -1169,19 +1059,7 @@ function App() {
 
     function openEditUser(u) {
         setEditingUser(u);
-        const userPerms = Array.isArray(u.customPermissions)
-            ? u.customPermissions
-            : (ROLE_PERMISSIONS[u.role] || []);
-        setEditUserForm({
-            id: u.id,
-            name: u.name,
-            email: u.email,
-            phone: u.phone || '',
-            password: '',
-            role: u.role,
-            isActive: u.isActive,
-            customPermissions: userPerms
-        });
+        setEditUserForm({ id: u.id, name: u.name, email: u.email, phone: u.phone || '', password: '', role: u.role, isActive: u.isActive });
     }
 
     function openEditCourse(c) {
@@ -1310,22 +1188,20 @@ function App() {
     }
 
     const allNavItems = [
-        hasPermission(user, 'adminDashboard') && ['Admin Dashboard', LayoutDashboard],
-        hasPermission(user, 'leadsDashboard') && ['Leads Dashboard', LayoutDashboard],
-        hasPermission(user, 'leads') && ['Leads', UsersIcon],
-        hasPermission(user, 'followups') && ['Follow-ups', CalendarDays],
-        hasPermission(user, 'courses') && ['Courses', BookOpen],
-        hasPermission(user, 'batches') && ['Batches', CalendarDays],
-        hasPermission(user, 'students') && ['Students', GraduationCap],
-        hasPermission(user, 'admissions') && ['Admissions', ArrowUpRight],
-        hasPermission(user, 'payments') && ['Payments', WalletCards],
-        hasPermission(user, 'reports') && ['Reports', BarChart3],
-        hasPermission(user, 'userControl') && ['Users', UserCheck],
-        hasPermission(user, 'adminSettings') && ['Admin Settings', Settings],
-        hasPermission(user, 'restrictedSettings') && !hasPermission(user, 'adminSettings') && ['Restricted Settings', Settings]
-    ].filter(Boolean);
+        ['Dashboard', LayoutDashboard],
+        ['Leads', UsersIcon],
+        ['Follow-ups', CalendarDays],
+        ['Courses', BookOpen],
+        ['Batches', CalendarDays],
+        ['Students', GraduationCap],
+        ['Admissions', ArrowUpRight],
+        ['Payments', WalletCards],
+        ['Reports', BarChart3],
+        ['Users', UserCheck],
+        ['Settings', Settings]
+    ];
 
-    const nav = allNavItems;
+    const nav = allNavItems.filter(([pageName]) => hasPermission(user?.role, pageName));
 
     return (
         <>
@@ -1347,21 +1223,7 @@ function App() {
                     onOpenAddModal={(p) => openAddModalForPage(p)}
                     onOpenSearch={() => setShowSearchModal(true)}
                 >
-                    {(page === 'Admin Dashboard' || (page === 'Dashboard' && hasPermission(user, 'adminDashboard'))) ? (
-                        <Dashboard
-                            user={user}
-                            token={token}
-                            leads={leads}
-                            followups={followups}
-                            admissions={admissions}
-                            payments={payments}
-                            onAddLead={() => setShowAddLead(true)}
-                            onSchedule={() => setShowSchedule(true)}
-                            onCompleteFollowup={completeFollowup}
-                            onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
-                            onNavigate={(targetPage) => setPage(targetPage)}
-                        />
-                    ) : (page === 'Leads Dashboard' || (page === 'Dashboard' && hasPermission(user, 'leadsDashboard'))) ? (
+                    {page === 'Dashboard' ? (
                         <MobileDashboard
                             user={user}
                             leads={leads}
@@ -1660,7 +1522,7 @@ function App() {
                 </header>
 
                 <ErrorBoundary key={page}>
-                    {!hasPermission(user, page) ? (
+                    {!hasPermission(user?.role, page) ? (
                         <div className="content" style={{ display: 'grid', placeItems: 'center', minHeight: '50vh' }}>
                             <div style={{ padding: 40, textAlign: 'center', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 12, maxWidth: 500 }}>
                                 <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#fee2e2', color: '#dc2626', display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}>
@@ -1670,28 +1532,15 @@ function App() {
                                 <p style={{ margin: '0 0 20px', color: 'var(--text-muted)', fontSize: 14 }}>
                                     Your account role (<b>{user?.role || 'User'}</b>) does not have permission to access the <b>{page}</b> module.
                                 </p>
-                                <button className="primary" onClick={() => handleNavigate(getDefaultPageForRole(user))}>
-                                    Return to {getDefaultPageForRole(user)}
+                                <button className="primary" onClick={() => setPage(getDefaultPageForRole(user?.role))}>
+                                    Return to {getDefaultPageForRole(user?.role)}
                                 </button>
                             </div>
                         </div>
-                    ) : (page === 'Admin Dashboard' || (page === 'Dashboard' && hasPermission(user, 'adminDashboard'))) ? (
+                    ) : page === 'Dashboard' ? (
                         <Dashboard
                             user={user}
                             token={token}
-                            leads={leads}
-                            followups={followups}
-                            admissions={admissions}
-                            payments={payments}
-                            onAddLead={() => setShowAddLead(true)}
-                            onSchedule={() => setShowSchedule(true)}
-                            onCompleteFollowup={completeFollowup}
-                            onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
-                            onNavigate={(targetPage) => handleNavigate(targetPage)}
-                        />
-                    ) : (page === 'Leads Dashboard' || (page === 'Dashboard' && hasPermission(user, 'leadsDashboard'))) ? (
-                        <MobileDashboard
-                            user={user}
                             leads={leads}
                             followups={followups}
                             admissions={admissions}
@@ -2001,11 +1850,7 @@ function App() {
                         <label className="checkbox-label">
                             <input type="checkbox" checked={editUserForm.isActive} onChange={(e) => setEditUserForm({ ...editUserForm, isActive: e.target.checked })} /> Active User Account
                         </label>
-                        <UserPermissionsSelector
-                            selectedPermissions={editUserForm.customPermissions || []}
-                            onChange={(perms) => setEditUserForm({ ...editUserForm, customPermissions: perms })}
-                        />
-                        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                             <button className="primary" type="submit">Save Changes</button>
                             <button type="button" onClick={() => setEditingUser(null)}>Cancel</button>
                         </div>
@@ -3093,13 +2938,7 @@ function App() {
                         </label>
                         <label>
                             Role
-                            <select
-                                value={addUserForm.role}
-                                onChange={(e) => {
-                                    const r = e.target.value;
-                                    setAddUserForm({ ...addUserForm, role: r, customPermissions: ROLE_PERMISSIONS[r] || [] });
-                                }}
-                            >
+                            <select value={addUserForm.role} onChange={(e) => setAddUserForm({ ...addUserForm, role: e.target.value })}>
                                 <option value="SUPER_ADMIN">SUPER_ADMIN</option>
                                 <option value="ADMIN">ADMIN</option>
                                 <option value="COUNSELLOR">COUNSELLOR</option>
@@ -3108,11 +2947,7 @@ function App() {
                                 <option value="RECEPTIONIST">RECEPTIONIST</option>
                             </select>
                         </label>
-                        <UserPermissionsSelector
-                            selectedPermissions={addUserForm.customPermissions || []}
-                            onChange={(perms) => setAddUserForm({ ...addUserForm, customPermissions: perms })}
-                        />
-                        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                             <button className="primary" type="submit">Create User</button>
                             <button type="button" onClick={() => setShowAddUser(false)}>Cancel</button>
                         </div>
@@ -7607,24 +7442,18 @@ function SettingsView({ userRole, user, token, theme, toggleTheme, sourcesList =
     const safeUserRole = userRole || user?.role || 'RECEPTIONIST';
     const safeUsers = Array.isArray(usersList) ? usersList : [];
 
-    const hasAdminSettings = hasPermission(user || safeUserRole, 'adminSettings');
-    const hasRestrictedSettings = hasPermission(user || safeUserRole, 'restrictedSettings');
-
     const allTabs = [
-        { id: 'Profile', label: 'Institute Profile', icon: ShieldCheck, adminOnly: true },
-        { id: 'Appearance', label: 'Appearance & Theme', icon: Sun, adminOnly: false },
-        { id: 'User Control', label: 'User Control & Roles', icon: UserCheck, adminOnly: true },
-        { id: 'Branch Management', label: 'Branch Management', icon: Database, adminOnly: true },
-        { id: 'WhatsApp & API', label: 'WhatsApp & API', icon: MessageCircle, adminOnly: true },
-        { id: 'Storage & Database', label: 'Storage & Database', icon: Database, adminOnly: true },
-        { id: 'Enquiry Sources', label: 'Enquiry Sources', icon: Plus, adminOnly: true },
-        { id: 'System Info', label: 'System Info', icon: Laptop, adminOnly: false }
+        { id: 'Profile', label: 'Institute Profile', icon: ShieldCheck, perm: 'settings.profile' },
+        { id: 'Appearance', label: 'Appearance & Theme', icon: Sun, perm: 'settings.appearance' },
+        { id: 'User Control', label: 'User Control & Roles', icon: UserCheck, perm: 'settings.users' },
+        { id: 'Branch Management', label: 'Branch Management', icon: Database, perm: 'settings.branches' },
+        { id: 'WhatsApp & API', label: 'WhatsApp & API', icon: MessageCircle, perm: 'settings.whatsapp' },
+        { id: 'Storage & Database', label: 'Storage & Database', icon: Database, perm: 'settings.whatsapp' },
+        { id: 'Enquiry Sources', label: 'Enquiry Sources', icon: Plus, perm: 'settings.whatsapp' },
+        { id: 'System Info', label: 'System Info', icon: Laptop, perm: 'settings.profile' }
     ];
 
-    const tabs = allTabs.filter((t) => {
-        if (t.adminOnly) return hasAdminSettings;
-        return hasRestrictedSettings || hasAdminSettings;
-    });
+    const tabs = allTabs.filter(t => hasPermission(safeUserRole, t.perm));
 
     useEffect(() => {
         if (tabs.length > 0 && !tabs.some(t => t.id === activeTab)) {

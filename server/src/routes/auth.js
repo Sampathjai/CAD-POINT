@@ -21,7 +21,7 @@ router.post('/login', async (req, res) => {
     const tDbStart = Date.now();
     const user = await prisma.user.findUnique({
       where: { email: data.email },
-      select: { id: true, name: true, email: true, role: true, isActive: true, customPermissions: true, passwordHash: true }
+      select: { id: true, name: true, email: true, role: true, isActive: true, passwordHash: true }
     });
     const tDbEnd = Date.now();
     console.log(`[LOGIN] 👤 User lookup completed in ${tDbEnd - tDbStart}ms`);
@@ -49,12 +49,12 @@ router.post('/login', async (req, res) => {
 
     const secret = process.env.JWT_SECRET || 'cadpoint_super_secret_jwt_key_2026_coimbatore';
     const token = jwt.sign(
-      { id: user.id, role: user.role, email: user.email, name: user.name, customPermissions: user.customPermissions || [] },
+      { id: user.id, role: user.role, email: user.email, name: user.name },
       secret,
       { expiresIn: '8h' }
     );
 
-    const safeUser = { id: user.id, name: user.name, email: user.email, role: user.role, isActive: user.isActive, customPermissions: user.customPermissions || [] };
+    const safeUser = { id: user.id, name: user.name, email: user.email, role: user.role, isActive: user.isActive };
     const tTotal = Date.now() - tStart;
     console.log(`[LOGIN SUCCESS] ✅ Authenticated user ${user.id} (${user.role}) in ${tTotal}ms`);
 

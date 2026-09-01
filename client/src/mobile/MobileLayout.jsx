@@ -52,22 +52,20 @@ export function MobileLayout({
   const [showBranchSheet, setShowBranchSheet] = useState(false);
 
   const allNavItems = [
-    hasPermission(user, 'adminDashboard') && { name: 'Admin Dashboard', label: 'Admin Dashboard', icon: LayoutDashboard },
-    hasPermission(user, 'leadsDashboard') && { name: 'Leads Dashboard', label: 'Leads Dashboard', icon: LayoutDashboard },
-    hasPermission(user, 'leads') && { name: 'Leads', label: 'Leads', icon: UsersIcon, badge: leadsCount },
-    hasPermission(user, 'followups') && { name: 'Follow-ups', label: 'Follow-ups', icon: CalendarDays, badge: followupsCount },
-    hasPermission(user, 'courses') && { name: 'Courses', label: 'Courses', icon: BookOpen },
-    hasPermission(user, 'batches') && { name: 'Batches', label: 'Batches', icon: CalendarDays },
-    hasPermission(user, 'students') && { name: 'Students', label: 'Students', icon: GraduationCap },
-    hasPermission(user, 'admissions') && { name: 'Admissions', label: 'Admissions', icon: ArrowUpRight },
-    hasPermission(user, 'payments') && { name: 'Payments', label: 'Payments', icon: WalletCards },
-    hasPermission(user, 'reports') && { name: 'Reports', label: 'Reports', icon: BarChart3 },
-    hasPermission(user, 'userControl') && { name: 'Users', label: 'Users', icon: UserCheck },
-    hasPermission(user, 'adminSettings') && { name: 'Admin Settings', label: 'Admin Settings', icon: Settings },
-    hasPermission(user, 'restrictedSettings') && !hasPermission(user, 'adminSettings') && { name: 'Restricted Settings', label: 'Restricted Settings', icon: Settings }
-  ].filter(Boolean);
+    { name: 'Dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { name: 'Leads', label: 'Leads', icon: UsersIcon, badge: leadsCount },
+    { name: 'Follow-ups', label: 'Follow-ups', icon: CalendarDays, badge: followupsCount },
+    { name: 'Courses', label: 'Courses', icon: BookOpen },
+    { name: 'Batches', label: 'Batches', icon: CalendarDays },
+    { name: 'Students', label: 'Students', icon: GraduationCap },
+    { name: 'Admissions', label: 'Admissions', icon: ArrowUpRight },
+    { name: 'Payments', label: 'Payments', icon: WalletCards },
+    { name: 'Reports', label: 'Reports', icon: BarChart3 },
+    { name: 'Users', label: 'Users', icon: UserCheck },
+    { name: 'Settings', label: 'Settings', icon: Settings }
+  ];
 
-  const allowedNavItems = allNavItems;
+  const allowedNavItems = allNavItems.filter(item => hasPermission(user?.role, item.name));
 
   function handleNavigate(targetPage) {
     setPage(targetPage);
@@ -131,7 +129,7 @@ export function MobileLayout({
 
       {/* Main Page View Container */}
       <main className="mobile-main-content">
-        {!hasPermission(user, page) ? (
+        {!hasPermission(user?.role, page) ? (
           <div className="mobile-restricted-view">
             <div className="mobile-restricted-card">
               <div className="mobile-restricted-icon">
@@ -233,7 +231,7 @@ export function MobileLayout({
         title="Quick Actions"
       >
         <div className="mobile-quick-add-grid">
-          {hasPermission(user, 'Leads') && (
+          {hasPermission(user?.role, 'Leads') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Leads')}>
               <div className="mobile-quick-add-icon bg-blue">
                 <UsersIcon size={20} />
@@ -246,7 +244,7 @@ export function MobileLayout({
             </button>
           )}
 
-          {hasPermission(user, 'Follow-ups') && (
+          {hasPermission(user?.role, 'Follow-ups') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Follow-ups')}>
               <div className="mobile-quick-add-icon bg-purple">
                 <CalendarDays size={20} />
@@ -259,7 +257,7 @@ export function MobileLayout({
             </button>
           )}
 
-          {hasPermission(user, 'Students') && (
+          {hasPermission(user?.role, 'Students') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Students')}>
               <div className="mobile-quick-add-icon bg-emerald">
                 <GraduationCap size={20} />
@@ -272,7 +270,7 @@ export function MobileLayout({
             </button>
           )}
 
-          {hasPermission(user, 'Admissions') && (
+          {hasPermission(user?.role, 'Admissions') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Admissions')}>
               <div className="mobile-quick-add-icon bg-amber">
                 <ArrowUpRight size={20} />
@@ -285,7 +283,7 @@ export function MobileLayout({
             </button>
           )}
 
-          {hasPermission(user, 'Payments') && (
+          {hasPermission(user?.role, 'Payments') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Payments')}>
               <div className="mobile-quick-add-icon bg-teal">
                 <WalletCards size={20} />
@@ -298,7 +296,7 @@ export function MobileLayout({
             </button>
           )}
 
-          {hasPermission(user, 'Batches') && (
+          {hasPermission(user?.role, 'Batches') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Batches')}>
               <div className="mobile-quick-add-icon bg-indigo">
                 <CalendarDays size={20} />
