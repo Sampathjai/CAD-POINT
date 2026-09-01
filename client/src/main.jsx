@@ -54,6 +54,7 @@ import {
     Key,
     Ban,
     Slash,
+    FileText,
     Tablet as TabletIcon
 } from 'lucide-react';
 import './styles.css';
