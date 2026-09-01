@@ -233,6 +233,7 @@ function CertificateBadge({ status, issueDate }) {
 function App() {
     const { isMobile } = useResponsive();
     const [page, setPage] = useState('Dashboard');
+    const [filterText, setFilterText] = useState('');
     const [activeBranch, setActiveBranch] = useState(() => localStorage.getItem('cadpoint_branch') || 'gandhipuram');
     const [branchesList, setBranchesList] = useState([]);
     const [sourcesList, setSourcesList] = useState([]);
@@ -1577,6 +1578,7 @@ function App() {
                             onPreviewPhoto={(url) => setPreviewPhotoUrl(url)}
                             onOpenEditProgress={openEditProgress}
                             setPage={setPage}
+                            initialFilterText={filterText}
                             setFilterText={setFilterText}
                             currentUserId={user?.id}
                             userRole={user?.role}
@@ -3857,9 +3859,13 @@ function Dashboard({ user, token, leads = [], followups = [], admissions = [], p
     );
 }
 
-function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onOpenAssignBatchModal, onUnassignStudentFromBatch, onCompleteFollowup, onOpenWhatsApp, onAdmitFromFollowup, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onEditStudent, onDeleteStudent, onDeleteAdmission, onEditPayment, onDeletePayment, onPreviewPhoto, onOpenEditProgress, setPage, setFilterText: setParentFilterText, currentUserId, userRole, user, token, theme, toggleTheme, refreshData }) {
+function Module({ page, leads = [], followups = [], courses = [], batches = [], students = [], admissions = [], payments = [], usersList = [], sourcesList = [], onOpenAddModal, onOpenAssignBatchModal, onUnassignStudentFromBatch, onCompleteFollowup, onOpenWhatsApp, onAdmitFromFollowup, onEditUser, onDeleteUser, onEditCourse, onDeleteCourse, onEditBatch, onDeleteBatch, onEditStudent, onDeleteStudent, onDeleteAdmission, onEditPayment, onDeletePayment, onPreviewPhoto, onOpenEditProgress, setPage, initialFilterText = '', setFilterText: setParentFilterText, currentUserId, userRole, user, token, theme, toggleTheme, refreshData }) {
     const itemSingular = page === 'Batches' ? 'Batch' : (page.endsWith('es') ? page.slice(0, -2) : (page.endsWith('s') ? page.slice(0, -1) : page));
-    const [filterText, setFilterText] = useState('');
+    const [filterText, setFilterText] = useState(initialFilterText || '');
+
+    useEffect(() => {
+        setFilterText(initialFilterText || '');
+    }, [initialFilterText, page]);
     const [paymentFromDate, setPaymentFromDate] = useState('');
     const [paymentToDate, setPaymentToDate] = useState('');
     const [paymentMonth, setPaymentMonth] = useState('ALL');
