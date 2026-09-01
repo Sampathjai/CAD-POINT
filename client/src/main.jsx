@@ -1411,7 +1411,8 @@ function App() {
 
             <main>
                 <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                    <div className="headright" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {/* LEFT SIDE: Search, Notifications, Branch Selector */}
+                    <div className="headleft" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div className="search" style={{ position: 'relative' }}>
                             <Search size={17} />
                             <input
@@ -1495,6 +1496,7 @@ function App() {
                             )}
                         </div>
 
+                        {/* Branch Selector */}
                         <div className="branch-selector" style={{ display: 'flex', alignItems: 'center', gap: 6, background: theme === 'dark' ? '#1e293b' : '#f1f5f9', padding: '6px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>
                             <span style={{ color: '#64748b' }}>Branch:</span>
                             <select
@@ -1514,16 +1516,17 @@ function App() {
                                 {user?.role === 'SUPER_ADMIN' && <option value="all">All Branches</option>}
                             </select>
                         </div>
+                    </div>
+
+                    {/* RIGHT SIDE: Welcome Message + Profile / Avatar Controls */}
+                    <div className="headright" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                            Welcome to CAD POINT, {user?.name || user?.email?.split('@')[0] || 'User'} 👋
+                        </h2>
 
                         <button className="user" onClick={logout} title="Click to Logout">
                             {(user && user.name && user.name.split(' ').map((s) => s[0]).slice(0, 2).join('')) || 'SK'}
                         </button>
-                    </div>
-
-                    <div className="headwelcome" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                            Welcome to CAD POINT, {user?.name || user?.email?.split('@')[0] || 'User'} 👋
-                        </h2>
                     </div>
                 </header>
 
@@ -3495,19 +3498,19 @@ function WhatsAppModal({ data, onClose, token }) {
     );
 }
 
-function Dashboard({ user, token, leads = [], followups = [], admissions = [], payments = [], onAddLead, onSchedule, onCompleteFollowup, onOpenWhatsApp, onNavigate }) {
-    const safeLeads = Array.isArray(leads) ? leads : [];
-    const safeFollowups = Array.isArray(followups) ? followups : [];
-    const safeAdmissions = Array.isArray(admissions) ? admissions : [];
-    const safePayments = Array.isArray(payments) ? payments : [];
+function Dashboard({ user, token, leads = [], followups = [], admissions = [], payments = [], activeBranch = 'gandhipuram', onAddLead, onSchedule, onCompleteFollowup, onOpenWhatsApp, onNavigate }) {
+    const safeLeads = Array.isArray(leads) ? leads.filter(Boolean) : [];
+    const safeFollowups = Array.isArray(followups) ? followups.filter(Boolean) : [];
+    const safeAdmissions = Array.isArray(admissions) ? admissions.filter(Boolean) : [];
+    const safePayments = Array.isArray(payments) ? payments.filter(Boolean) : [];
 
-    const isCounsellor = user?.role === 'COUNSELLOR';
+    const isCounsellor = (user?.role + '').toUpperCase() === 'COUNSELLOR';
     const [counsellorPeriod, setCounsellorPeriod] = useState('6_months');
     const [counsellorData, setCounsellorData] = useState(null);
 
     useEffect(() => {
         if (isCounsellor && token) {
-            fetch(API_BASE + `/reports/counsellor-dashboard?period=${counsellorPeriod}`, {
+            fetch(API_BASE + `/reports/counsellor-dashboard?period=${counsellorPeriod}&branchId=${activeBranch || 'all'}`, {
                 headers: { Authorization: 'Bearer ' + token }
             })
             .then(r => r.json())
@@ -3516,7 +3519,7 @@ function Dashboard({ user, token, leads = [], followups = [], admissions = [], p
             })
             .catch(e => console.error('counsellor dashboard fetch error', e));
         }
-    }, [isCounsellor, token, counsellorPeriod]);
+    }, [isCounsellor, token, counsellorPeriod, activeBranch]);
 
     const now = new Date();
     const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -3593,17 +3596,22 @@ function Dashboard({ user, token, leads = [], followups = [], admissions = [], p
 
     if (isCounsellor) {
         const cTotalLeads = counsellorData?.totalLeads ?? safeLeads.length;
-        const cNewLeads = counsellorData?.newLeads ?? safeLeads.filter(l => (l.status || '').toUpperCase() === 'NEW').length;
+        const cNewLeads = counsellorData?.newLeads ?? safeLeads.filter(l => (l?.status || '').toUpperCase() === 'NEW').length;
         const cFollowUps = counsellorData?.followUps ?? safeFollowups.length;
         const cAdmissions = counsellorData?.totalAdmissions ?? safeAdmissions.length;
-        const cConverted = counsellorData?.convertedLeads ?? safeLeads.filter(l => (l.status || '').toUpperCase() === 'CONVERTED' || (l.status || '').toUpperCase() === 'ENROLLED').length;
+        const cConverted = counsellorData?.convertedLeads ?? safeLeads.filter(l => (l?.status || '').toUpperCase() === 'CONVERTED' || (l?.status || '').toUpperCase() === 'ENROLLED').length;
         const cConvRate = counsellorData?.conversionRate ?? (cTotalLeads > 0 ? `${Math.round((cAdmissions / cTotalLeads) * 100)}%` : '0%');
 
-        const monthlyEnquiries = counsellorData?.monthlyEnquiries || monthlyTrends.map(t => ({ month: t.label, shortMonth: t.shortLabel, count: t.leads }));
-        const monthlyAdmissions = counsellorData?.monthlyAdmissions || monthlyTrends.map(t => ({ month: t.label, shortMonth: t.shortLabel, count: t.admissions }));
+        const monthlyEnquiries = Array.isArray(counsellorData?.monthlyEnquiries) && counsellorData.monthlyEnquiries.length > 0
+            ? counsellorData.monthlyEnquiries
+            : monthlyTrends.map(t => ({ month: t.label, shortMonth: t.shortLabel, count: t.leads }));
 
-        const maxEnquiryCount = Math.max(1, ...monthlyEnquiries.map(e => e.count));
-        const maxAdmissionCount = Math.max(1, ...monthlyAdmissions.map(a => a.count));
+        const monthlyAdmissions = Array.isArray(counsellorData?.monthlyAdmissions) && counsellorData.monthlyAdmissions.length > 0
+            ? counsellorData.monthlyAdmissions
+            : monthlyTrends.map(t => ({ month: t.label, shortMonth: t.shortLabel, count: t.admissions }));
+
+        const maxEnquiryCount = Math.max(1, ...(Array.isArray(monthlyEnquiries) ? monthlyEnquiries.map(e => Number(e?.count) || 0) : [0]));
+        const maxAdmissionCount = Math.max(1, ...(Array.isArray(monthlyAdmissions) ? monthlyAdmissions.map(a => Number(a?.count) || 0) : [0]));
 
         return (
             <div className="content">

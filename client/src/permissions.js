@@ -118,14 +118,16 @@ export function normalizeRole(role) {
   return r;
 }
 
-export function hasPermission(role, permissionKey) {
+export function hasPermission(roleOrUser, permissionKey) {
+  const role = typeof roleOrUser === 'object' ? roleOrUser?.role : roleOrUser;
   const normRole = normalizeRole(role);
   const allowedPermissions = ROLE_PERMISSIONS[normRole] || [];
   const targetKey = PAGE_TO_PERMISSION_KEY[permissionKey] || permissionKey;
   return allowedPermissions.includes(targetKey);
 }
 
-export function getDefaultPageForRole(role) {
+export function getDefaultPageForRole(roleOrUser) {
+  const role = typeof roleOrUser === 'object' ? roleOrUser?.role : roleOrUser;
   const normRole = normalizeRole(role);
   switch (normRole) {
     case 'SUPER_ADMIN':
