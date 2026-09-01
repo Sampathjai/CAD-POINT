@@ -396,3 +396,4 @@ export function MobileSettingsView({
     </div>
   );
 }
+

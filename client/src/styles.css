@@ -1466,49 +1466,27 @@ td {
     margin-top: 14px;
 }
 
-@media(max-width:900px) {
+@media (max-width: 767px) {
     aside {
-        width: 70px;
+        display: none !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
     }
-    .brand div:not(.logo), .nav span, .nav em, .section, .sidecard, .profile div, .profile svg {
-        display: none;
+    .app {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
-    main {
-        margin-left: 70px;
-        width: calc(100% - 70px);
-    }
-    .cards {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    .grid {
-        grid-template-columns: 1fr;
-    }
-    .search {
-        width: 180px;
-    }
-}
-
-@media(max-width:600px) {
-    header {
-        padding: 15px;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-    .content {
-        padding: 15px;
-    }
-    .cards {
-        grid-template-columns: 1fr 1fr;
-    }
-    .search {
-        display: none;
-    }
-    .card strong {
-        font-size: 20px;
-    }
-    .headright {
-        width: 100%;
-        justify-content: space-between;
+    main, .main-content, .mobile-main-content, .content {
+        margin-left: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 12px 14px 80px 14px !important;
+        box-sizing: border-box !important;
     }
 }
 
