@@ -1411,8 +1411,15 @@ function App() {
 
             <main>
                 <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                    {/* LEFT SIDE: Search, Notifications, Branch Selector */}
-                    <div className="headleft" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {/* LEFT SIDE: Welcome Message */}
+                    <div className="headleft" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                            Welcome to CAD POINT, {user?.name || user?.email?.split('@')[0] || 'User'} 👋
+                        </h2>
+                    </div>
+
+                    {/* RIGHT SIDE: Search, Notifications, Branch Selector, Profile / Avatar Controls */}
+                    <div className="headright" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div className="search" style={{ position: 'relative' }}>
                             <Search size={17} />
                             <input
@@ -1516,13 +1523,6 @@ function App() {
                                 {user?.role === 'SUPER_ADMIN' && <option value="all">All Branches</option>}
                             </select>
                         </div>
-                    </div>
-
-                    {/* RIGHT SIDE: Welcome Message + Profile / Avatar Controls */}
-                    <div className="headright" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                            Welcome to CAD POINT, {user?.name || user?.email?.split('@')[0] || 'User'} 👋
-                        </h2>
 
                         <button className="user" onClick={logout} title="Click to Logout">
                             {(user && user.name && user.name.split(' ').map((s) => s[0]).slice(0, 2).join('')) || 'SK'}
