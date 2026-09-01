@@ -1106,10 +1106,16 @@ function App() {
 
     async function createUserSubmit() {
         try {
+            const payload = {
+                ...addUserForm,
+                customPermissions: Array.isArray(addUserForm.customPermissions) && addUserForm.customPermissions.length === 0
+                    ? ['NONE']
+                    : addUserForm.customPermissions
+            };
             const res = await fetch(API_BASE + '/users', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify(addUserForm)
+                body: JSON.stringify(payload)
             });
             const j = await res.json();
             if (!j.success) return alert(j.message || 'Create user failed');
@@ -1124,10 +1130,16 @@ function App() {
 
     async function updateUserSubmit() {
         try {
+            const payload = {
+                ...editUserForm,
+                customPermissions: Array.isArray(editUserForm.customPermissions) && editUserForm.customPermissions.length === 0
+                    ? ['NONE']
+                    : editUserForm.customPermissions
+            };
             const res = await fetch(API_BASE + '/users/' + editUserForm.id, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify(editUserForm)
+                body: JSON.stringify(payload)
             });
             const j = await res.json();
             if (!j.success) return alert(j.message || 'Update user failed');

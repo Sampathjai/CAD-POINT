@@ -4,8 +4,7 @@
 
 export const ROLE_PERMISSIONS = {
   SUPER_ADMIN: [
-    'adminDashboard',
-    'leadsDashboard',
+    'dashboard',
     'leads',
     'followups',
     'courses',
@@ -16,12 +15,10 @@ export const ROLE_PERMISSIONS = {
     'reports',
     'whatsapp',
     'userControl',
-    'adminSettings',
-    'restrictedSettings'
+    'settings'
   ],
   ADMIN: [
-    'adminDashboard',
-    'leadsDashboard',
+    'dashboard',
     'leads',
     'followups',
     'courses',
@@ -31,49 +28,48 @@ export const ROLE_PERMISSIONS = {
     'payments',
     'reports',
     'whatsapp',
-    'adminSettings',
-    'restrictedSettings'
+    'settings'
   ],
   COUNSELLOR: [
-    'leadsDashboard',
+    'dashboard',
     'leads',
     'followups',
     'courses',
     'batches',
     'students',
     'admissions',
-    'restrictedSettings'
+    'settings'
   ],
   TRAINER: [
     'courses',
     'batches',
     'students',
-    'restrictedSettings'
+    'settings'
   ],
   ACCOUNTANT: [
-    'adminDashboard',
+    'dashboard',
     'payments',
     'reports',
-    'restrictedSettings'
+    'settings'
   ],
   ACCOUNTS: [
-    'adminDashboard',
+    'dashboard',
     'payments',
     'reports',
-    'restrictedSettings'
+    'settings'
   ],
   RECEPTIONIST: [
-    'leadsDashboard',
     'leads',
     'followups',
     'batches',
     'students',
-    'restrictedSettings'
+    'settings'
   ]
 };
 
 export const PAGE_TO_PERMISSION_KEY = {
-  Dashboard: 'adminDashboard',
+  Dashboard: 'dashboard',
+  dashboard: 'dashboard',
   'Admin Dashboard': 'adminDashboard',
   adminDashboard: 'adminDashboard',
   'Leads Dashboard': 'leadsDashboard',
@@ -100,7 +96,8 @@ export const PAGE_TO_PERMISSION_KEY = {
   Users: 'userControl',
   'User Control': 'userControl',
   userControl: 'userControl',
-  Settings: 'adminSettings',
+  Settings: 'settings',
+  settings: 'settings',
   'Admin Settings': 'adminSettings',
   adminSettings: 'adminSettings',
   'Restricted Settings': 'restrictedSettings',
@@ -152,13 +149,14 @@ export function hasPermission(roleOrUser, permissionKey) {
 
   const checkPerm = (permArray) => {
     if (!Array.isArray(permArray)) return false;
+    if (permArray.includes('NONE')) return false;
     if (permArray.includes(targetKey) || permArray.includes(permissionKey)) return true;
-    if ((targetKey === 'adminDashboard' || targetKey === 'leadsDashboard') && permArray.includes('dashboard')) return true;
-    if ((targetKey === 'adminSettings' || targetKey === 'restrictedSettings') && (permArray.includes('settings') || permArray.includes('userSettings'))) return true;
+    if ((targetKey === 'adminDashboard' || targetKey === 'leadsDashboard' || targetKey === 'dashboard') && permArray.includes('dashboard')) return true;
+    if ((targetKey === 'adminSettings' || targetKey === 'restrictedSettings' || targetKey === 'settings') && (permArray.includes('settings') || permArray.includes('userSettings'))) return true;
     return false;
   };
 
-  if (Array.isArray(customPermissions)) {
+  if (Array.isArray(customPermissions) && customPermissions.length > 0) {
     return checkPerm(customPermissions);
   }
 
@@ -168,7 +166,10 @@ export function hasPermission(roleOrUser, permissionKey) {
 
 export function getDefaultPageForRole(roleOrUser) {
   let user = typeof roleOrUser === 'object' ? roleOrUser : { role: roleOrUser };
-  if (hasPermission(user, 'adminDashboard')) return 'Admin Dashboard';
+  if (hasPermission(user, 'adminDashboard') || hasPermission(user, 'Dashboard')) {
+    if (hasPermission(user, 'adminDashboard')) return 'Admin Dashboard';
+    return 'Dashboard';
+  }
   if (hasPermission(user, 'leadsDashboard')) return 'Leads Dashboard';
   if (hasPermission(user, 'leads')) return 'Leads';
   if (hasPermission(user, 'students')) return 'Students';
