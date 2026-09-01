@@ -16,7 +16,9 @@ import {
   DollarSign,
   User,
   Check,
-  Calendar
+  Calendar,
+  UserCheck,
+  Target
 } from 'lucide-react';
 
 export function MobileDashboard({
@@ -32,6 +34,8 @@ export function MobileDashboard({
   onOpenWhatsApp,
   onNavigate
 }) {
+  const isCounsellor = user?.role === 'COUNSELLOR';
+
   const safeLeads = Array.isArray(leads) ? leads : [];
   const safeFollowups = Array.isArray(followups) ? followups : [];
   const safeAdmissions = Array.isArray(admissions) ? admissions : [];
@@ -64,8 +68,26 @@ export function MobileDashboard({
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   };
 
-  const filteredLeads = safeLeads.filter(l => selectedMonth === 'ALL' || getYM(l.createdAt) === selectedMonth);
-  const filteredAdmissions = safeAdmissions.filter(a => selectedMonth === 'ALL' || getYM(a.admissionDate || a.createdAt || a.startDate) === selectedMonth);
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // If user is a Counsellor, filter scope to Counsellor's assigned records
+  const targetLeads = useMemo(() => {
+    if (!isCounsellor) return safeLeads;
+    return safeLeads.filter(l => l.assignedCounsellorId === user?.id || l.assignedCounsellor?.id === user?.id || !l.assignedCounsellorId);
+  }, [isCounsellor, safeLeads, user?.id]);
+
+  const targetFollowups = useMemo(() => {
+    if (!isCounsellor) return safeFollowups;
+    return safeFollowups.filter(f => f.assignedUserId === user?.id || f.lead?.assignedCounsellorId === user?.id || !f.assignedUserId);
+  }, [isCounsellor, safeFollowups, user?.id]);
+
+  const targetAdmissions = useMemo(() => {
+    if (!isCounsellor) return safeAdmissions;
+    return safeAdmissions.filter(a => a.counsellorId === user?.id || a.lead?.assignedCounsellorId === user?.id);
+  }, [isCounsellor, safeAdmissions, user?.id]);
+
+  const filteredLeads = targetLeads.filter(l => selectedMonth === 'ALL' || getYM(l.createdAt) === selectedMonth);
+  const filteredAdmissions = targetAdmissions.filter(a => selectedMonth === 'ALL' || getYM(a.admissionDate || a.createdAt || a.startDate) === selectedMonth);
   const filteredPayments = safePayments.filter(p => selectedMonth === 'ALL' || getYM(p.paymentDate || p.createdAt) === selectedMonth);
 
   const monthlyRevenue = filteredPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
@@ -76,30 +98,32 @@ export function MobileDashboard({
   const monthlyLeadsCount = filteredLeads.length;
   const monthlyConversionRate = monthlyLeadsCount > 0 ? ((monthlyAdmissionsCount / monthlyLeadsCount) * 100).toFixed(0) : '0';
 
+  const newCount = filteredLeads.filter((l) => l.status && (l.status + '').toUpperCase() === 'NEW').length;
   const contactedCount = filteredLeads.filter((l) => l.status && (l.status + '').toUpperCase() === 'CONTACTED').length;
   const interestedCount = filteredLeads.filter((l) => l.status && (l.status + '').toUpperCase() === 'INTERESTED').length;
   const demoCount = filteredLeads.filter((l) => l.status && (l.status + '').toUpperCase().includes('DEMO')).length;
+  const convertedCount = filteredLeads.filter((l) => l.status && ((l.status + '').toUpperCase() === 'CONVERTED' || (l.status + '').toUpperCase() === 'ENROLLED')).length;
 
   // Monthly trends for last 6 months
   const monthlyTrends = useMemo(() => {
     const last6 = monthOptions.slice(0, 6).reverse();
     return last6.map(m => {
-      const mLeads = safeLeads.filter(l => getYM(l.createdAt) === m.key).length;
-      const mAdmissions = safeAdmissions.filter(a => getYM(a.createdAt || a.startDate) === m.key).length;
+      const mLeads = targetLeads.filter(l => getYM(l.createdAt) === m.key).length;
+      const mAdmissions = targetAdmissions.filter(a => getYM(a.createdAt || a.startDate) === m.key).length;
       const mPayments = safePayments.filter(p => getYM(p.paymentDate || p.createdAt) === m.key);
       const mRevenue = mPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
       const mConv = mLeads > 0 ? ((mAdmissions / mLeads) * 100).toFixed(0) : '0';
       return { ...m, leads: mLeads, admissions: mAdmissions, revenue: mRevenue, conversion: mConv };
     });
-  }, [monthOptions, safeLeads, safeAdmissions, safePayments]);
+  }, [monthOptions, targetLeads, targetAdmissions, safePayments]);
 
+  const maxTrendLeads = Math.max(1, ...monthlyTrends.map(t => t.leads));
   const maxTrendRevenue = Math.max(1, ...monthlyTrends.map(t => t.revenue));
 
   const selectedMonthObj = monthOptions.find(m => m.key === selectedMonth);
   const monthTitleLabel = selectedMonth === 'ALL' ? 'All Months (Year-to-Date)' : (selectedMonthObj ? selectedMonthObj.label : 'Monthly Overview');
 
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const pendingTodayFollowups = safeFollowups.filter(f => {
+  const pendingTodayFollowups = targetFollowups.filter(f => {
     if (f.status !== 'PENDING') return false;
     const fDate = f.scheduledAt ? new Date(f.scheduledAt).toISOString().slice(0, 10) : '';
     return fDate === todayStr;
@@ -107,12 +131,14 @@ export function MobileDashboard({
 
   return (
     <div className="mobile-dashboard">
-      {/* Welcome Greeting & Month Filter Bar */}
+      {/* Welcome Greeting Card */}
       <div className="mobile-welcome-card">
         <div className="mobile-welcome-text">
-          <span className="mobile-badge-pill">CADPOINT CRM</span>
-          <h2>Good day, {user?.name ? user.name.split(' ')[0] : 'Counselor'} 👋</h2>
-          <p>Showing overview for <b>{monthTitleLabel}</b></p>
+          <span className="mobile-badge-pill">
+            {isCounsellor ? 'TELECALLER / COUNSELLOR' : 'CADPOINT CRM'}
+          </span>
+          <h2>Good day, {user?.name ? user.name.split(' ')[0] : (isCounsellor ? 'Counsellor' : 'Admin')} 👋</h2>
+          <p>{isCounsellor ? 'Your active lead pipeline & daily follow-up targets' : `Showing overview for ${monthTitleLabel}`}</p>
         </div>
         <div className="mobile-welcome-sparkle">
           <Sparkles size={26} />
@@ -135,13 +161,13 @@ export function MobileDashboard({
         </select>
       </div>
 
-      {/* Action Row */}
+      {/* Quick Action Row */}
       <div className="mobile-quick-actions-row">
-        <button className="mobile-action-pill primary" onClick={onAddLead}>
+        <button className="mobile-btn-primary" style={{ flex: 1 }} onClick={onAddLead}>
           <Plus size={16} /> Add Lead
         </button>
-        <button className="mobile-action-pill secondary" onClick={onSchedule}>
-          <CalendarDays size={16} /> Schedule Follow-up
+        <button className="mobile-btn-secondary" style={{ flex: 1 }} onClick={onSchedule}>
+          <CalendarDays size={16} /> Schedule
         </button>
       </div>
 
@@ -151,78 +177,106 @@ export function MobileDashboard({
           {/* Card 1 */}
           <div className="mobile-carousel-card blue">
             <div className="card-top">
-              <span>Monthly Enquiries</span>
+              <span>{isCounsellor ? 'Assigned Enquiries' : 'Monthly Enquiries'}</span>
               <div className="icon-wrap blue"><UsersIcon size={16} /></div>
             </div>
             <strong className="card-val">{monthlyLeadsCount}</strong>
             <small className="card-sub">{selectedMonth === 'ALL' ? 'Total YTD' : 'This Period'}</small>
-            <small className="card-foot">{safeLeads.length} total logged</small>
+            <small className="card-foot">{targetLeads.length} total logged</small>
           </div>
 
           {/* Card 2 */}
+          <div className="mobile-carousel-card amber">
+            <div className="card-top">
+              <span>Today's Follow-ups</span>
+              <div className="icon-wrap amber"><Clock size={16} /></div>
+            </div>
+            <strong className="card-val">{pendingTodayFollowups.length}</strong>
+            <small className="card-sub" style={{ color: pendingTodayFollowups.length > 0 ? '#d97706' : '#10b981' }}>
+              {pendingTodayFollowups.length > 0 ? 'Pending calls today' : 'All caught up!'}
+            </small>
+            <small className="card-foot">{targetFollowups.length} total follow-ups</small>
+          </div>
+
+          {/* Card 3 */}
           <div className="mobile-carousel-card purple">
             <div className="card-top">
-              <span>Monthly Admissions</span>
+              <span>Enrolled Admissions</span>
               <div className="icon-wrap purple"><ArrowUpRight size={16} /></div>
             </div>
             <strong className="card-val">{monthlyAdmissionsCount}</strong>
             <small className="card-sub">{monthlyConversionRate}% conv. rate</small>
-            <small className="card-foot">{monthlyAdmissionsCount} enrolled</small>
-          </div>
-
-          {/* Card 3 */}
-          <div className="mobile-carousel-card emerald">
-            <div className="card-top">
-              <span>Monthly Revenue</span>
-              <div className="icon-wrap emerald"><TrendingUp size={16} /></div>
-            </div>
-            <strong className="card-val">₹{monthlyRevenue.toLocaleString()}</strong>
-            <small className="card-sub">{filteredPayments.length} receipts</small>
-            <small className="card-foot">collections this period</small>
+            <small className="card-foot">{monthlyAdmissionsCount} converted students</small>
           </div>
 
           {/* Card 4 */}
-          <div className="mobile-carousel-card amber">
+          <div className="mobile-carousel-card emerald">
             <div className="card-top">
-              <span>Business Value</span>
-              <div className="icon-wrap amber"><DollarSign size={16} /></div>
+              <span>New Enquiries</span>
+              <div className="icon-wrap emerald"><Sparkles size={16} /></div>
             </div>
-            <strong className="card-val">₹{businessValue.toLocaleString()}</strong>
-            <small className="card-sub">New admissions value</small>
-            <small className="card-foot">{monthlyAdmissionsCount} admissions</small>
+            <strong className="card-val">{newCount}</strong>
+            <small className="card-sub">Fresh leads</small>
+            <small className="card-foot">require initial call</small>
           </div>
 
-          {/* Card 5 */}
-          <div className="mobile-carousel-card red">
-            <div className="card-top">
-              <span>Fee Pending</span>
-              <div className="icon-wrap red"><Clock size={16} /></div>
-            </div>
-            <strong className="card-val">₹{monthlyOutstanding.toLocaleString()}</strong>
-            <small className="card-sub" style={{ color: monthlyOutstanding > 0 ? '#ef4444' : '#10b981' }}>
-              {monthlyOutstanding > 0 ? 'Pending collection' : 'Fully collected'}
-            </small>
-            <small className="card-foot">agreed fee balance</small>
-          </div>
+          {/* ADMIN ONLY FINANCIAL CARDS */}
+          {!isCounsellor && (
+            <>
+              <div className="mobile-carousel-card emerald">
+                <div className="card-top">
+                  <span>Monthly Revenue</span>
+                  <div className="icon-wrap emerald"><TrendingUp size={16} /></div>
+                </div>
+                <strong className="card-val">₹{monthlyRevenue.toLocaleString()}</strong>
+                <small className="card-sub">{filteredPayments.length} receipts</small>
+                <small className="card-foot">collections this period</small>
+              </div>
+
+              <div className="mobile-carousel-card amber">
+                <div className="card-top">
+                  <span>Business Value</span>
+                  <div className="icon-wrap amber"><DollarSign size={16} /></div>
+                </div>
+                <strong className="card-val">₹{businessValue.toLocaleString()}</strong>
+                <small className="card-sub">New admissions value</small>
+                <small className="card-foot">{monthlyAdmissionsCount} admissions</small>
+              </div>
+
+              <div className="mobile-carousel-card red">
+                <div className="card-top">
+                  <span>Fee Pending</span>
+                  <div className="icon-wrap red"><Clock size={16} /></div>
+                </div>
+                <strong className="card-val">₹{monthlyOutstanding.toLocaleString()}</strong>
+                <small className="card-sub" style={{ color: monthlyOutstanding > 0 ? '#ef4444' : '#10b981' }}>
+                  {monthlyOutstanding > 0 ? 'Pending collection' : 'Fully collected'}
+                </small>
+                <small className="card-foot">agreed fee balance</small>
+              </div>
+            </>
+          )}
         </div>
         <div className="mobile-carousel-hint">← Swipe to view more metrics →</div>
       </div>
 
-      {/* Mobile Chart Stack (Full-width Cards) */}
+      {/* Mobile Chart Stack */}
       <div className="mobile-chart-stack">
-        {/* Revenue Trend Card */}
+        {/* Enquiry Trend Chart */}
         <div className="mobile-chart-card">
           <div className="chart-card-header">
             <BarChart3 size={18} className="text-emerald" />
             <div>
-              <h4>Monthly Revenue & Trend</h4>
-              <span>Collection trends (Last 6 Months)</span>
+              <h4>{isCounsellor ? 'Monthly Enquiries & Admissions' : 'Monthly Revenue & Trend'}</h4>
+              <span>{isCounsellor ? 'Enquiry performance (Last 6 Months)' : 'Collection trends (Last 6 Months)'}</span>
             </div>
           </div>
 
           <div className="mobile-bar-chart">
             {monthlyTrends.map((t) => {
-              const heightPct = maxTrendRevenue > 0 ? Math.max(16, Math.round((t.revenue / maxTrendRevenue) * 120)) : 16;
+              const val = isCounsellor ? t.leads : t.revenue;
+              const maxVal = isCounsellor ? maxTrendLeads : maxTrendRevenue;
+              const heightPct = maxVal > 0 ? Math.max(16, Math.round((val / maxVal) * 120)) : 16;
               const isSelected = t.key === selectedMonth;
               return (
                 <div 
@@ -230,7 +284,7 @@ export function MobileDashboard({
                   className={`mobile-bar-col ${isSelected ? 'selected' : ''}`}
                   onClick={() => setSelectedMonth(t.key)}
                 >
-                  <span className="bar-val">{t.revenue > 0 ? `₹${(t.revenue / 1000).toFixed(0)}k` : '₹0'}</span>
+                  <span className="bar-val">{isCounsellor ? val : (t.revenue > 0 ? `₹${(t.revenue / 1000).toFixed(0)}k` : '₹0')}</span>
                   <div className="bar-fill" style={{ height: heightPct }}></div>
                   <span className="bar-label">{t.shortLabel}</span>
                 </div>
@@ -244,18 +298,18 @@ export function MobileDashboard({
           <div className="chart-card-header">
             <TrendingUp size={18} className="text-blue" />
             <div>
-              <h4>Lead Conversion Funnel</h4>
+              <h4>{isCounsellor ? 'My Lead Pipeline Funnel' : 'Lead Conversion Funnel'}</h4>
               <span>{monthTitleLabel} progress</span>
             </div>
           </div>
 
           <div className="mobile-funnel-stack">
             {[
-              ['Monthly Enquiries', monthlyLeadsCount, '100%'],
+              ['Enquiries', monthlyLeadsCount, '100%'],
               ['Contacted', contactedCount, monthlyLeadsCount > 0 ? Math.round((contactedCount / monthlyLeadsCount) * 100) + '%' : '0%'],
               ['Interested', interestedCount, monthlyLeadsCount > 0 ? Math.round((interestedCount / monthlyLeadsCount) * 100) + '%' : '0%'],
               ['Demo Scheduled', demoCount, monthlyLeadsCount > 0 ? Math.round((demoCount / monthlyLeadsCount) * 100) + '%' : '0%'],
-              ['Enrolled Admission', monthlyAdmissionsCount, monthlyConversionRate + '%']
+              ['Enrolled Admissions', monthlyAdmissionsCount, monthlyConversionRate + '%']
             ].map((item, idx) => (
               <div key={idx} className="mobile-funnel-row">
                 <div className="funnel-label-line">
@@ -267,59 +321,6 @@ export function MobileDashboard({
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-
-        {/* Month-by-Month Performance Breakdown Cards */}
-        <div className="mobile-chart-card">
-          <div className="chart-card-header">
-            <Calendar size={18} className="text-purple" />
-            <div>
-              <h4>Monthly Performance Breakdown</h4>
-              <span>Comparative stats per month</span>
-            </div>
-          </div>
-
-          <div className="mobile-month-cards-list">
-            {monthlyTrends.map((m) => {
-              const isSelected = m.key === selectedMonth;
-              const isCurrent = m.key === currentYearMonth;
-              return (
-                <div key={m.key} className={`mobile-month-card ${isSelected ? 'selected' : ''}`}>
-                  <div className="month-card-header">
-                    <div>
-                      <b>{m.label}</b>
-                      {isCurrent && <span className="current-badge">Current</span>}
-                    </div>
-                    <button 
-                      className={`select-month-btn ${isSelected ? 'active' : ''}`}
-                      onClick={() => setSelectedMonth(m.key)}
-                    >
-                      {isSelected ? 'Selected' : 'Select'}
-                    </button>
-                  </div>
-
-                  <div className="month-card-grid">
-                    <div>
-                      <span>Enquiries</span>
-                      <b>{m.leads}</b>
-                    </div>
-                    <div>
-                      <span>Admissions</span>
-                      <b>{m.admissions}</b>
-                    </div>
-                    <div>
-                      <span>Revenue</span>
-                      <b>₹{m.revenue.toLocaleString()}</b>
-                    </div>
-                    <div>
-                      <span>Conversion</span>
-                      <b>{m.conversion}%</b>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
           </div>
         </div>
       </div>
@@ -391,14 +392,14 @@ export function MobileDashboard({
         </button>
       </div>
 
-      {safeLeads.length === 0 ? (
+      {targetLeads.length === 0 ? (
         <div className="mobile-empty-card">
           <User size={32} />
           <p>No leads recorded yet.</p>
         </div>
       ) : (
         <div className="mobile-card-list">
-          {safeLeads.slice(0, 5).map((l) => {
+          {targetLeads.slice(0, 5).map((l) => {
             const leadName = `${l.firstName || ''} ${l.lastName || ''}`.trim() || 'Unnamed Lead';
             const statusClass = (l.status || 'NEW').toLowerCase();
             const initials = (l.firstName ? l.firstName[0] : 'L') + (l.lastName ? l.lastName[0] : '');
