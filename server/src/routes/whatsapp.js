@@ -750,4 +750,257 @@ router.post('/webhook', async (req, res) => {
   }
 });
 
+// ============================================================================
+// WHATSAPP MESSAGE TEMPLATE MANAGEMENT ENDPOINTS
+// ============================================================================
+
+const DEFAULT_SYSTEM_TEMPLATES = [
+  {
+    name: 'New Enquiry Welcome',
+    category: 'LEAD',
+    description: 'Welcome message sent to new course enquiries',
+    isSystemTemplate: true,
+    content: `Hello {{first_name}} 👋! Thank you for contacting CADPOINT COIMBATORE. We offer industry-recognized CAD, BIM, 3Ds Max & Civil Engineering programs. How can we assist your training goals today?`
+  },
+  {
+    name: 'Course & Fee Overview',
+    category: 'LEAD',
+    description: 'Overview of course fees and upcoming batch options',
+    isSystemTemplate: true,
+    content: `Hi {{first_name}}! Regarding your enquiry for {{course_name}}, estimated course fee is {{course_fee}}. Our upcoming batches offer flexible morning & evening schedules. Let us know if you would like to reserve your seat!`
+  },
+  {
+    name: 'Free Demo Session Invitation',
+    category: 'LEAD',
+    description: 'Invitation to attend a free live demo session',
+    isSystemTemplate: true,
+    content: `Hi {{first_name}}! We invite you to attend a free live demo session for {{course_name}} at CADPOINT COIMBATORE. Please reply with your convenient date and time slot!`
+  },
+  {
+    name: 'Admission Confirmation',
+    category: 'ADMISSION',
+    description: 'Official admission confirmation message',
+    isSystemTemplate: true,
+    content: `Hi {{student_name}} 👋! Your admission has been successfully confirmed for {{course_name}} at CADPOINT {{branch_name}} Branch.\n\nBatch: {{batch_name}}\nAdmission Date: {{admission_date}}\n\nThank you for choosing CADPOINT!`
+  },
+  {
+    name: 'Documents Required Reminder',
+    category: 'ADMISSION',
+    description: 'Reminder to submit required enrollment documents',
+    isSystemTemplate: true,
+    content: `Hi {{student_name}}, please submit your educational certificates, photo, and ID proof to complete your {{course_name}} enrollment registration at CADPOINT {{branch_name}} Branch.`
+  },
+  {
+    name: 'Payment Receipt Notification',
+    category: 'PAYMENT',
+    description: 'Confirmation receipt for fee payment received',
+    isSystemTemplate: true,
+    content: `Dear {{student_name}}, payment of {{paid_amount}} has been received successfully for {{course_name}} on {{payment_date}}. Remaining Pending Fee: {{pending_amount}}. Thank you! - CADPOINT {{branch_name}}`
+  },
+  {
+    name: 'Pending Fee Reminder',
+    category: 'PAYMENT',
+    description: 'Gentle reminder for outstanding course fees',
+    isSystemTemplate: true,
+    content: `Hello {{student_name}}, this is a reminder regarding your pending course fee of {{pending_amount}} for {{course_name}}.\nTotal Agreed Fee: {{course_fee}}\nPaid Amount: {{paid_amount}}\nPending Amount: {{pending_amount}}\n\nKindly complete the pending payment at your earliest convenience. Thank you, CADPOINT.`
+  },
+  {
+    name: 'Overdue Fee Alert',
+    category: 'PAYMENT',
+    description: 'Urgent notice for overdue pending fee balance',
+    isSystemTemplate: true,
+    content: `IMPORTANT NOTICE: Dear {{student_name}}, your pending fee balance of {{pending_amount}} for {{course_name}} is overdue. Please settle the pending amount today to ensure uninterrupted class access.`
+  },
+  {
+    name: 'Follow-up Call Reminder',
+    category: 'FOLLOW_UP',
+    description: 'Follow-up message for pending discussions',
+    isSystemTemplate: true,
+    content: `Hello {{first_name}}, this is a gentle follow-up from CADPOINT COIMBATORE regarding your {{course_name}} enquiry. Are you available for a brief discussion or callback today?`
+  },
+  {
+    name: 'No Response Follow-up',
+    category: 'FOLLOW_UP',
+    description: 'Re-engagement message when client has not responded',
+    isSystemTemplate: true,
+    content: `Hi {{first_name}}, we noticed we missed you earlier! Our new batch for {{course_name}} is starting this week. Reply to this message to check available time slots!`
+  },
+  {
+    name: 'Batch Schedule & Timing Info',
+    category: 'BATCH',
+    description: 'Information regarding batch start dates and timings',
+    isSystemTemplate: true,
+    content: `Hi {{student_name}}! Your {{course_name}} batch ({{batch_name}}) regular sessions are scheduled at CADPOINT {{branch_name}} Branch. Please reach out if you need timing adjustments!`
+  },
+  {
+    name: 'Certificate Pickup Ready',
+    category: 'COURSE',
+    description: 'Notification when course completion certificate is ready',
+    isSystemTemplate: true,
+    content: `Congratulations {{student_name}} 🎉! Your official course completion certificate for {{course_name}} is ready for pickup at CADPOINT {{branch_name}} Branch. Great job!`
+  }
+];
+
+// Seed Templates if empty
+async function seedDefaultTemplates(organizationId = 'org_default') {
+  const count = await prisma.whatsAppTemplate.count({ where: { organizationId } });
+  if (count === 0) {
+    const templatesToCreate = DEFAULT_SYSTEM_TEMPLATES.map(t => ({
+      ...t,
+      organizationId
+    }));
+    await prisma.whatsAppTemplate.createMany({ data: templatesToCreate });
+    console.log('✅ Auto-seeded default WhatsApp message templates into database.');
+  }
+}
+
+// GET /api/whatsapp/templates - Fetch templates with optional category/active filter
+router.get('/templates', authenticate, async (req, res) => {
+  try {
+    const organizationId = req.user?.organizationId || 'org_default';
+    await seedDefaultTemplates(organizationId);
+
+    const { category, activeOnly } = req.query;
+    const where = { organizationId };
+
+    if (category && category !== 'ALL') {
+      where.category = category.toUpperCase();
+    }
+    if (activeOnly === 'true') {
+      where.isActive = true;
+    }
+
+    const templates = await prisma.whatsAppTemplate.findMany({
+      where,
+      orderBy: [
+        { isSystemTemplate: 'desc' },
+        { name: 'asc' }
+      ]
+    });
+
+    res.json({ success: true, data: templates });
+  } catch (err) {
+    console.error('whatsapp.getTemplates', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/whatsapp/templates - Create new template (Admin only)
+router.post('/templates', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    const organizationId = req.user?.organizationId || 'org_default';
+    const { name, category, content, description, isActive } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Template name is required.' });
+    }
+    if (!content || !content.trim()) {
+      return res.status(400).json({ success: false, message: 'Template content is required.' });
+    }
+
+    const template = await prisma.whatsAppTemplate.create({
+      data: {
+        organizationId,
+        name: name.trim(),
+        category: (category || 'GENERAL').toUpperCase(),
+        content: content.trim(),
+        description: description ? description.trim() : null,
+        isActive: isActive !== false,
+        isSystemTemplate: false,
+        createdBy: req.user?.id || null
+      }
+    });
+
+    res.json({ success: true, message: 'WhatsApp template created successfully!', data: template });
+  } catch (err) {
+    console.error('whatsapp.createTemplate', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// PUT /api/whatsapp/templates/:id - Update template (Admin only)
+router.put('/templates/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, category, content, description, isActive } = req.body;
+
+    const existing = await prisma.whatsAppTemplate.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Template not found.' });
+    }
+
+    const updated = await prisma.whatsAppTemplate.update({
+      where: { id },
+      data: {
+        name: name ? name.trim() : existing.name,
+        category: category ? category.toUpperCase() : existing.category,
+        content: content ? content.trim() : existing.content,
+        description: description !== undefined ? (description ? description.trim() : null) : existing.description,
+        isActive: isActive !== undefined ? Boolean(isActive) : existing.isActive
+      }
+    });
+
+    res.json({ success: true, message: 'WhatsApp template updated successfully!', data: updated });
+  } catch (err) {
+    console.error('whatsapp.updateTemplate', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// DELETE /api/whatsapp/templates/:id - Delete custom template (Admin only)
+router.delete('/templates/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await prisma.whatsAppTemplate.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Template not found.' });
+    }
+
+    if (existing.isSystemTemplate) {
+      // Soft disable system templates rather than hard deleting
+      await prisma.whatsAppTemplate.update({
+        where: { id },
+        data: { isActive: false }
+      });
+      return res.json({ success: true, message: 'System template deactivated.' });
+    }
+
+    await prisma.whatsAppTemplate.delete({ where: { id } });
+    res.json({ success: true, message: 'Custom template deleted successfully.' });
+  } catch (err) {
+    console.error('whatsapp.deleteTemplate', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/whatsapp/templates/:id/duplicate - Duplicate template
+router.post('/templates/:id/duplicate', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.whatsAppTemplate.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Template not found.' });
+    }
+
+    const duplicated = await prisma.whatsAppTemplate.create({
+      data: {
+        organizationId: existing.organizationId,
+        name: `Copy of ${existing.name}`,
+        category: existing.category,
+        content: existing.content,
+        description: existing.description ? `Copy of ${existing.description}` : null,
+        isActive: true,
+        isSystemTemplate: false,
+        createdBy: req.user?.id || null
+      }
+    });
+
+    res.json({ success: true, message: 'Template duplicated successfully!', data: duplicated });
+  } catch (err) {
+    console.error('whatsapp.duplicateTemplate', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;

@@ -3141,15 +3141,8 @@ function WhatsAppModal({ data, onClose, token }) {
 
     const defaultMsg = data.defaultMessage || data.message || `Hello ${recipientName}! Thank you for contacting CADPOINT COIMBATORE. How can we assist your training goals today?`;
 
-    const templates = {
-        DEFAULT: defaultMsg,
-        WELCOME: `Hello ${recipientName}! Thank you for contacting CADPOINT COIMBATORE. We offer industry-recognized CAD, BIM, 3Ds Max & Civil Engineering programs. How can we assist your training goals today?`,
-        COURSE_FEE: `Hi ${recipientName}! Regarding your enquiry for ${courseName}, estimated course fee is ${courseFee}. Our upcoming batches offer flexible morning & evening schedules. Would you like to reserve a seat?`,
-        FOLLOWUP: `Hello ${recipientName}, this is a gentle follow-up from CADPOINT COIMBATORE regarding your course enquiry. Are you available for a brief discussion or demo session today?`,
-        DEMO_INVITE: `Hi ${recipientName}! We invite you to attend a free live demo session at CADPOINT COIMBATORE. Please reply with your convenient time slot!`
-    };
-
-    const [selectedTemplateKey, setSelectedTemplateKey] = useState(data.defaultMessage ? 'DEFAULT' : 'WELCOME');
+    const [dbTemplates, setDbTemplates] = useState([]);
+    const [selectedTemplateId, setSelectedTemplateId] = useState(data.defaultMessage ? 'DEFAULT' : '');
     const [messageText, setMessageText] = useState(defaultMsg);
 
     const [statusData, setStatusData] = useState({ loading: true, isConnected: false, branchName: 'Branch', displayPhoneNumber: '', errorMessage: '' });
@@ -3159,6 +3152,40 @@ function WhatsAppModal({ data, onClose, token }) {
     const [sendError, setSendError] = useState('');
     const [sendSuccess, setSendSuccess] = useState('');
     const [showHistory, setShowHistory] = useState(false);
+
+    // Fetch DB Templates
+    useEffect(() => {
+        let isMounted = true;
+        fetch(`${API_BASE}/whatsapp/templates?activeOnly=true`, {
+            headers: { Authorization: `Bearer ${token}` }
+        })
+        .then(r => r.json())
+        .then(j => {
+            if (isMounted && j.success && Array.isArray(j.data)) {
+                setDbTemplates(j.data);
+                if (!data.defaultMessage && j.data.length > 0) {
+                    const firstTpl = j.data[0];
+                    setSelectedTemplateId(firstTpl.id);
+                    setMessageText(interpolateWhatsAppTemplate(firstTpl.content, data));
+                }
+            }
+        })
+        .catch(err => console.error('Failed to load DB templates:', err));
+
+        return () => { isMounted = false; };
+    }, [token, data]);
+
+    function handleTemplateSelect(templateId) {
+        setSelectedTemplateId(templateId);
+        if (templateId === 'DEFAULT') {
+            setMessageText(defaultMsg);
+        } else {
+            const found = dbTemplates.find(t => t.id === templateId);
+            if (found) {
+                setMessageText(interpolateWhatsAppTemplate(found.content, data));
+            }
+        }
+    }
 
     // 1. Fetch Branch Connection Status
     useEffect(() => {
@@ -3341,15 +3368,16 @@ function WhatsAppModal({ data, onClose, token }) {
                             Choose Message Template
                         </label>
                         <select
-                            value={selectedTemplateKey}
-                            onChange={(e) => handleTemplateChange(e.target.value)}
+                            value={selectedTemplateId}
+                            onChange={(e) => handleTemplateSelect(e.target.value)}
                             style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13 }}
                         >
                             {data.defaultMessage && <option value="DEFAULT">📋 Current Custom Message / Reminder</option>}
-                            <option value="WELCOME">💬 Enquiry Welcome & Overview</option>
-                            <option value="COURSE_FEE">🎓 Course Fee & Batch Info</option>
-                            <option value="FOLLOWUP">⏰ Follow-up Reminder</option>
-                            <option value="DEMO_INVITE">✨ Free Demo Session Invitation</option>
+                            {dbTemplates.map(t => (
+                                <option key={t.id} value={t.id}>
+                                    [{t.category}] {t.name}
+                                </option>
+                            ))}
                         </select>
                     </div>
 
@@ -6411,6 +6439,465 @@ function ReportsView({ leads = [], followups = [], courses = [], batches = [], s
     );
 }
 
+function interpolateWhatsAppTemplate(templateContent, data) {
+    if (!templateContent) return '';
+    const lead = data.lead || data.followup?.lead || null;
+    const student = data.student || data.admission?.student || (data.firstName ? data : null);
+    const admission = data.admission || null;
+    const followup = data.followup || null;
+
+    const recipientName = data.recipientName ||
+        (student ? `${student.firstName || ''} ${student.lastName || ''}`.trim() :
+         lead ? `${lead.firstName || ''} ${lead.lastName || ''}`.trim() :
+         data.firstName ? `${data.firstName} ${data.lastName || ''}`.trim() : 'Valued Client');
+
+    const firstName = (student?.firstName || lead?.firstName || data.firstName || 'Client').trim();
+    const phone = data.recipientPhone || data.phone || student?.whatsappNumber || student?.phone || lead?.whatsappNumber || lead?.phone || '';
+    const courseName = data.interestedCourse || lead?.interestedCourse || admission?.course?.name || data.course?.name || 'CAD/BIM Courses';
+    const batchName = data.batchName || admission?.batch?.name || data.batch?.name || 'Upcoming Batch';
+    const branchName = data.branchName || student?.branch?.name || lead?.branch?.name || admission?.branch?.name || 'Coimbatore';
+    const admissionDate = admission?.admissionDate ? new Date(admission.admissionDate).toLocaleDateString() : new Date().toLocaleDateString();
+    const courseFee = data.finalFee ? `₹${Number(data.finalFee).toLocaleString()}` : (data.estimatedValue ? `₹${Number(data.estimatedValue).toLocaleString()}` : 'Standard Fee');
+    const paidAmount = data.totalPaid !== undefined ? `₹${Number(data.totalPaid).toLocaleString()}` : (data.paidAmount !== undefined ? `₹${Number(data.paidAmount).toLocaleString()}` : '₹0');
+    const pendingAmount = data.pendingAmount !== undefined ? `₹${Number(data.pendingAmount).toLocaleString()}` : '₹0';
+    const paymentDate = new Date().toLocaleDateString();
+    const followUpDate = followup?.scheduledAt ? new Date(followup.scheduledAt).toLocaleDateString() : 'Today';
+    const counsellorName = lead?.assignedCounsellor ? `${lead.assignedCounsellor.firstName || ''} ${lead.assignedCounsellor.lastName || ''}`.trim() : 'CADPOINT Counsellor';
+
+    return templateContent
+        .replace(/\{\{student_name\}\}/g, recipientName)
+        .replace(/\{\{first_name\}\}/g, firstName)
+        .replace(/\{\{phone\}\}/g, phone)
+        .replace(/\{\{course_name\}\}/g, courseName)
+        .replace(/\{\{batch_name\}\}/g, batchName)
+        .replace(/\{\{branch_name\}\}/g, branchName)
+        .replace(/\{\{admission_date\}\}/g, admissionDate)
+        .replace(/\{\{course_fee\}\}/g, courseFee)
+        .replace(/\{\{paid_amount\}\}/g, paidAmount)
+        .replace(/\{\{pending_amount\}\}/g, pendingAmount)
+        .replace(/\{\{payment_date\}\}/g, paymentDate)
+        .replace(/\{\{follow_up_date\}\}/g, followUpDate)
+        .replace(/\{\{counsellor_name\}\}/g, counsellorName)
+        .replace(/\{\{staff_name\}\}/g, 'CADPOINT Team')
+        .replace(/\{\{demo_date\}\}/g, 'Tomorrow')
+        .replace(/\{\{demo_time\}\}/g, '11:00 AM')
+        .replace(/\{\{course_duration\}\}/g, '2 Months');
+}
+
+function WhatsAppTemplatesManager({ token, userRole }) {
+    const [templates, setTemplates] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [activeCategory, setActiveCategory] = useState('ALL');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [editingTemplate, setEditingTemplate] = useState(null);
+    const [saving, setSaving] = useState(false);
+    const [previewEntity] = useState({
+        student_name: 'Swetha Ramesh',
+        first_name: 'Swetha',
+        phone: '9876543210',
+        course_name: 'AutoCAD & Revit BIM',
+        batch_name: 'Morning 10:00 AM Batch',
+        branch_name: 'Gandhipuram',
+        admission_date: '01/09/2026',
+        course_fee: '₹25,000',
+        paid_amount: '₹10,000',
+        pending_amount: '₹15,000',
+        payment_date: '01/09/2026',
+        follow_up_date: '02/09/2026',
+        counsellor_name: 'Anitha (Senior Counsellor)',
+        staff_name: 'CADPOINT Team',
+        demo_date: 'Tomorrow',
+        demo_time: '11:00 AM',
+        course_duration: '2 Months'
+    });
+
+    const categories = [
+        { id: 'ALL', label: 'All Templates' },
+        { id: 'LEAD', label: 'Leads' },
+        { id: 'ADMISSION', label: 'Admissions' },
+        { id: 'PAYMENT', label: 'Payments' },
+        { id: 'FOLLOW_UP', label: 'Follow-ups' },
+        { id: 'BATCH', label: 'Batches' },
+        { id: 'COURSE', label: 'Courses' },
+        { id: 'GENERAL', label: 'General' }
+    ];
+
+    const availableVariables = [
+        { key: '{{student_name}}', label: 'Student Name' },
+        { key: '{{first_name}}', label: 'First Name' },
+        { key: '{{phone}}', label: 'Phone' },
+        { key: '{{course_name}}', label: 'Course Name' },
+        { key: '{{batch_name}}', label: 'Batch Name' },
+        { key: '{{branch_name}}', label: 'Branch Name' },
+        { key: '{{admission_date}}', label: 'Admission Date' },
+        { key: '{{course_fee}}', label: 'Total Course Fee' },
+        { key: '{{paid_amount}}', label: 'Paid Amount' },
+        { key: '{{pending_amount}}', label: 'Pending Amount' },
+        { key: '{{payment_date}}', label: 'Payment Date' },
+        { key: '{{follow_up_date}}', label: 'Follow-up Date' },
+        { key: '{{counsellor_name}}', label: 'Counsellor Name' }
+    ];
+
+    const fetchTemplates = useCallback(async () => {
+        setLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/whatsapp/templates`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const j = await res.json();
+            if (j.success && Array.isArray(j.data)) {
+                setTemplates(j.data);
+            }
+        } catch (e) {
+            console.error('Failed to fetch WhatsApp templates:', e);
+        } finally {
+            setLoading(false);
+        }
+    }, [token]);
+
+    useEffect(() => {
+        fetchTemplates();
+    }, [fetchTemplates]);
+
+    const filteredTemplates = templates.filter(t => {
+        const matchesCategory = activeCategory === 'ALL' || t.category === activeCategory;
+        const matchesSearch = !searchQuery.trim() ||
+            t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            t.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (t.description && t.description.toLowerCase().includes(searchQuery.toLowerCase()));
+        return matchesCategory && matchesSearch;
+    });
+
+    async function handleSaveTemplate(e) {
+        e.preventDefault();
+        if (!editingTemplate?.name?.trim()) return alert('Template name is required.');
+        if (!editingTemplate?.content?.trim()) return alert('Message content is required.');
+
+        setSaving(true);
+        try {
+            const isEdit = Boolean(editingTemplate.id);
+            const url = isEdit ? `${API_BASE}/whatsapp/templates/${editingTemplate.id}` : `${API_BASE}/whatsapp/templates`;
+            const method = isEdit ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(editingTemplate)
+            });
+            const j = await res.json();
+            if (j.success) {
+                alert(j.message || 'Template saved successfully!');
+                setEditingTemplate(null);
+                fetchTemplates();
+            } else {
+                alert(j.message || 'Failed to save template.');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Failed to save template.');
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    async function handleToggleActive(template) {
+        try {
+            const res = await fetch(`${API_BASE}/whatsapp/templates/${template.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ isActive: !template.isActive })
+            });
+            const j = await res.json();
+            if (j.success) {
+                fetchTemplates();
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function handleDuplicateTemplate(template) {
+        try {
+            const res = await fetch(`${API_BASE}/whatsapp/templates/${template.id}/duplicate`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const j = await res.json();
+            if (j.success) {
+                alert('✅ Template duplicated!');
+                fetchTemplates();
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function handleDeleteTemplate(template) {
+        if (!window.confirm(`Delete template "${template.name}"?`)) return;
+        try {
+            const res = await fetch(`${API_BASE}/whatsapp/templates/${template.id}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const j = await res.json();
+            if (j.success) {
+                alert(j.message || 'Template deleted!');
+                fetchTemplates();
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function insertVariableAtCursor(varKey) {
+        if (!editingTemplate) return;
+        setEditingTemplate(prev => ({
+            ...prev,
+            content: (prev.content || '') + ' ' + varKey + ' '
+        }));
+    }
+
+    function renderPreview(content) {
+        if (!content) return '';
+        let result = content;
+        Object.keys(previewEntity).forEach(key => {
+            const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+            result = result.replace(regex, previewEntity[key]);
+        });
+        return result;
+    }
+
+    const isAdmin = ['SUPER_ADMIN', 'ADMIN'].includes(userRole);
+
+    return (
+        <div className="settings-card" style={{ marginTop: 20 }}>
+            <div className="settings-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                    <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <FileText size={20} color="#16a34a" /> Configurable WhatsApp Message Templates
+                    </h3>
+                    <p>Create, customize, and manage dynamic WhatsApp templates with CRM variables across Leads, Admissions, Payments, and Follow-ups.</p>
+                </div>
+                {isAdmin && (
+                    <button
+                        type="button"
+                        className="primary"
+                        onClick={() => setEditingTemplate({ name: '', category: 'GENERAL', content: '', description: '', isActive: true })}
+                        style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff', fontSize: 13, fontWeight: 700, padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                    >
+                        <Plus size={16} /> Create Custom Template
+                    </button>
+                )}
+            </div>
+
+            {/* CATEGORY TABS & SEARCH */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 16, marginBottom: 16 }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {categories.map(c => (
+                        <button
+                            key={c.id}
+                            type="button"
+                            className={`secondary ${activeCategory === c.id ? 'active' : ''}`}
+                            onClick={() => setActiveCategory(c.id)}
+                            style={{
+                                padding: '5px 12px',
+                                fontSize: 12,
+                                borderRadius: 20,
+                                fontWeight: activeCategory === c.id ? 700 : 500,
+                                background: activeCategory === c.id ? '#16a34a' : '#f1f5f9',
+                                color: activeCategory === c.id ? '#ffffff' : '#475569',
+                                border: 'none'
+                            }}
+                        >
+                            {c.label}
+                        </button>
+                    ))}
+                </div>
+                <div style={{ minWidth: 200 }}>
+                    <input
+                        type="text"
+                        placeholder="Search templates..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        style={{ padding: '6px 12px', fontSize: 13, borderRadius: 8, border: '1px solid #cbd5e1', width: '100%' }}
+                    />
+                </div>
+            </div>
+
+            {/* TEMPLATES LIST GRID */}
+            {loading ? (
+                <div style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>Loading WhatsApp templates...</div>
+            ) : filteredTemplates.length === 0 ? (
+                <div style={{ padding: 24, textAlign: 'center', color: '#64748b', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                    No templates found matching the selected filter.
+                </div>
+            ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 14 }}>
+                    {filteredTemplates.map(t => (
+                        <div key={t.id} style={{ background: t.isActive ? '#ffffff' : '#f8fafc', border: `1px solid ${t.isActive ? '#cbd5e1' : '#e2e8f0'}`, borderRadius: 10, padding: 16, opacity: t.isActive ? 1 : 0.65, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                            <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+                                    <div>
+                                        <b style={{ fontSize: 14, color: '#0f172a', display: 'block' }}>{t.name}</b>
+                                        <span style={{ fontSize: 11, color: '#64748b' }}>{t.description || 'System WhatsApp Template'}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                        <span style={{ background: '#e0f2fe', color: '#0369a1', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12 }}>
+                                            {t.category}
+                                        </span>
+                                        {t.isSystemTemplate && (
+                                            <span style={{ background: '#fef3c7', color: '#b45309', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12 }}>
+                                                System
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div style={{ background: '#f8fafc', padding: 10, borderRadius: 6, fontSize: 12, color: '#334155', fontFamily: 'sans-serif', whiteSpace: 'pre-wrap', marginBottom: 12, border: '1px solid #e2e8f0', maxHeight: 100, overflowY: 'auto' }}>
+                                    {t.content}
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid #f1f5f9' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => handleToggleActive(t)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: t.isActive ? '#16a34a' : '#94a3b8' }}
+                                >
+                                    {t.isActive ? '🟢 Active' : '⚪ Disabled'}
+                                </button>
+                                {isAdmin && (
+                                    <div style={{ display: 'flex', gap: 6 }}>
+                                        <button type="button" className="secondary" style={{ padding: '3px 8px', fontSize: 11 }} onClick={() => setEditingTemplate({ ...t })}>
+                                            Edit
+                                        </button>
+                                        <button type="button" className="secondary" style={{ padding: '3px 8px', fontSize: 11 }} onClick={() => handleDuplicateTemplate(t)}>
+                                            Duplicate
+                                        </button>
+                                        {!t.isSystemTemplate && (
+                                            <button type="button" className="secondary" style={{ padding: '3px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }} onClick={() => handleDeleteTemplate(t)}>
+                                                Delete
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* CREATE / EDIT TEMPLATE MODAL */}
+            {editingTemplate && (
+                <div className="modal" style={{ zIndex: 1200 }}>
+                    <div className="panel" style={{ maxWidth: 640, width: '92%' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <h3 style={{ margin: 0, fontSize: 17, color: '#0f172a', fontWeight: 700 }}>
+                                {editingTemplate.id ? 'Edit WhatsApp Template' : 'Create Custom WhatsApp Template'}
+                            </h3>
+                            <button onClick={() => setEditingTemplate(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveTemplate} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                <div>
+                                    <label style={{ fontSize: 12, fontWeight: 700, color: '#334155', display: 'block', marginBottom: 4 }}>Template Name</label>
+                                    <input
+                                        type="text"
+                                        value={editingTemplate.name}
+                                        onChange={e => setEditingTemplate({ ...editingTemplate, name: e.target.value })}
+                                        placeholder="e.g. Special Discount Follow-up"
+                                        required
+                                        style={{ width: '100%', padding: '8px 12px', fontSize: 13, borderRadius: 8, border: '1px solid #cbd5e1' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ fontSize: 12, fontWeight: 700, color: '#334155', display: 'block', marginBottom: 4 }}>Module Category</label>
+                                    <select
+                                        value={editingTemplate.category}
+                                        onChange={e => setEditingTemplate({ ...editingTemplate, category: e.target.value })}
+                                        style={{ width: '100%', padding: '8px 12px', fontSize: 13, borderRadius: 8, border: '1px solid #cbd5e1' }}
+                                    >
+                                        <option value="GENERAL">General</option>
+                                        <option value="LEAD">Leads</option>
+                                        <option value="ADMISSION">Admissions</option>
+                                        <option value="PAYMENT">Payments</option>
+                                        <option value="FOLLOW_UP">Follow-ups</option>
+                                        <option value="BATCH">Batches</option>
+                                        <option value="COURSE">Courses</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label style={{ fontSize: 12, fontWeight: 700, color: '#334155', display: 'block', marginBottom: 4 }}>Description (Optional)</label>
+                                <input
+                                    type="text"
+                                    value={editingTemplate.description || ''}
+                                    onChange={e => setEditingTemplate({ ...editingTemplate, description: e.target.value })}
+                                    placeholder="Short note describing when to use this template..."
+                                    style={{ width: '100%', padding: '8px 12px', fontSize: 13, borderRadius: 8, border: '1px solid #cbd5e1' }}
+                                />
+                            </div>
+
+                            <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
+                                    <label style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>Message Content</label>
+                                    <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Insert CRM Variable:</span>
+                                        <select
+                                            onChange={e => {
+                                                if (e.target.value) {
+                                                    insertVariableAtCursor(e.target.value);
+                                                    e.target.value = '';
+                                                }
+                                            }}
+                                            style={{ padding: '3px 8px', fontSize: 11, borderRadius: 6, border: '1px solid #93c5fd', background: '#eff6ff', color: '#1d4ed8', fontWeight: 700, cursor: 'pointer' }}
+                                        >
+                                            <option value="">[ Insert Variable ▼ ]</option>
+                                            {availableVariables.map(v => (
+                                                <option key={v.key} value={v.key}>{v.label} ({v.key})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <textarea
+                                    rows={5}
+                                    value={editingTemplate.content}
+                                    onChange={e => setEditingTemplate({ ...editingTemplate, content: e.target.value })}
+                                    placeholder="Type message template with variables like {{student_name}}, {{course_name}}, {{pending_amount}}..."
+                                    required
+                                    style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8, border: '1px solid #cbd5e1', resize: 'vertical' }}
+                                />
+                            </div>
+
+                            {/* LIVE PREVIEW BOX */}
+                            <div>
+                                <label style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                                    <Eye size={14} /> Live Variable Substitution Preview
+                                </label>
+                                <div style={{ background: '#f0fdf4', padding: 12, borderRadius: 8, border: '1px solid #bbf7d0', fontSize: 13, color: '#166534', whiteSpace: 'pre-wrap', minHeight: 60 }}>
+                                    {renderPreview(editingTemplate.content) || <i style={{ color: '#86efac' }}>Message preview will appear here...</i>}
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
+                                <button type="button" className="secondary" onClick={() => setEditingTemplate(null)}>Cancel</button>
+                                <button type="submit" className="primary" disabled={saving} style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff' }}>
+                                    {saving ? 'Saving...' : 'Save Template'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 function SettingsView({ userRole, user, token, theme, toggleTheme, sourcesList = [], refreshSources, usersList = [], currentUserId, onOpenAddModal, onEditUser, onDeleteUser }) {
     const [activeTab, setActiveTab] = useState('Profile');
     const [saving, setSaving] = useState(false);
@@ -7630,6 +8117,9 @@ function SettingsView({ userRole, user, token, theme, toggleTheme, sourcesList =
                             </div>
                         </div>
                     </div>
+
+                    {/* Dynamic WhatsApp Templates Manager Card */}
+                    <WhatsAppTemplatesManager token={token} userRole={safeUserRole} />
                 </div>
             )}
 

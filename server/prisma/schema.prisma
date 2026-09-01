@@ -546,3 +546,22 @@ model WhatsAppMessage {
   @@index([wamid])
 }
 
+model WhatsAppTemplate {
+  id               String   @id @default(uuid())
+  organizationId   String   @default("org_default")
+  name             String
+  category         String   @default("GENERAL")
+  content          String   @db.Text
+  description      String?
+  isActive         Boolean  @default(true)
+  isSystemTemplate Boolean  @default(false)
+  createdBy        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([category])
+  @@index([isActive])
+}
+
+
