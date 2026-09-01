@@ -242,7 +242,7 @@ router.post('/:id/unassign', authenticate, authorize(...BATCH_ROLES), async (req
 });
 
 // DELETE /api/batches/:id
-router.delete('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+router.delete('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'COUNSELLOR'), async (req, res) => {
   try {
     const { id } = req.params;
     await prisma.batch.delete({ where: { id } });

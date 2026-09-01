@@ -525,16 +525,24 @@ function App() {
     }
 
     function openEditProgress(admission) {
+        if (!admission) return;
         setEditingAdmissionProgress(admission);
         const currentPct = typeof admission.completionPct === 'number' ? admission.completionPct : (admission.certificate?.completionPct || 0);
+        
+        const safeSlice = (val) => {
+            if (!val) return '';
+            if (typeof val === 'string') return val.slice(0, 10);
+            try { return new Date(val).toISOString().slice(0, 10); } catch { return ''; }
+        };
+
         setProgressForm({
             id: admission.id,
-            startDate: admission.startDate ? admission.startDate.slice(0, 10) : '',
-            endDate: admission.endDate ? admission.endDate.slice(0, 10) : '',
+            startDate: safeSlice(admission.startDate),
+            endDate: safeSlice(admission.endDate),
             completionPct: currentPct,
             modeOfLearning: admission.modeOfLearning || admission.batch?.mode || 'OFFLINE',
             certificateStatus: admission.certificate?.status || (currentPct === 100 ? 'COMPLETED' : currentPct > 0 ? 'IN_PROGRESS' : 'NOT_STARTED'),
-            issueDate: admission.certificate?.issueDate ? admission.certificate.issueDate.slice(0, 10) : ''
+            issueDate: safeSlice(admission.certificate?.issueDate)
         });
     }
 
@@ -757,13 +765,13 @@ function App() {
         }
     }
 
-    async function unassignStudentFromBatch(batchId, studentId, studentName) {
+    async function unassignStudentFromBatch(batchId, studentId, studentName, admissionId) {
         if (!window.confirm(`Are you sure you want to remove "${studentName}" from this batch?`)) return;
         try {
             const res = await fetch(API_BASE + '/batches/' + batchId + '/unassign', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify({ studentId })
+                body: JSON.stringify({ studentId, admissionId })
             });
             const j = await res.json();
             if (!j.success) return alert(j.message || 'Remove student failed');
@@ -1049,15 +1057,23 @@ function App() {
     }
 
     function openEditBatch(b) {
+        if (!b) return;
         setEditingBatch(b);
+
+        const safeSlice = (val) => {
+            if (!val) return '';
+            if (typeof val === 'string') return val.slice(0, 10);
+            try { return new Date(val).toISOString().slice(0, 10); } catch { return ''; }
+        };
+
         setEditBatchForm({
             id: b.id,
             batchCode: b.batchCode || '',
             name: b.name || '',
             courseId: b.courseId || '',
             trainerId: b.trainerId || b.trainer?.id || '',
-            startDate: b.startDate ? b.startDate.slice(0, 10) : '',
-            endDate: b.endDate ? b.endDate.slice(0, 10) : '',
+            startDate: safeSlice(b.startDate),
+            endDate: safeSlice(b.endDate),
             capacity: b.capacity || 25,
             progress: b.progress || 'In Progress',
             syllabusProgress: typeof b.syllabusProgress === 'number' ? b.syllabusProgress : 0,
