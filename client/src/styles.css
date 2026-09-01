@@ -3074,39 +3074,160 @@ button, select, input[type="text"], input[type="email"], input[type="tel"], inpu
 .status-confirmed, .status-converted { background: #d1fae5; color: #065f46; }
 .status-lost { background: #fee2e2; color: #991b1b; }
 
+/* --- Global Mobile Button Design System --- */
+.mobile-btn-primary {
+    min-height: 44px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    background: #2563eb;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+    transition: background 0.15s ease, transform 0.1s ease;
+    box-sizing: border-box;
+}
+
+.mobile-btn-primary:active {
+    transform: scale(0.98);
+    background: #1d4ed8;
+}
+
+.mobile-btn-secondary {
+    min-height: 44px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    background: #f1f5f9;
+    color: #1e293b;
+    border: 1px solid #cbd5e1;
+    font-size: 14px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+    box-sizing: border-box;
+}
+
+[data-theme="dark"] .mobile-btn-secondary {
+    background: #334155;
+    border-color: #475569;
+    color: #f8fafc;
+}
+
+.mobile-btn-secondary:active {
+    transform: scale(0.98);
+    background: #e2e8f0;
+}
+
+.mobile-btn-edit {
+    min-height: 40px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: #f1f5f9;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+    font-size: 13px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+[data-theme="dark"] .mobile-btn-edit {
+    background: #334155;
+    border-color: #475569;
+    color: #f8fafc;
+}
+
+.mobile-btn-edit:active {
+    transform: scale(0.98);
+    background: #e2e8f0;
+}
+
+.mobile-btn-danger {
+    min-height: 40px;
+    min-width: 40px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: #fee2e2;
+    color: #dc2626;
+    border: 1px solid #fca5a5;
+    font-size: 13px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+[data-theme="dark"] .mobile-btn-danger {
+    background: #450a0a;
+    border-color: #7f1d1d;
+    color: #fca5a5;
+}
+
+.mobile-btn-danger:active {
+    transform: scale(0.98);
+    background: #fecaca;
+}
+
+.mobile-header-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 /* 1-Tap Card Actions */
 .mobile-card-actions {
     display: flex;
-    gap: 6px;
-    margin-top: 10px;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
 }
 
 .mobile-card-btn {
     flex: 1;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    padding: 8px 10px;
-    border-radius: 8px;
-    font-size: 12px;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 13px;
     font-weight: 700;
     border: none;
     cursor: pointer;
     text-decoration: none;
-    line-height: 1;
+    line-height: 1.2;
+    min-height: 40px;
+    box-sizing: border-box;
 }
 
 .mobile-card-btn.call { background: #dbeafe; color: #1d4ed8; }
 .mobile-card-btn.whatsapp { background: #dcfce7; color: #15803d; }
 .mobile-card-btn.complete { background: #10b981; color: #ffffff; }
 .mobile-card-btn.details { background: #f1f5f9; color: #334155; }
-.mobile-card-btn.secondary { background: #e2e8f0; color: #1e293b; }
-.mobile-card-btn.danger-icon { background: #fee2e2; color: #dc2626; flex: 0 0 36px; }
+.mobile-card-btn.secondary { background: #f1f5f9; color: #1e293b; border: 1px solid #cbd5e1; }
+.mobile-card-btn.danger-icon { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; flex: 0 0 40px; }
 
 [data-theme="dark"] .mobile-card-btn.details,
 [data-theme="dark"] .mobile-card-btn.secondary {
     background: #334155;
+    border-color: #475569;
     color: #f8fafc;
 }
 

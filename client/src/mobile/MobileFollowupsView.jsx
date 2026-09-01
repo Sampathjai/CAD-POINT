@@ -46,12 +46,12 @@ export function MobileFollowupsView({
           <h2>Follow-ups</h2>
           <span>Schedule & track lead conversations</span>
         </div>
-        <button className="mobile-add-btn" onClick={() => onOpenAddModal('Follow-ups')}>
+        <button className="mobile-btn-primary" onClick={() => onOpenAddModal('Follow-ups')}>
           <Plus size={16} /> Schedule
         </button>
       </div>
 
-      {/* Tabs Row */}
+      {/* Segmented Control Tabs Row */}
       <div className="mobile-tabs-row">
         <button 
           className={`mobile-tab-btn ${tab === 'TODAY' ? 'active' : ''}`}
@@ -142,4 +142,3 @@ export function MobileFollowupsView({
     </div>
   );
 }
-

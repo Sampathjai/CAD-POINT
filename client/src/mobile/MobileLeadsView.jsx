@@ -129,7 +129,7 @@ export function MobileLeadsView({
           <h2>Leads Directory</h2>
           <span>Showing {filteredLeads.length} of {leads.length} records</span>
         </div>
-        <button className="mobile-add-btn" onClick={() => onOpenAddModal('Leads')}>
+        <button className="mobile-btn-primary" onClick={() => onOpenAddModal('Leads')}>
           <Plus size={16} /> Add Lead
         </button>
       </div>

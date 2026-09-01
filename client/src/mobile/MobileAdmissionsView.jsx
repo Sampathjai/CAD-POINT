@@ -48,11 +48,11 @@ export function MobileAdmissionsView({
       {/* Header Info */}
       <div className="mobile-view-header">
         <div>
-          <h2>Admissions</h2>
-          <span>Total {filteredAdmissions.length} enrolled students</span>
+          <h2>Admissions ({filteredAdmissions.length})</h2>
+          <span>Enrolled student course contracts</span>
         </div>
-        <button className="mobile-add-btn" onClick={() => onOpenAddModal('Admissions')}>
-          <Plus size={16} /> Admission
+        <button className="mobile-btn-primary" onClick={() => onOpenAddModal('Admissions')}>
+          <Plus size={16} /> Add Admission
         </button>
       </div>
 
@@ -123,13 +123,13 @@ export function MobileAdmissionsView({
                 {/* Card Action Buttons */}
                 <div className="mobile-card-actions">
                   <button 
-                    className="mobile-card-btn secondary"
+                    className="mobile-btn-edit"
                     onClick={() => onOpenEditProgress(adm)}
                   >
                     <Edit3 size={14} /> Update Progress
                   </button>
                   <button 
-                    className="mobile-card-btn danger-icon"
+                    className="mobile-btn-danger"
                     onClick={() => onDeleteAdmission(adm.id, adm.admissionNumber)}
                     title="Delete Admission"
                   >
@@ -144,4 +144,3 @@ export function MobileAdmissionsView({
     </div>
   );
 }
-

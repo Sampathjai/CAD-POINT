@@ -32,8 +32,8 @@ export function MobileCoursesView({ courses = [], onOpenAddModal, onEditCourse, 
           <h2>Courses ({courses.length})</h2>
           <span>Available curriculum & fee structure</span>
         </div>
-        <button className="mobile-add-btn" onClick={() => onOpenAddModal('Courses')}>
-          <Plus size={16} /> Course
+        <button className="mobile-btn-primary" onClick={() => onOpenAddModal('Courses')}>
+          <Plus size={16} /> Add Course
         </button>
       </div>
 
@@ -57,10 +57,10 @@ export function MobileCoursesView({ courses = [], onOpenAddModal, onEditCourse, 
               </div>
             </div>
             <div className="mobile-card-actions">
-              <button className="mobile-card-btn secondary" onClick={() => onEditCourse(c)}>
+              <button className="mobile-btn-edit" onClick={() => onEditCourse(c)}>
                 <Edit3 size={14} /> Edit
               </button>
-              <button className="mobile-card-btn danger-icon" onClick={() => onDeleteCourse(c.id, c.name)}>
+              <button className="mobile-btn-danger" onClick={() => onDeleteCourse(c.id, c.name)} title="Delete Course">
                 <Trash2 size={14} />
               </button>
             </div>
@@ -81,11 +81,11 @@ export function MobileBatchesView({ batches = [], onOpenAddModal, onOpenAssignBa
           <span>Class schedules & progress</span>
         </div>
         <div className="mobile-header-actions-row">
-          <button className="mobile-add-btn secondary" onClick={onOpenAssignBatchModal}>
-            Assign
+          <button className="mobile-btn-secondary" onClick={onOpenAssignBatchModal}>
+            <UserPlus size={15} /> Assign
           </button>
-          <button className="mobile-add-btn" onClick={() => onOpenAddModal('Batches')}>
-            <Plus size={16} /> Batch
+          <button className="mobile-btn-primary" onClick={() => onOpenAddModal('Batches')}>
+            <Plus size={16} /> Add Batch
           </button>
         </div>
       </div>
@@ -123,10 +123,10 @@ export function MobileBatchesView({ batches = [], onOpenAddModal, onOpenAssignBa
             </div>
 
             <div className="mobile-card-actions">
-              <button className="mobile-card-btn secondary" onClick={() => onEditBatch(b)}>
+              <button className="mobile-btn-edit" onClick={() => onEditBatch(b)}>
                 <Edit3 size={14} /> Edit
               </button>
-              <button className="mobile-card-btn danger-icon" onClick={() => onDeleteBatch(b.id, b.name)}>
+              <button className="mobile-btn-danger" onClick={() => onDeleteBatch(b.id, b.name)} title="Delete Batch">
                 <Trash2 size={14} />
               </button>
             </div>
@@ -146,8 +146,8 @@ export function MobileStudentsView({ students = [], onOpenAddModal, onEditStuden
           <h2>Students ({students.length})</h2>
           <span>Student directory records</span>
         </div>
-        <button className="mobile-add-btn" onClick={() => onOpenAddModal('Students')}>
-          <Plus size={16} /> Student
+        <button className="mobile-btn-primary" onClick={() => onOpenAddModal('Students')}>
+          <Plus size={16} /> Register Student
         </button>
       </div>
 
@@ -173,10 +173,10 @@ export function MobileStudentsView({ students = [], onOpenAddModal, onEditStuden
             </div>
 
             <div className="mobile-card-actions">
-              <button className="mobile-card-btn secondary" onClick={() => onEditStudent(s)}>
+              <button className="mobile-btn-edit" onClick={() => onEditStudent(s)}>
                 <Edit3 size={14} /> Edit
               </button>
-              <button className="mobile-card-btn danger-icon" onClick={() => onDeleteStudent(s.id, s.firstName)}>
+              <button className="mobile-btn-danger" onClick={() => onDeleteStudent(s.id, s.firstName)} title="Delete Student">
                 <Trash2 size={14} />
               </button>
             </div>
@@ -196,8 +196,8 @@ export function MobilePaymentsView({ payments = [], onOpenAddModal, onEditPaymen
           <h2>Payments ({payments.length})</h2>
           <span>Fee receipts & payment logs</span>
         </div>
-        <button className="mobile-add-btn" onClick={() => onOpenAddModal('Payments')}>
-          <Plus size={16} /> Payment
+        <button className="mobile-btn-primary" onClick={() => onOpenAddModal('Payments')}>
+          <Plus size={16} /> Record Payment
         </button>
       </div>
 
@@ -206,28 +206,28 @@ export function MobilePaymentsView({ payments = [], onOpenAddModal, onEditPaymen
           <div key={p.id} className="mobile-card">
             <div className="mobile-card-top">
               <div>
-                <span className="mobile-adm-code">Receipt #{p.receiptNumber}</span>
-                <h3 className="mobile-card-title">₹{Number(p.amount || 0).toLocaleString()}</h3>
+                <span className="mobile-adm-code">#{p.receiptNumber}</span>
+                <h3 className="mobile-card-title">{p.student ? `${p.student.firstName} ${p.student.lastName || ''}` : 'Unlinked Student'}</h3>
               </div>
-              <span className="mobile-status-badge status-confirmed">{p.paymentMethod}</span>
+              <span className="mobile-status-badge status-confirmed">RECEIVED</span>
             </div>
 
             <div className="mobile-card-meta-grid">
               <div>
-                <span className="meta-label">Admission #</span>
-                <span className="meta-val">{p.admission?.admissionNumber || 'N/A'}</span>
+                <span className="meta-label">Amount Paid</span>
+                <span className="meta-val text-emerald">₹{Number(p.amount || 0).toLocaleString()}</span>
               </div>
               <div>
-                <span className="meta-label">Date</span>
-                <span className="meta-val">{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : 'N/A'}</span>
+                <span className="meta-label">Payment Method</span>
+                <span className="meta-val">{(p.paymentMethod || 'OTHER').toUpperCase()}</span>
               </div>
             </div>
 
             <div className="mobile-card-actions">
-              <button className="mobile-card-btn secondary" onClick={() => onEditPayment(p)}>
+              <button className="mobile-btn-edit" onClick={() => onEditPayment(p)}>
                 <Edit3 size={14} /> Edit
               </button>
-              <button className="mobile-card-btn danger-icon" onClick={() => onDeletePayment(p.id, p.receiptNumber)}>
+              <button className="mobile-btn-danger" onClick={() => onDeletePayment(p.id, p.receiptNumber)} title="Delete Receipt">
                 <Trash2 size={14} />
               </button>
             </div>
@@ -245,10 +245,10 @@ export function MobileUsersView({ usersList = [], onOpenAddModal, onEditUser, on
       <div className="mobile-view-header">
         <div>
           <h2>Users ({usersList.length})</h2>
-          <span>System accounts & RBAC roles</span>
+          <span>Staff & access roles</span>
         </div>
-        <button className="mobile-add-btn" onClick={() => onOpenAddModal('Users')}>
-          <UserPlus size={16} /> User
+        <button className="mobile-btn-primary" onClick={() => onOpenAddModal('Users')}>
+          <Plus size={16} /> Add User
         </button>
       </div>
 
@@ -257,7 +257,7 @@ export function MobileUsersView({ usersList = [], onOpenAddModal, onEditUser, on
           <div key={u.id} className="mobile-card">
             <div className="mobile-card-top">
               <div>
-                <span className="mobile-adm-code">{u.role}</span>
+                <span className="mobile-status-badge status-confirmed">{u.role ? u.role.replace('_', ' ') : 'STAFF'}</span>
                 <h3 className="mobile-card-title">{u.name}</h3>
               </div>
               <span className={`mobile-status-badge ${u.isActive ? 'status-confirmed' : 'status-lost'}`}>
@@ -268,7 +268,7 @@ export function MobileUsersView({ usersList = [], onOpenAddModal, onEditUser, on
             <div className="mobile-card-meta-grid">
               <div>
                 <span className="meta-label">Email</span>
-                <span className="meta-val">{u.email}</span>
+                <span className="meta-val">{u.email || 'N/A'}</span>
               </div>
               <div>
                 <span className="meta-label">Phone</span>
@@ -277,10 +277,10 @@ export function MobileUsersView({ usersList = [], onOpenAddModal, onEditUser, on
             </div>
 
             <div className="mobile-card-actions">
-              <button className="mobile-card-btn secondary" onClick={() => onEditUser(u)}>
+              <button className="mobile-btn-edit" onClick={() => onEditUser(u)}>
                 <Edit3 size={14} /> Edit
               </button>
-              <button className="mobile-card-btn danger-icon" onClick={() => onDeleteUser(u.id, u.name)}>
+              <button className="mobile-btn-danger" onClick={() => onDeleteUser(u.id, u.name)} title="Delete User">
                 <Trash2 size={14} />
               </button>
             </div>
@@ -290,4 +290,3 @@ export function MobileUsersView({ usersList = [], onOpenAddModal, onEditUser, on
     </div>
   );
 }
-
