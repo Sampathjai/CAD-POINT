@@ -36,8 +36,8 @@ router.get('/config', authenticate, async (req, res) => {
       return res.json({
         success: true,
         data: {
-          appId: process.env.META_APP_ID || '',
-          configId: process.env.META_CONFIG_ID || '',
+          appId: process.env.META_APP_ID || '9662422233860000',
+          configId: process.env.META_CONFIG_ID || '109283746590',
           apiVersion: META_GRAPH_VERSION,
           isConnected: Boolean(integration),
           integration: integration ? {
@@ -87,8 +87,8 @@ router.get('/config', authenticate, async (req, res) => {
     res.json({
       success: true,
       data: {
-        appId: process.env.META_APP_ID || '',
-        configId: process.env.META_CONFIG_ID || '',
+        appId: process.env.META_APP_ID || '9662422233860000',
+        configId: process.env.META_CONFIG_ID || '109283746590',
         apiVersion: META_GRAPH_VERSION,
         isConnected: globalConnected,
         branches: branchIntegrations
