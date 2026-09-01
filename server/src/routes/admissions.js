@@ -258,7 +258,7 @@ router.patch('/:id/installments', authenticate, authorize('SUPER_ADMIN', 'ADMIN'
 router.patch('/:id/progress', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'COUNSELLOR', 'TRAINER'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { startDate, endDate, completionPct, certificateStatus, issueDate } = req.body;
+    const { startDate, endDate, completionPct, certificateStatus, issueDate, modeOfLearning } = req.body;
 
     const admission = await prisma.admission.findUnique({ where: { id } });
     if (!admission) return res.status(404).json({ success: false, message: 'Admission record not found' });
@@ -271,6 +271,7 @@ router.patch('/:id/progress', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'C
       where: { id },
       data: {
         completionPct: validPct,
+        ...(modeOfLearning ? { modeOfLearning } : {}),
         ...(validPct === 100 ? { status: 'COMPLETED' } : {}),
         ...(startDate ? { startDate: new Date(startDate) } : {}),
         ...(endDate ? { endDate: new Date(endDate) } : {})

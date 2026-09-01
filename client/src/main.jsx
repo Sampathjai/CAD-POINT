@@ -532,6 +532,7 @@ function App() {
             startDate: admission.startDate ? admission.startDate.slice(0, 10) : '',
             endDate: admission.endDate ? admission.endDate.slice(0, 10) : '',
             completionPct: currentPct,
+            modeOfLearning: admission.modeOfLearning || admission.batch?.mode || 'OFFLINE',
             certificateStatus: admission.certificate?.status || (currentPct === 100 ? 'COMPLETED' : currentPct > 0 ? 'IN_PROGRESS' : 'NOT_STARTED'),
             issueDate: admission.certificate?.issueDate ? admission.certificate.issueDate.slice(0, 10) : ''
         });
@@ -1630,6 +1631,17 @@ function App() {
                                 value={progressForm.completionPct}
                                 onChange={(e) => setProgressForm({ ...progressForm, completionPct: Number(e.target.value) })}
                             />
+                        </label>
+                        <label>
+                            Mode of Learning (Online / Offline)
+                            <select
+                                value={progressForm.modeOfLearning || 'OFFLINE'}
+                                onChange={(e) => setProgressForm({ ...progressForm, modeOfLearning: e.target.value })}
+                            >
+                                <option value="OFFLINE">Offline (In-Person)</option>
+                                <option value="ONLINE">Online (Live Class)</option>
+                                <option value="HYBRID">Hybrid (Online + Offline)</option>
+                            </select>
                         </label>
                         <label>
                             Certificate Status
@@ -4483,6 +4495,7 @@ ${instituteName}`;
                                                                                 <th>Student Name</th>
                                                                                 <th>Phone</th>
                                                                                 <th>Admission #</th>
+                                                                                <th>Mode</th>
                                                                                 <th>Course Completion (%)</th>
                                                                                 <th>Status</th>
                                                                                 <th>Action</th>
@@ -4497,16 +4510,28 @@ ${instituteName}`;
                                                                                     return (st?.studentCode || '').toLowerCase().includes(bf) || (st?.firstName || '').toLowerCase().includes(bf) || (st?.phone || '').includes(bf) || (adm.admissionNumber || '').toLowerCase().includes(bf);
                                                                                 })
                                                                                 .map((adm) => {
-                                                                                    const stPct = typeof adm.completionPct === 'number' ? adm.completionPct : (adm.certificate?.completionPct || 0);
+                                                                                    const fullAdm = safeAdmissions.find(a => a.id === adm.id) || adm;
+                                                                                    const stPct = typeof fullAdm.completionPct === 'number' ? fullAdm.completionPct : (fullAdm.certificate?.completionPct || 0);
                                                                                     const isDone = stPct === 100;
                                                                                     const isStarted = stPct > 0;
+                                                                                    const modeVal = fullAdm.modeOfLearning || b.mode || 'OFFLINE';
 
                                                                                     return (
-                                                                                        <tr key={adm.id}>
+                                                                                        <tr key={adm.id} onClick={(e) => e.stopPropagation()}>
                                                                                             <td><b style={{ color: '#2563eb' }}>{adm.student?.studentCode || 'STU'}</b></td>
                                                                                             <td><b>{adm.student ? `${adm.student.firstName} ${adm.student.lastName || ''}`.trim() : 'Student'}</b></td>
                                                                                             <td>{adm.student?.phone || '-'}</td>
                                                                                             <td><b>{adm.admissionNumber}</b></td>
+                                                                                            <td>
+                                                                                                <span className="badge" style={{
+                                                                                                    background: modeVal === 'ONLINE' ? '#e0f2fe' : '#f1f5f9',
+                                                                                                    color: modeVal === 'ONLINE' ? '#0369a1' : '#475569',
+                                                                                                    fontSize: 11,
+                                                                                                    fontWeight: 700
+                                                                                                }}>
+                                                                                                    {modeVal === 'ONLINE' ? '🌐 Online' : '🏢 Offline'}
+                                                                                                </span>
+                                                                                            </td>
                                                                                             <td>
                                                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                                                                                     <div style={{ width: 70, height: 7, borderRadius: 4, background: '#e2e8f0', overflow: 'hidden' }}>
@@ -4525,33 +4550,44 @@ ${instituteName}`;
                                                                                                     {isDone ? '✓ Completed' : isStarted ? 'In Progress' : 'Not Started'}
                                                                                                 </span>
                                                                                             </td>
-                                                                                            <td>
+                                                                                            <td onClick={(e) => e.stopPropagation()}>
                                                                                                 <div style={{ display: 'flex', gap: 6 }}>
                                                                                                     <button
                                                                                                         type="button"
                                                                                                         className="secondary"
-                                                                                                        style={{ padding: '3px 6px', fontSize: 11, color: '#0284c7', borderColor: '#bae6fd', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                                                                                                        onClick={() => openEditProgress(adm)}
-                                                                                                        title="Update Student Course Completion %"
+                                                                                                        style={{ padding: '3px 8px', fontSize: 11, color: '#0284c7', borderColor: '#bae6fd', display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+                                                                                                        onClick={(e) => {
+                                                                                                            e.preventDefault();
+                                                                                                            e.stopPropagation();
+                                                                                                            openEditProgress(fullAdm);
+                                                                                                        }}
+                                                                                                        title="Update Student Course Completion % & Mode"
                                                                                                     >
                                                                                                         <Edit size={11} /> Progress
                                                                                                     </button>
                                                                                                     <button
                                                                                                         type="button"
                                                                                                         className="secondary"
-                                                                                                        style={{ padding: '3px 6px', fontSize: 11 }}
-                                                                                                        onClick={() => {
+                                                                                                        style={{ padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}
+                                                                                                        onClick={(e) => {
+                                                                                                            e.preventDefault();
+                                                                                                            e.stopPropagation();
                                                                                                             setPage('Students');
-                                                                                                            setFilterText(adm.student?.studentCode || '');
+                                                                                                            setFilterText(adm.student?.studentCode || adm.student?.firstName || '');
                                                                                                         }}
+                                                                                                        title="View Student Profile"
                                                                                                     >
                                                                                                         View
                                                                                                     </button>
                                                                                                     <button
                                                                                                         type="button"
                                                                                                         className="secondary"
-                                                                                                        style={{ padding: '3px 6px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }}
-                                                                                                        onClick={() => onUnassignStudentFromBatch && onUnassignStudentFromBatch(b.id, adm.studentId, adm.student?.firstName || 'Student')}
+                                                                                                        style={{ padding: '3px 8px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5', cursor: 'pointer' }}
+                                                                                                        onClick={(e) => {
+                                                                                                            e.preventDefault();
+                                                                                                            e.stopPropagation();
+                                                                                                            onUnassignStudentFromBatch && onUnassignStudentFromBatch(b.id, adm.studentId, adm.student?.firstName || 'Student');
+                                                                                                        }}
                                                                                                     >
                                                                                                         Remove
                                                                                                     </button>

@@ -165,6 +165,7 @@ export function MobileBatchesView({ batches = [], onOpenAddModal, onOpenAssignBa
                         const stPct = typeof adm.completionPct === 'number' ? adm.completionPct : (adm.certificate?.completionPct || 0);
                         const isDone = stPct === 100;
                         const isStarted = stPct > 0;
+                        const modeVal = adm.modeOfLearning || b.mode || 'OFFLINE';
 
                         return (
                           <div key={adm.id} style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
@@ -173,16 +174,28 @@ export function MobileBatchesView({ batches = [], onOpenAddModal, onOpenAssignBa
                                 <span style={{ fontSize: 11, color: '#2563eb', fontWeight: 700 }}>#{stCode}</span>
                                 <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{stName}</div>
                               </div>
-                              <span style={{
-                                fontSize: 10,
-                                fontWeight: 800,
-                                padding: '2px 7px',
-                                borderRadius: 10,
-                                background: isDone ? '#dcfce7' : isStarted ? '#fef3c7' : '#f1f5f9',
-                                color: isDone ? '#15803d' : isStarted ? '#b45309' : '#475569'
-                              }}>
-                                {isDone ? '✓ Completed' : isStarted ? 'In Progress' : 'Not Started'}
-                              </span>
+                              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                <span style={{
+                                  fontSize: 10,
+                                  fontWeight: 800,
+                                  padding: '2px 6px',
+                                  borderRadius: 8,
+                                  background: modeVal === 'ONLINE' ? '#e0f2fe' : '#f1f5f9',
+                                  color: modeVal === 'ONLINE' ? '#0369a1' : '#475569'
+                                }}>
+                                  {modeVal === 'ONLINE' ? '🌐 Online' : '🏢 Offline'}
+                                </span>
+                                <span style={{
+                                  fontSize: 10,
+                                  fontWeight: 800,
+                                  padding: '2px 7px',
+                                  borderRadius: 10,
+                                  background: isDone ? '#dcfce7' : isStarted ? '#fef3c7' : '#f1f5f9',
+                                  color: isDone ? '#15803d' : isStarted ? '#b45309' : '#475569'
+                                }}>
+                                  {isDone ? '✓ Completed' : isStarted ? 'In Progress' : 'Not Started'}
+                                </span>
+                              </div>
                             </div>
 
                             <div className="mobile-progress-block" style={{ margin: '6px 0 8px' }}>
@@ -199,7 +212,11 @@ export function MobileBatchesView({ batches = [], onOpenAddModal, onOpenAssignBa
                               <button 
                                 className="mobile-btn-edit"
                                 style={{ width: '100%', minHeight: 32, padding: '4px 8px', fontSize: 11, justifyContent: 'center', marginTop: 4 }}
-                                onClick={() => onOpenEditProgress(adm)}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  onOpenEditProgress(adm);
+                                }}
                               >
                                 <Edit3 size={12} /> Update Progress ({stPct}%)
                               </button>
