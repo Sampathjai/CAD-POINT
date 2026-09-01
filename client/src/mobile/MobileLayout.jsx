@@ -52,20 +52,22 @@ export function MobileLayout({
   const [showBranchSheet, setShowBranchSheet] = useState(false);
 
   const allNavItems = [
-    { name: 'Dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { name: 'Leads', label: 'Leads', icon: UsersIcon, badge: leadsCount },
-    { name: 'Follow-ups', label: 'Follow-ups', icon: CalendarDays, badge: followupsCount },
-    { name: 'Courses', label: 'Courses', icon: BookOpen },
-    { name: 'Batches', label: 'Batches', icon: CalendarDays },
-    { name: 'Students', label: 'Students', icon: GraduationCap },
-    { name: 'Admissions', label: 'Admissions', icon: ArrowUpRight },
-    { name: 'Payments', label: 'Payments', icon: WalletCards },
-    { name: 'Reports', label: 'Reports', icon: BarChart3 },
-    { name: 'Users', label: 'Users', icon: UserCheck },
-    { name: 'Settings', label: 'Settings', icon: Settings }
-  ];
+    hasPermission(user, 'adminDashboard') && { name: 'Admin Dashboard', label: 'Admin Dashboard', icon: LayoutDashboard },
+    hasPermission(user, 'leadsDashboard') && { name: 'Leads Dashboard', label: 'Leads Dashboard', icon: LayoutDashboard },
+    hasPermission(user, 'leads') && { name: 'Leads', label: 'Leads', icon: UsersIcon, badge: leadsCount },
+    hasPermission(user, 'followups') && { name: 'Follow-ups', label: 'Follow-ups', icon: CalendarDays, badge: followupsCount },
+    hasPermission(user, 'courses') && { name: 'Courses', label: 'Courses', icon: BookOpen },
+    hasPermission(user, 'batches') && { name: 'Batches', label: 'Batches', icon: CalendarDays },
+    hasPermission(user, 'students') && { name: 'Students', label: 'Students', icon: GraduationCap },
+    hasPermission(user, 'admissions') && { name: 'Admissions', label: 'Admissions', icon: ArrowUpRight },
+    hasPermission(user, 'payments') && { name: 'Payments', label: 'Payments', icon: WalletCards },
+    hasPermission(user, 'reports') && { name: 'Reports', label: 'Reports', icon: BarChart3 },
+    hasPermission(user, 'userControl') && { name: 'Users', label: 'Users', icon: UserCheck },
+    hasPermission(user, 'adminSettings') && { name: 'Admin Settings', label: 'Admin Settings', icon: Settings },
+    hasPermission(user, 'userSettings') && !hasPermission(user, 'adminSettings') && { name: 'Settings', label: 'Settings', icon: Settings }
+  ].filter(Boolean);
 
-  const allowedNavItems = allNavItems.filter(item => hasPermission(user, item.name));
+  const allowedNavItems = allNavItems;
 
   function handleNavigate(targetPage) {
     setPage(targetPage);

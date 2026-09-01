@@ -4,7 +4,8 @@
 
 const ROLE_PERMISSIONS = {
   SUPER_ADMIN: [
-    'dashboard',
+    'adminDashboard',
+    'leadsDashboard',
     'leads',
     'followups',
     'courses',
@@ -15,16 +16,12 @@ const ROLE_PERMISSIONS = {
     'reports',
     'whatsapp',
     'userControl',
-    'settings',
-    'settings.profile',
-    'settings.appearance',
-    'settings.whatsapp',
-    'settings.devices',
-    'settings.branches',
-    'settings.users'
+    'adminSettings',
+    'userSettings'
   ],
   ADMIN: [
-    'dashboard',
+    'adminDashboard',
+    'leadsDashboard',
     'leads',
     'followups',
     'courses',
@@ -34,63 +31,53 @@ const ROLE_PERMISSIONS = {
     'payments',
     'reports',
     'whatsapp',
-    'settings',
-    'settings.profile',
-    'settings.appearance',
-    'settings.whatsapp',
-    'settings.devices',
-    'settings.branches'
+    'adminSettings',
+    'userSettings'
   ],
   COUNSELLOR: [
-    'dashboard',
+    'leadsDashboard',
     'leads',
     'followups',
     'courses',
     'batches',
     'students',
     'admissions',
-    'settings',
-    'settings.profile',
-    'settings.appearance'
+    'userSettings'
   ],
   TRAINER: [
     'courses',
     'batches',
     'students',
-    'settings',
-    'settings.profile',
-    'settings.appearance'
+    'userSettings'
   ],
   ACCOUNTANT: [
-    'dashboard',
+    'adminDashboard',
     'payments',
     'reports',
-    'settings',
-    'settings.profile',
-    'settings.appearance'
+    'userSettings'
   ],
   ACCOUNTS: [
-    'dashboard',
+    'adminDashboard',
     'payments',
     'reports',
-    'settings',
-    'settings.profile',
-    'settings.appearance'
+    'userSettings'
   ],
   RECEPTIONIST: [
+    'leadsDashboard',
     'leads',
     'followups',
     'batches',
     'students',
-    'settings',
-    'settings.profile',
-    'settings.appearance'
+    'userSettings'
   ]
 };
 
 const PAGE_TO_PERMISSION_KEY = {
-  Dashboard: 'dashboard',
-  dashboard: 'dashboard',
+  Dashboard: 'adminDashboard',
+  'Admin Dashboard': 'adminDashboard',
+  adminDashboard: 'adminDashboard',
+  'Leads Dashboard': 'leadsDashboard',
+  leadsDashboard: 'leadsDashboard',
   Leads: 'leads',
   leads: 'leads',
   'Follow-ups': 'followups',
@@ -113,23 +100,29 @@ const PAGE_TO_PERMISSION_KEY = {
   Users: 'userControl',
   'User Control': 'userControl',
   userControl: 'userControl',
-  Settings: 'settings',
-  settings: 'settings'
+  Settings: 'adminSettings',
+  'Admin Settings': 'adminSettings',
+  adminSettings: 'adminSettings',
+  'Normal User Settings': 'userSettings',
+  'User Settings': 'userSettings',
+  userSettings: 'userSettings'
 };
 
 const ALL_CRM_MODULES = [
-  { key: 'dashboard', label: 'Dashboard', group: 'Core' },
-  { key: 'leads', label: 'Leads', group: 'Core' },
-  { key: 'students', label: 'Students', group: 'Core' },
-  { key: 'admissions', label: 'Admissions', group: 'Operations' },
-  { key: 'courses', label: 'Courses', group: 'Operations' },
-  { key: 'batches', label: 'Batches', group: 'Operations' },
-  { key: 'payments', label: 'Payments', group: 'Operations' },
-  { key: 'followups', label: 'Follow-ups', group: 'Communication' },
-  { key: 'whatsapp', label: 'WhatsApp', group: 'Communication' },
-  { key: 'reports', label: 'Reports', group: 'Reports' },
-  { key: 'userControl', label: 'Users', group: 'Administration' },
-  { key: 'settings', label: 'Settings', group: 'Administration' }
+  { key: 'adminDashboard', label: 'Admin Dashboard', group: 'DASHBOARDS' },
+  { key: 'leadsDashboard', label: 'Leads Dashboard', group: 'DASHBOARDS' },
+  { key: 'leads', label: 'Leads', group: 'CORE' },
+  { key: 'students', label: 'Students', group: 'CORE' },
+  { key: 'admissions', label: 'Admissions', group: 'OPERATIONS' },
+  { key: 'courses', label: 'Courses', group: 'OPERATIONS' },
+  { key: 'batches', label: 'Batches', group: 'OPERATIONS' },
+  { key: 'payments', label: 'Payments', group: 'OPERATIONS' },
+  { key: 'followups', label: 'Follow-ups', group: 'COMMUNICATION' },
+  { key: 'whatsapp', label: 'WhatsApp', group: 'COMMUNICATION' },
+  { key: 'reports', label: 'Reports', group: 'REPORTS' },
+  { key: 'userControl', label: 'Users', group: 'ADMINISTRATION' },
+  { key: 'adminSettings', label: 'Admin Settings', group: 'ADMINISTRATION' },
+  { key: 'userSettings', label: 'Normal User Settings', group: 'ADMINISTRATION' }
 ];
 
 function normalizeRole(role) {
@@ -155,30 +148,30 @@ function hasPermission(roleOrUser, permissionKey) {
 
   const targetKey = PAGE_TO_PERMISSION_KEY[permissionKey] || permissionKey;
 
+  const checkPerm = (permArray) => {
+    if (!Array.isArray(permArray)) return false;
+    if (permArray.includes(targetKey) || permArray.includes(permissionKey)) return true;
+    if ((targetKey === 'adminDashboard' || targetKey === 'leadsDashboard') && permArray.includes('dashboard')) return true;
+    if ((targetKey === 'adminSettings' || targetKey === 'userSettings') && permArray.includes('settings')) return true;
+    return false;
+  };
+
   if (Array.isArray(customPermissions) && customPermissions.length > 0) {
-    return customPermissions.includes(targetKey) || customPermissions.includes(permissionKey);
+    return checkPerm(customPermissions);
   }
 
   const allowedPermissions = ROLE_PERMISSIONS[normRole] || [];
-  return allowedPermissions.includes(targetKey);
+  return checkPerm(allowedPermissions);
 }
 
-function getDefaultPageForRole(role) {
-  const normRole = normalizeRole(role);
-  switch (normRole) {
-    case 'SUPER_ADMIN':
-    case 'ADMIN':
-    case 'COUNSELLOR':
-    case 'ACCOUNTS':
-    case 'ACCOUNTANT':
-      return 'Dashboard';
-    case 'RECEPTIONIST':
-      return 'Leads';
-    case 'TRAINER':
-      return 'Courses';
-    default:
-      return 'Leads';
-  }
+function getDefaultPageForRole(roleOrUser) {
+  let user = typeof roleOrUser === 'object' ? roleOrUser : { role: roleOrUser };
+  if (hasPermission(user, 'adminDashboard')) return 'Admin Dashboard';
+  if (hasPermission(user, 'leadsDashboard')) return 'Leads Dashboard';
+  if (hasPermission(user, 'leads')) return 'Leads';
+  if (hasPermission(user, 'students')) return 'Students';
+  if (hasPermission(user, 'courses')) return 'Courses';
+  return 'Leads';
 }
 
 module.exports = {

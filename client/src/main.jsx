@@ -232,7 +232,7 @@ function CertificateBadge({ status, issueDate }) {
 }
 
 function UserPermissionsSelector({ selectedPermissions = [], onChange }) {
-    const groups = ['Core', 'Operations', 'Communication', 'Reports', 'Administration'];
+    const groups = ['DASHBOARDS', 'CORE', 'OPERATIONS', 'COMMUNICATION', 'REPORTS', 'ADMINISTRATION'];
 
     const handleToggle = (key) => {
         if (selectedPermissions.includes(key)) {
@@ -1298,20 +1298,22 @@ function App() {
     }
 
     const allNavItems = [
-        ['Dashboard', LayoutDashboard],
-        ['Leads', UsersIcon],
-        ['Follow-ups', CalendarDays],
-        ['Courses', BookOpen],
-        ['Batches', CalendarDays],
-        ['Students', GraduationCap],
-        ['Admissions', ArrowUpRight],
-        ['Payments', WalletCards],
-        ['Reports', BarChart3],
-        ['Users', UserCheck],
-        ['Settings', Settings]
-    ];
+        hasPermission(user, 'adminDashboard') && ['Admin Dashboard', LayoutDashboard],
+        hasPermission(user, 'leadsDashboard') && ['Leads Dashboard', LayoutDashboard],
+        hasPermission(user, 'leads') && ['Leads', UsersIcon],
+        hasPermission(user, 'followups') && ['Follow-ups', CalendarDays],
+        hasPermission(user, 'courses') && ['Courses', BookOpen],
+        hasPermission(user, 'batches') && ['Batches', CalendarDays],
+        hasPermission(user, 'students') && ['Students', GraduationCap],
+        hasPermission(user, 'admissions') && ['Admissions', ArrowUpRight],
+        hasPermission(user, 'payments') && ['Payments', WalletCards],
+        hasPermission(user, 'reports') && ['Reports', BarChart3],
+        hasPermission(user, 'userControl') && ['Users', UserCheck],
+        hasPermission(user, 'adminSettings') && ['Admin Settings', Settings],
+        hasPermission(user, 'userSettings') && !hasPermission(user, 'adminSettings') && ['Settings', Settings]
+    ].filter(Boolean);
 
-    const nav = allNavItems.filter(([pageName]) => hasPermission(user, pageName));
+    const nav = allNavItems;
 
     return (
         <>
@@ -1333,7 +1335,21 @@ function App() {
                     onOpenAddModal={(p) => openAddModalForPage(p)}
                     onOpenSearch={() => setShowSearchModal(true)}
                 >
-                    {page === 'Dashboard' ? (
+                    {(page === 'Admin Dashboard' || (page === 'Dashboard' && hasPermission(user, 'adminDashboard'))) ? (
+                        <Dashboard
+                            user={user}
+                            token={token}
+                            leads={leads}
+                            followups={followups}
+                            admissions={admissions}
+                            payments={payments}
+                            onAddLead={() => setShowAddLead(true)}
+                            onSchedule={() => setShowSchedule(true)}
+                            onCompleteFollowup={completeFollowup}
+                            onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
+                            onNavigate={(targetPage) => setPage(targetPage)}
+                        />
+                    ) : (page === 'Leads Dashboard' || (page === 'Dashboard' && hasPermission(user, 'leadsDashboard'))) ? (
                         <MobileDashboard
                             user={user}
                             leads={leads}
@@ -1642,15 +1658,28 @@ function App() {
                                 <p style={{ margin: '0 0 20px', color: 'var(--text-muted)', fontSize: 14 }}>
                                     Your account role (<b>{user?.role || 'User'}</b>) does not have permission to access the <b>{page}</b> module.
                                 </p>
-                                <button className="primary" onClick={() => setPage(getDefaultPageForRole(user?.role))}>
-                                    Return to {getDefaultPageForRole(user?.role)}
+                                <button className="primary" onClick={() => handleNavigate(getDefaultPageForRole(user))}>
+                                    Return to {getDefaultPageForRole(user)}
                                 </button>
                             </div>
                         </div>
-                    ) : page === 'Dashboard' ? (
+                    ) : (page === 'Admin Dashboard' || (page === 'Dashboard' && hasPermission(user, 'adminDashboard'))) ? (
                         <Dashboard
                             user={user}
                             token={token}
+                            leads={leads}
+                            followups={followups}
+                            admissions={admissions}
+                            payments={payments}
+                            onAddLead={() => setShowAddLead(true)}
+                            onSchedule={() => setShowSchedule(true)}
+                            onCompleteFollowup={completeFollowup}
+                            onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
+                            onNavigate={(targetPage) => handleNavigate(targetPage)}
+                        />
+                    ) : (page === 'Leads Dashboard' || (page === 'Dashboard' && hasPermission(user, 'leadsDashboard'))) ? (
+                        <MobileDashboard
+                            user={user}
                             leads={leads}
                             followups={followups}
                             admissions={admissions}
@@ -7566,18 +7595,24 @@ function SettingsView({ userRole, user, token, theme, toggleTheme, sourcesList =
     const safeUserRole = userRole || user?.role || 'RECEPTIONIST';
     const safeUsers = Array.isArray(usersList) ? usersList : [];
 
+    const hasAdminSettings = hasPermission(user || safeUserRole, 'adminSettings');
+    const hasUserSettings = hasPermission(user || safeUserRole, 'userSettings');
+
     const allTabs = [
-        { id: 'Profile', label: 'Institute Profile', icon: ShieldCheck, perm: 'settings.profile' },
-        { id: 'Appearance', label: 'Appearance & Theme', icon: Sun, perm: 'settings.appearance' },
-        { id: 'User Control', label: 'User Control & Roles', icon: UserCheck, perm: 'settings.users' },
-        { id: 'Branch Management', label: 'Branch Management', icon: Database, perm: 'settings.branches' },
-        { id: 'WhatsApp & API', label: 'WhatsApp & API', icon: MessageCircle, perm: 'settings.whatsapp' },
-        { id: 'Storage & Database', label: 'Storage & Database', icon: Database, perm: 'settings.whatsapp' },
-        { id: 'Enquiry Sources', label: 'Enquiry Sources', icon: Plus, perm: 'settings.whatsapp' },
-        { id: 'System Info', label: 'System Info', icon: Laptop, perm: 'settings.profile' }
+        { id: 'Profile', label: 'Institute Profile', icon: ShieldCheck, adminOnly: true },
+        { id: 'Appearance', label: 'Appearance & Theme', icon: Sun, adminOnly: false },
+        { id: 'User Control', label: 'User Control & Roles', icon: UserCheck, adminOnly: true },
+        { id: 'Branch Management', label: 'Branch Management', icon: Database, adminOnly: true },
+        { id: 'WhatsApp & API', label: 'WhatsApp & API', icon: MessageCircle, adminOnly: true },
+        { id: 'Storage & Database', label: 'Storage & Database', icon: Database, adminOnly: true },
+        { id: 'Enquiry Sources', label: 'Enquiry Sources', icon: Plus, adminOnly: true },
+        { id: 'System Info', label: 'System Info', icon: Laptop, adminOnly: false }
     ];
 
-    const tabs = allTabs.filter(t => hasPermission(safeUserRole, t.perm));
+    const tabs = allTabs.filter((t) => {
+        if (t.adminOnly) return hasAdminSettings;
+        return hasUserSettings || hasAdminSettings;
+    });
 
     useEffect(() => {
         if (tabs.length > 0 && !tabs.some(t => t.id === activeTab)) {
