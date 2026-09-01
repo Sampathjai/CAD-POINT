@@ -1545,6 +1545,7 @@ function App() {
                             followups={followups}
                             admissions={admissions}
                             payments={payments}
+                            activeBranch={activeBranch}
                             onAddLead={() => setShowAddLead(true)}
                             onSchedule={() => setShowSchedule(true)}
                             onCompleteFollowup={completeFollowup}
@@ -3600,6 +3601,29 @@ function Dashboard({ user, token, leads = [], followups = [], admissions = [], p
 
         return (
             <div className="content">
+                {/* Welcome & Greeting Banner Header */}
+                <div className="welcome-banner" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: '#ffffff', padding: '20px 24px', borderRadius: 12, marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, boxShadow: '0 4px 14px rgba(15, 23, 42, 0.15)' }}>
+                    <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#ffffff' }}>
+                                Welcome back, {user?.name || user?.email || 'Administrator'}! 👋
+                            </h2>
+                            <span style={{ background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80', padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700, border: '1px solid rgba(74, 222, 128, 0.3)' }}>
+                                {user?.role || 'ADMIN'}
+                            </span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: 13, color: '#94a3b8' }}>
+                            CAD POINT Training Institute — Manage enquiries, admissions, fees, and monthly branch performance.
+                        </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ textAlign: 'right' }}>
+                            <span style={{ display: 'block', fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>Active Branch</span>
+                            <strong style={{ fontSize: 14, color: '#ffffff' }}>{(activeBranch || 'gandhipuram').toUpperCase()} BRANCH</strong>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Header Toolbar */}
                 <div className="actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
