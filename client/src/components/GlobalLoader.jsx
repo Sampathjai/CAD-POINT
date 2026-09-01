@@ -25,3 +25,4 @@ export function GlobalLoader({ message = 'Loading CADPOINT CRM...', subtext = 'I
     </div>
   );
 }
+
