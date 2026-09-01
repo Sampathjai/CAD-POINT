@@ -1197,6 +1197,7 @@ function App() {
                             onOpenAddModal={openAddModalForPage}
                             onCompleteFollowup={completeFollowup}
                             onOpenWhatsApp={(lead, followup) => setWhatsAppModalData({ lead, followup })}
+                            onAdmitFromFollowup={openAdmitFromFollowup}
                         />
                     ) : page === 'Admissions' ? (
                         <MobileAdmissionsView

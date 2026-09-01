@@ -3219,6 +3219,7 @@ button, select, input[type="text"], input[type="email"], input[type="tel"], inpu
 
 .mobile-card-btn.call { background: #dbeafe; color: #1d4ed8; }
 .mobile-card-btn.whatsapp { background: #dcfce7; color: #15803d; }
+.mobile-card-btn.admit { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
 .mobile-card-btn.complete { background: #10b981; color: #ffffff; }
 .mobile-card-btn.details { background: #f1f5f9; color: #334155; }
 .mobile-card-btn.secondary { background: #f1f5f9; color: #1e293b; border: 1px solid #cbd5e1; }

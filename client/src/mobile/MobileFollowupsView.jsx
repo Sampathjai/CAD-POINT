@@ -8,14 +8,16 @@ import {
   Plus, 
   User, 
   BookOpen, 
-  AlertCircle 
+  AlertCircle,
+  GraduationCap
 } from 'lucide-react';
 
 export function MobileFollowupsView({
   followups = [],
   onOpenAddModal,
   onCompleteFollowup,
-  onOpenWhatsApp
+  onOpenWhatsApp,
+  onAdmitFromFollowup
 }) {
   const [tab, setTab] = useState('TODAY');
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -124,6 +126,15 @@ export function MobileFollowupsView({
                         onClick={() => onOpenWhatsApp(f.lead, f)}
                       >
                         <MessageSquare size={14} /> WhatsApp
+                      </button>
+                    )}
+                    {onAdmitFromFollowup && (
+                      <button 
+                        className="mobile-card-btn admit"
+                        onClick={() => onAdmitFromFollowup(f)}
+                        title="Admit student from follow-up"
+                      >
+                        <GraduationCap size={14} /> Admit
                       </button>
                     )}
                     <button 
