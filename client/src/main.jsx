@@ -1277,6 +1277,14 @@ function App() {
                             onEditUser={openEditUser}
                             onDeleteUser={deleteUser}
                             API_BASE={API_BASE}
+                            primaryDevice={primaryDevice}
+                            authorizedDevices={authorizedDevices}
+                            deviceLoading={deviceLoading}
+                            fetchDevices={fetchDevices}
+                            handleRegisterDeviceSubmit={handleRegisterDeviceSubmit}
+                            handleDeleteDevice={handleDeleteDevice}
+                            getOrGenerateDeviceId={getOrGenerateDeviceId}
+                            branchesList={branchesList}
                         />
                     ) : page === 'Reports' ? (
                         <MobileReportsView

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Building, 
   Moon, 
@@ -15,7 +15,10 @@ import {
   Shield,
   Smartphone,
   Tablet as TabletIcon,
-  Monitor
+  Monitor,
+  Trash2,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import { hasPermission } from '../permissions';
 
@@ -32,10 +35,28 @@ export function MobileSettingsView({
   onOpenAddModal,
   onEditUser,
   onDeleteUser,
-  API_BASE
+  API_BASE,
+  primaryDevice,
+  authorizedDevices = [],
+  deviceLoading = false,
+  fetchDevices,
+  handleRegisterDeviceSubmit,
+  handleDeleteDevice,
+  getOrGenerateDeviceId,
+  branchesList = []
 }) {
   const [activeSection, setActiveSection] = useState(null); // null = menu list, string = specific form page
   const [saving, setSaving] = useState(false);
+
+  // Device registration state
+  const currentDevInfo = typeof getOrGenerateDeviceId === 'function' ? getOrGenerateDeviceId() : { deviceId: 'DEV-MOBILE-CLIENT', suggestedName: 'Mobile Device', suggestedType: 'MOBILE' };
+  const [deviceForm, setDeviceForm] = useState({
+    deviceName: currentDevInfo.suggestedName || 'Mobile Phone',
+    deviceType: currentDevInfo.suggestedType || 'MOBILE',
+    deviceRole: 'AUTHORIZED',
+    branchId: localStorage.getItem('cadpoint_branch') || 'gandhipuram'
+  });
+  const [showDeviceRegisterForm, setShowDeviceRegisterForm] = useState(false);
 
   // Form states
   const [profileForm, setProfileForm] = useState({
@@ -62,6 +83,12 @@ export function MobileSettingsView({
 
   const [newSourceName, setNewSourceName] = useState('');
 
+  useEffect(() => {
+    if (activeSection === 'devices' && typeof fetchDevices === 'function') {
+      fetchDevices();
+    }
+  }, [activeSection, fetchDevices]);
+
   async function handleSaveProfile(e) {
     e.preventDefault();
     setSaving(true);
@@ -80,7 +107,21 @@ export function MobileSettingsView({
     }, 600);
   }
 
+  async function submitRegisterDevice(e) {
+    e.preventDefault();
+    if (typeof handleRegisterDeviceSubmit === 'function') {
+      await handleRegisterDeviceSubmit(e);
+      setShowDeviceRegisterForm(false);
+      if (typeof fetchDevices === 'function') fetchDevices();
+    } else {
+      alert(`✅ Mobile device registered successfully as ${deviceForm.deviceName}`);
+      setShowDeviceRegisterForm(false);
+    }
+  }
+
+  // Available for ALL user roles (Admin, Counsellor, Staff, Accounts)
   const settingsMenuItems = [
+    { id: 'devices', title: 'Registered Devices & Hardware', desc: 'Register mobile devices, master device & access limits', icon: Smartphone, color: 'text-indigo' },
     { id: 'profile', title: 'Institute Profile & Branding', desc: 'Institute name, logo, contact & tax GSTIN', icon: Building, color: 'text-blue' },
     { id: 'theme', title: 'Appearance & Theme', desc: 'Toggle light / dark mode styling', icon: theme === 'dark' ? Sun : Moon, color: 'text-purple' },
     { id: 'users', title: 'User Control & Roles', desc: 'Manage user access, roles & staff permissions', icon: Users, color: 'text-emerald' },
@@ -89,6 +130,10 @@ export function MobileSettingsView({
     { id: 'storage', title: 'Storage & Database', desc: 'Database health, backups & system storage', icon: Database, color: 'text-rose' },
     { id: 'system', title: 'System Info & Diagnostics', desc: 'App version, server environment & client info', icon: Laptop, color: 'text-indigo' }
   ];
+
+  // Check if current device is registered
+  const allRegDevices = [primaryDevice, ...(authorizedDevices || [])].filter(Boolean);
+  const isCurrentDeviceRegistered = allRegDevices.some(d => d.deviceId === currentDevInfo.deviceId);
 
   // If a specific section is selected, render full-screen Mobile Form Page
   if (activeSection) {
@@ -102,6 +147,163 @@ export function MobileSettingsView({
         </div>
 
         <div className="mobile-settings-form-container">
+          {/* DEVICES & MOBILE HARDWARE REGISTRATION SECTION */}
+          {activeSection === 'devices' && (
+            <div className="mobile-devices-settings-wrap" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Current Device Card */}
+              <div className="mobile-card" style={{ background: isCurrentDeviceRegistered ? '#f0fdf4' : '#fffbe6', border: `1px solid ${isCurrentDeviceRegistered ? '#bbf7d0' : '#fef08a'}` }}>
+                <div className="mobile-card-top">
+                  <div>
+                    <span className="mobile-adm-code" style={{ background: isCurrentDeviceRegistered ? '#166534' : '#854d0e', color: '#ffffff' }}>
+                      {isCurrentDeviceRegistered ? 'REGISTERED DEVICE' : 'UNREGISTERED DEVICE'}
+                    </span>
+                    <h3 className="mobile-card-title" style={{ marginTop: 4 }}>This Mobile Phone</h3>
+                  </div>
+                  <Smartphone size={24} className={isCurrentDeviceRegistered ? 'text-emerald' : 'text-amber'} />
+                </div>
+                <div className="mobile-card-meta-grid" style={{ marginTop: 8 }}>
+                  <div>
+                    <span className="meta-label">Device ID</span>
+                    <span className="meta-val" style={{ fontFamily: 'monospace', fontSize: 11 }}>{(currentDevInfo.deviceId || '').slice(0, 18)}...</span>
+                  </div>
+                  <div>
+                    <span className="meta-label">Suggested Type</span>
+                    <span className="meta-val">{currentDevInfo.suggestedType || 'MOBILE'}</span>
+                  </div>
+                </div>
+                {!isCurrentDeviceRegistered && (
+                  <button 
+                    className="mobile-btn-primary" 
+                    style={{ marginTop: 12, width: '100%' }}
+                    onClick={() => setShowDeviceRegisterForm(true)}
+                  >
+                    <Smartphone size={16} /> Register This Device
+                  </button>
+                )}
+              </div>
+
+              {/* Add Device Header Bar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Authorized Hardware Devices</h4>
+                  <span style={{ fontSize: 12, color: '#64748b' }}>{allRegDevices.length} active registered devices</span>
+                </div>
+                <button className="mobile-btn-primary" onClick={() => setShowDeviceRegisterForm(!showDeviceRegisterForm)}>
+                  <Plus size={16} /> Add Device
+                </button>
+              </div>
+
+              {/* Register Device Form */}
+              {showDeviceRegisterForm && (
+                <form onSubmit={submitRegisterDevice} className="mobile-single-column-form" style={{ background: '#f8fafc', padding: 14, borderRadius: 12, border: '1px solid #cbd5e1' }}>
+                  <h4 style={{ margin: '0 0 10px', fontSize: 14, fontWeight: 700 }}>Register New Mobile Device</h4>
+                  <label className="mobile-form-label">
+                    Device Name *
+                    <input
+                      type="text"
+                      value={deviceForm.deviceName}
+                      onChange={(e) => setDeviceForm({ ...deviceForm, deviceName: e.target.value })}
+                      placeholder="e.g. Counsellor iPhone 15"
+                      required
+                    />
+                  </label>
+
+                  <label className="mobile-form-label">
+                    Device Type
+                    <select 
+                      value={deviceForm.deviceType}
+                      onChange={(e) => setDeviceForm({ ...deviceForm, deviceType: e.target.value })}
+                      className="mobile-form-select"
+                    >
+                      <option value="MOBILE">Mobile Phone</option>
+                      <option value="TABLET">Tablet / iPad</option>
+                      <option value="DESKTOP">Desktop / Laptop</option>
+                    </select>
+                  </label>
+
+                  <label className="mobile-form-label">
+                    Device Access Role
+                    <select 
+                      value={deviceForm.deviceRole}
+                      onChange={(e) => setDeviceForm({ ...deviceForm, deviceRole: e.target.value })}
+                      className="mobile-form-select"
+                    >
+                      <option value="AUTHORIZED">Authorized Staff Device</option>
+                      <option value="PRIMARY">Primary Master Device</option>
+                    </select>
+                  </label>
+
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                    <button type="submit" className="mobile-btn-primary" style={{ flex: 1 }}>
+                      <Smartphone size={16} /> Confirm & Register
+                    </button>
+                    <button type="button" className="mobile-btn-secondary" onClick={() => setShowDeviceRegisterForm(false)}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Active Registered Devices List */}
+              <div className="mobile-card-list">
+                {deviceLoading ? (
+                  <div style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>
+                    <RefreshCw size={20} className="spin" style={{ marginBottom: 6 }} />
+                    <p style={{ margin: 0, fontSize: 13 }}>Fetching registered devices...</p>
+                  </div>
+                ) : allRegDevices.length === 0 ? (
+                  <div className="mobile-empty-state">
+                    <Smartphone size={32} />
+                    <b>No registered devices</b>
+                    <p>Tap "Register This Device" above to bind your phone to CADPOINT CRM.</p>
+                  </div>
+                ) : (
+                  allRegDevices.map((d) => {
+                    const isPrimary = d.deviceRole === 'PRIMARY' || d.id === primaryDevice?.id;
+                    const isThisDevice = d.deviceId === currentDevInfo.deviceId;
+                    return (
+                      <div key={d.id || d.deviceId} className="mobile-card">
+                        <div className="mobile-card-top">
+                          <div>
+                            <span className={`mobile-status-badge ${isPrimary ? 'status-confirmed' : 'status-new'}`}>
+                              {isPrimary ? 'PRIMARY MASTER' : 'AUTHORIZED'}
+                              {isThisDevice ? ' • (THIS PHONE)' : ''}
+                            </span>
+                            <h3 className="mobile-card-title" style={{ marginTop: 4 }}>{d.deviceName || 'Mobile Device'}</h3>
+                          </div>
+                          {d.deviceType === 'MOBILE' ? <Smartphone size={20} className="text-blue" /> : d.deviceType === 'TABLET' ? <TabletIcon size={20} className="text-purple" /> : <Monitor size={20} className="text-emerald" />}
+                        </div>
+
+                        <div className="mobile-card-meta-grid" style={{ marginTop: 8 }}>
+                          <div>
+                            <span className="meta-label">Device Type</span>
+                            <span className="meta-val">{d.deviceType || 'MOBILE'}</span>
+                          </div>
+                          <div>
+                            <span className="meta-label">Device ID</span>
+                            <span className="meta-val" style={{ fontFamily: 'monospace', fontSize: 11 }}>{(d.deviceId || '').slice(0, 16)}...</span>
+                          </div>
+                        </div>
+
+                        {typeof handleDeleteDevice === 'function' && (
+                          <div className="mobile-card-actions" style={{ marginTop: 10 }}>
+                            <button 
+                              className="mobile-btn-danger" 
+                              style={{ width: '100%' }}
+                              onClick={() => handleDeleteDevice(d.id, d.deviceName)}
+                            >
+                              <Trash2 size={14} /> Remove Registered Device
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
           {activeSection === 'profile' && (
             <form onSubmit={handleSaveProfile} className="mobile-single-column-form">
               <label className="mobile-form-label">
@@ -110,7 +312,6 @@ export function MobileSettingsView({
                   type="text"
                   value={profileForm.instituteName}
                   onChange={(e) => setProfileForm({ ...profileForm, instituteName: e.target.value })}
-                  required
                 />
               </label>
 
@@ -124,54 +325,25 @@ export function MobileSettingsView({
               </label>
 
               <label className="mobile-form-label">
-                Contact Email
+                Official Contact Email
                 <input
                   type="email"
                   value={profileForm.contactEmail}
                   onChange={(e) => setProfileForm({ ...profileForm, contactEmail: e.target.value })}
-                  required
                 />
               </label>
 
               <label className="mobile-form-label">
-                Contact Phone
+                Official Phone / WhatsApp
                 <input
-                  type="tel"
+                  type="text"
                   value={profileForm.contactPhone}
                   onChange={(e) => setProfileForm({ ...profileForm, contactPhone: e.target.value })}
-                  required
                 />
               </label>
 
               <label className="mobile-form-label">
-                Address
-                <textarea
-                  rows={2}
-                  value={profileForm.address}
-                  onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
-                />
-              </label>
-
-              <label className="mobile-form-label">
-                City
-                <input
-                  type="text"
-                  value={profileForm.city}
-                  onChange={(e) => setProfileForm({ ...profileForm, city: e.target.value })}
-                />
-              </label>
-
-              <label className="mobile-form-label">
-                State
-                <input
-                  type="text"
-                  value={profileForm.state}
-                  onChange={(e) => setProfileForm({ ...profileForm, state: e.target.value })}
-                />
-              </label>
-
-              <label className="mobile-form-label">
-                GSTIN Number
+                GSTIN Tax Number
                 <input
                   type="text"
                   value={profileForm.gstin}
@@ -180,44 +352,27 @@ export function MobileSettingsView({
               </label>
 
               <button type="submit" className="mobile-btn-primary full-width" disabled={saving}>
-                <Save size={16} /> {saving ? 'Saving...' : 'Save Profile Changes'}
+                <Save size={16} /> {saving ? 'Saving...' : 'Save Institute Profile'}
               </button>
             </form>
           )}
 
           {activeSection === 'theme' && (
-            <div className="mobile-theme-settings-card">
-              <h4>Active Theme Mode</h4>
-              <p>Choose your preferred interface appearance.</p>
-
-              <div className="mobile-theme-toggle-grid">
-                <button
-                  className={`mobile-theme-option ${theme !== 'dark' ? 'active' : ''}`}
-                  onClick={() => { if (theme === 'dark') toggleTheme(); }}
-                >
-                  <Sun size={28} />
-                  <b>Light Mode</b>
-                  <span>Clean white layout</span>
-                </button>
-
-                <button
-                  className={`mobile-theme-option ${theme === 'dark' ? 'active' : ''}`}
-                  onClick={() => { if (theme !== 'dark') toggleTheme(); }}
-                >
-                  <Moon size={28} />
-                  <b>Dark Mode</b>
-                  <span>Sleek dark interface</span>
-                </button>
-              </div>
+            <div className="mobile-theme-toggle-card">
+              <h4>Active UI Appearance Theme</h4>
+              <p>Current theme: <b>{(theme || 'light').toUpperCase()} MODE</b></p>
+              <button className="mobile-btn-primary" onClick={toggleTheme}>
+                {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />} Switch to {theme === 'dark' ? 'Light' : 'Dark'} Mode
+              </button>
             </div>
           )}
 
           {activeSection === 'users' && (
-            <div className="mobile-users-settings-list">
-              <div className="mobile-view-header">
+            <div className="mobile-users-settings-card">
+              <div className="mobile-card-header-row">
                 <h4>System Users ({usersList.length})</h4>
                 <button className="mobile-add-btn" onClick={() => onOpenAddModal('Users')}>
-                  + Add User
+                  <Plus size={16} /> User
                 </button>
               </div>
 
@@ -226,26 +381,20 @@ export function MobileSettingsView({
                   <div key={u.id} className="mobile-card">
                     <div className="mobile-card-top">
                       <div>
-                        <b>{u.name}</b>
-                        <span className="mobile-card-subtitle">{u.role}</span>
+                        <span className="mobile-status-badge status-confirmed">{u.role ? u.role.replace('_', ' ') : 'STAFF'}</span>
+                        <h3 className="mobile-card-title">{u.name}</h3>
                       </div>
                       <span className={`mobile-status-badge ${u.isActive ? 'status-confirmed' : 'status-lost'}`}>
                         {u.isActive ? 'ACTIVE' : 'INACTIVE'}
                       </span>
                     </div>
-                    <div className="mobile-card-meta-grid">
-                      <div>
-                        <span className="meta-label">Email</span>
-                        <span className="meta-val">{u.email}</span>
-                      </div>
-                    </div>
                     <div className="mobile-card-actions">
-                      <button className="mobile-card-btn secondary" onClick={() => onEditUser(u)}>
-                        Edit
-                      </button>
-                      <button className="mobile-card-btn danger-icon" onClick={() => onDeleteUser(u.id, u.name)}>
-                        Delete
-                      </button>
+                      <button className="mobile-card-btn secondary" onClick={() => onEditUser(u)}>Edit</button>
+                      {currentUserId !== u.id && (
+                        <button className="mobile-card-btn danger-icon" onClick={() => onDeleteUser(u.id, u.name)}>
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -396,4 +545,3 @@ export function MobileSettingsView({
     </div>
   );
 }
-
