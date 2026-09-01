@@ -16,3 +16,4 @@ describe('WhatsApp API Architecture & Database Integrity', () => {
     expect(Array.isArray(integrations)).toBe(true);
   });
 });
+

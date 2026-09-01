@@ -6610,28 +6610,73 @@ function SettingsView({ userRole, user, token, theme, toggleTheme, sourcesList =
         }
     }
 
-    async function handleConnectWhatsApp(targetBranchId = null) {
-        setWaConnecting(true);
-        try {
-            const appId = waConfig?.appId || '';
-            const configId = waConfig?.configId || '';
-            const selectedBranch = branches.find(b => b.id === targetBranchId) || branches[0];
+    const loadFacebookSDK = (appId, version = 'v21.0') => {
+        return new Promise((resolve, reject) => {
+            if (window.FB) return resolve(window.FB);
+            if (document.getElementById('facebook-jssdk')) {
+                const checkFB = setInterval(() => {
+                    if (window.FB) {
+                        clearInterval(checkFB);
+                        resolve(window.FB);
+                    }
+                }, 100);
+                setTimeout(() => { clearInterval(checkFB); reject(new Error('Facebook SDK load timeout')); }, 8000);
+                return;
+            }
 
-            if (window.FB && appId) {
+            window.fbAsyncInit = function() {
                 window.FB.init({
                     appId: appId,
                     autoLogAppEvents: true,
                     xfbml: true,
-                    version: waConfig?.apiVersion || 'v21.0'
+                    version: version
+                });
+                resolve(window.FB);
+            };
+
+            const js = document.createElement('script');
+            js.id = 'facebook-jssdk';
+            js.src = 'https://connect.facebook.net/en_US/sdk.js';
+            js.async = true;
+            js.defer = true;
+            js.onerror = () => reject(new Error('Failed to load Facebook SDK script'));
+            document.body.appendChild(js);
+        });
+    };
+
+    async function handleConnectWhatsApp(targetBranchId = null) {
+        setWaConnecting(true);
+        const selectedBranch = (branches && branches.find(b => b.id === targetBranchId)) || { id: targetBranchId, name: 'Branch' };
+        const appId = waConfig?.appId || '';
+        const configId = waConfig?.configId || '';
+        const apiVersion = waConfig?.apiVersion || 'v21.0';
+
+        try {
+            let FB = window.FB;
+            if (!FB && appId) {
+                try {
+                    FB = await loadFacebookSDK(appId, apiVersion);
+                } catch (e) {
+                    console.warn('Facebook SDK dynamic load notice:', e.message);
+                }
+            }
+
+            if (FB && appId) {
+                FB.init({
+                    appId: appId,
+                    autoLogAppEvents: true,
+                    xfbml: true,
+                    version: apiVersion
                 });
 
-                window.FB.login((response) => {
+                FB.login((response) => {
                     if (response.authResponse && response.authResponse.code) {
+                        const authCode = response.authResponse.code;
                         fetch(API_BASE + '/whatsapp/connect', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
                             body: JSON.stringify({
-                                code: response.authResponse.code,
+                                code: authCode,
                                 branchId: targetBranchId || selectedBranch?.id
                             })
                         })
@@ -6646,13 +6691,15 @@ function SettingsView({ userRole, user, token, theme, toggleTheme, sourcesList =
                             }
                         })
                         .catch(err => {
-                            console.error(err);
-                            alert('WhatsApp connection error.');
+                            console.error('WhatsApp connect error:', err);
+                            alert('WhatsApp connection error: ' + err.message);
                         })
                         .finally(() => setWaConnecting(false));
                     } else {
                         setWaConnecting(false);
-                        alert('WhatsApp connection was cancelled or not authorized.');
+                        if (response && response.status !== 'unknown') {
+                            alert('WhatsApp setup was cancelled or not authorized.');
+                        }
                     }
                 }, {
                     config_id: configId,
@@ -6661,29 +6708,64 @@ function SettingsView({ userRole, user, token, theme, toggleTheme, sourcesList =
                     scope: 'whatsapp_business_messaging,whatsapp_business_management'
                 });
             } else {
-                const codeInput = prompt(`Enter Meta Embedded Signup Authorization Code or System Token for ${selectedBranch?.name || 'Branch'}:`);
-                if (!codeInput) {
-                    setWaConnecting(false);
-                    return;
-                }
-                const res = await fetch(API_BASE + '/whatsapp/connect', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                    body: JSON.stringify({
-                        code: codeInput,
-                        accessToken: codeInput,
-                        branchId: targetBranchId || selectedBranch?.id
-                    })
-                });
-                const j = await res.json();
-                if (j.success) {
-                    alert(`✅ WhatsApp connected successfully for ${selectedBranch?.name || 'Branch'}!`);
-                    fetchWhatsAppStatus();
-                    if (typeof fetchBranches === 'function') fetchBranches();
+                // Meta Embedded Signup OAuth Dialog Popup Flow (No Manual Prompt!)
+                const redirectUri = window.location.origin + window.location.pathname;
+                const popupUrl = appId ?
+                    `https://www.facebook.com/${apiVersion}/dialog/oauth?client_id=${encodeURIComponent(appId)}&config_id=${encodeURIComponent(configId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=whatsapp_business_messaging,whatsapp_business_management`
+                    : null;
+                
+                if (popupUrl) {
+                    const popup = window.open(popupUrl, 'MetaWhatsAppSignup', 'width=600,height=700,scrollbars=yes');
+                    if (!popup) {
+                        setWaConnecting(false);
+                        return alert('Please allow popups in your browser to complete Meta WhatsApp Embedded Signup.');
+                    }
+
+                    const handleMessage = async (event) => {
+                        if (event.origin !== window.location.origin && !event.origin.includes('facebook.com')) return;
+                        if (event.data && (event.data.code || event.data.type === 'WA_EMBEDDED_SIGNUP')) {
+                            window.removeEventListener('message', handleMessage);
+                            const authCode = event.data.code || event.data.data?.code;
+                            if (authCode) {
+                                try {
+                                    const res = await fetch(API_BASE + '/whatsapp/connect', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                                        body: JSON.stringify({
+                                            code: authCode,
+                                            branchId: targetBranchId || selectedBranch?.id
+                                        })
+                                    });
+                                    const j = await res.json();
+                                    if (j.success) {
+                                        alert(`✅ WhatsApp connected successfully for ${selectedBranch?.name || 'Branch'}!`);
+                                        fetchWhatsAppStatus();
+                                        if (typeof fetchBranches === 'function') fetchBranches();
+                                    } else {
+                                        alert(j.message || 'WhatsApp connection failed.');
+                                    }
+                                } catch (err) {
+                                    console.error(err);
+                                    alert('WhatsApp connection error.');
+                                } finally {
+                                    setWaConnecting(false);
+                                }
+                            }
+                        }
+                    };
+                    window.addEventListener('message', handleMessage);
+
+                    const checkPopup = setInterval(() => {
+                        if (popup.closed) {
+                            clearInterval(checkPopup);
+                            window.removeEventListener('message', handleMessage);
+                            setWaConnecting(false);
+                        }
+                    }, 1000);
                 } else {
-                    alert(j.message || 'WhatsApp connection failed.');
+                    setWaConnecting(false);
+                    alert('Meta App ID is not configured. Please set META_APP_ID in server environment settings.');
                 }
-                setWaConnecting(false);
             }
         } catch (e) {
             console.error(e);
