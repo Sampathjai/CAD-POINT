@@ -526,22 +526,31 @@ function App() {
 
     function openEditProgress(admission) {
         setEditingAdmissionProgress(admission);
+        const currentPct = typeof admission.completionPct === 'number' ? admission.completionPct : (admission.certificate?.completionPct || 0);
         setProgressForm({
             id: admission.id,
             startDate: admission.startDate ? admission.startDate.slice(0, 10) : '',
             endDate: admission.endDate ? admission.endDate.slice(0, 10) : '',
-            completionPct: admission.completionPct || 0,
-            certificateStatus: admission.certificate?.status || 'NOT_STARTED',
+            completionPct: currentPct,
+            certificateStatus: admission.certificate?.status || (currentPct === 100 ? 'COMPLETED' : currentPct > 0 ? 'IN_PROGRESS' : 'NOT_STARTED'),
             issueDate: admission.certificate?.issueDate ? admission.certificate.issueDate.slice(0, 10) : ''
         });
     }
 
     async function updateAdmissionProgress() {
         try {
+            const parsed = parseInt(progressForm.completionPct, 10);
+            const validPct = isNaN(parsed) ? 0 : Math.min(100, Math.max(0, parsed));
+            const payload = {
+                ...progressForm,
+                completionPct: validPct,
+                certificateStatus: validPct === 100 ? 'COMPLETED' : validPct > 0 ? 'IN_PROGRESS' : (progressForm.certificateStatus || 'NOT_STARTED')
+            };
+
             const res = await fetch(API_BASE + '/admissions/' + progressForm.id + '/progress', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify(progressForm)
+                body: JSON.stringify(payload)
             });
             const j = await res.json();
             if (!j.success) return alert(j.message || 'Failed to update progress');
@@ -1240,6 +1249,7 @@ function App() {
                             onOpenAssignBatchModal={() => setShowAssignBatchModal(true)}
                             onEditBatch={openEditBatch}
                             onDeleteBatch={deleteBatch}
+                            onOpenEditProgress={openEditProgress}
                         />
                     ) : page === 'Students' ? (
                         <MobileStudentsView
@@ -4473,6 +4483,8 @@ ${instituteName}`;
                                                                                 <th>Student Name</th>
                                                                                 <th>Phone</th>
                                                                                 <th>Admission #</th>
+                                                                                <th>Course Completion (%)</th>
+                                                                                <th>Status</th>
                                                                                 <th>Action</th>
                                                                             </tr>
                                                                         </thead>
@@ -4484,37 +4496,70 @@ ${instituteName}`;
                                                                                     const st = adm.student;
                                                                                     return (st?.studentCode || '').toLowerCase().includes(bf) || (st?.firstName || '').toLowerCase().includes(bf) || (st?.phone || '').includes(bf) || (adm.admissionNumber || '').toLowerCase().includes(bf);
                                                                                 })
-                                                                                .map((adm) => (
-                                                                                    <tr key={adm.id}>
-                                                                                        <td><b style={{ color: '#2563eb' }}>{adm.student?.studentCode || 'STU'}</b></td>
-                                                                                        <td>{adm.student?.firstName || adm.student?.name || 'Student'}</td>
-                                                                                        <td>{adm.student?.phone || '-'}</td>
-                                                                                        <td><b>{adm.admissionNumber}</b></td>
-                                                                                        <td>
-                                                                                            <div style={{ display: 'flex', gap: 6 }}>
-                                                                                                <button
-                                                                                                    type="button"
-                                                                                                    className="secondary"
-                                                                                                    style={{ padding: '3px 6px', fontSize: 11 }}
-                                                                                                    onClick={() => {
-                                                                                                        setPage('Students');
-                                                                                                        setFilterText(adm.student?.studentCode || '');
-                                                                                                    }}
-                                                                                                >
-                                                                                                    View
-                                                                                                </button>
-                                                                                                <button
-                                                                                                    type="button"
-                                                                                                    className="secondary"
-                                                                                                    style={{ padding: '3px 6px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }}
-                                                                                                    onClick={() => onUnassignStudentFromBatch && onUnassignStudentFromBatch(b.id, adm.studentId, adm.student?.firstName || 'Student')}
-                                                                                                >
-                                                                                                    Remove
-                                                                                                </button>
-                                                                                            </div>
-                                                                                        </td>
-                                                                                    </tr>
-                                                                                ))}
+                                                                                .map((adm) => {
+                                                                                    const stPct = typeof adm.completionPct === 'number' ? adm.completionPct : (adm.certificate?.completionPct || 0);
+                                                                                    const isDone = stPct === 100;
+                                                                                    const isStarted = stPct > 0;
+
+                                                                                    return (
+                                                                                        <tr key={adm.id}>
+                                                                                            <td><b style={{ color: '#2563eb' }}>{adm.student?.studentCode || 'STU'}</b></td>
+                                                                                            <td><b>{adm.student ? `${adm.student.firstName} ${adm.student.lastName || ''}`.trim() : 'Student'}</b></td>
+                                                                                            <td>{adm.student?.phone || '-'}</td>
+                                                                                            <td><b>{adm.admissionNumber}</b></td>
+                                                                                            <td>
+                                                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                                                                    <div style={{ width: 70, height: 7, borderRadius: 4, background: '#e2e8f0', overflow: 'hidden' }}>
+                                                                                                        <div style={{ width: `${Math.min(100, Math.max(0, stPct))}%`, height: '100%', background: isDone ? '#16a34a' : '#2563eb' }} />
+                                                                                                    </div>
+                                                                                                    <b style={{ fontSize: 12, color: isDone ? '#16a34a' : '#1e293b' }}>{stPct}%</b>
+                                                                                                </div>
+                                                                                            </td>
+                                                                                            <td>
+                                                                                                <span className="badge" style={{
+                                                                                                    background: isDone ? '#dcfce7' : isStarted ? '#fef3c7' : '#f1f5f9',
+                                                                                                    color: isDone ? '#15803d' : isStarted ? '#b45309' : '#475569',
+                                                                                                    fontSize: 11,
+                                                                                                    fontWeight: 700
+                                                                                                }}>
+                                                                                                    {isDone ? '✓ Completed' : isStarted ? 'In Progress' : 'Not Started'}
+                                                                                                </span>
+                                                                                            </td>
+                                                                                            <td>
+                                                                                                <div style={{ display: 'flex', gap: 6 }}>
+                                                                                                    <button
+                                                                                                        type="button"
+                                                                                                        className="secondary"
+                                                                                                        style={{ padding: '3px 6px', fontSize: 11, color: '#0284c7', borderColor: '#bae6fd', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                                                                                                        onClick={() => openEditProgress(adm)}
+                                                                                                        title="Update Student Course Completion %"
+                                                                                                    >
+                                                                                                        <Edit size={11} /> Progress
+                                                                                                    </button>
+                                                                                                    <button
+                                                                                                        type="button"
+                                                                                                        className="secondary"
+                                                                                                        style={{ padding: '3px 6px', fontSize: 11 }}
+                                                                                                        onClick={() => {
+                                                                                                            setPage('Students');
+                                                                                                            setFilterText(adm.student?.studentCode || '');
+                                                                                                        }}
+                                                                                                    >
+                                                                                                        View
+                                                                                                    </button>
+                                                                                                    <button
+                                                                                                        type="button"
+                                                                                                        className="secondary"
+                                                                                                        style={{ padding: '3px 6px', fontSize: 11, color: '#dc2626', borderColor: '#fca5a5' }}
+                                                                                                        onClick={() => onUnassignStudentFromBatch && onUnassignStudentFromBatch(b.id, adm.studentId, adm.student?.firstName || 'Student')}
+                                                                                                    >
+                                                                                                        Remove
+                                                                                                    </button>
+                                                                                                </div>
+                                                                                            </td>
+                                                                                        </tr>
+                                                                                    );
+                                                                                })}
                                                                         </tbody>
                                                                     </table>
                                                                 )}

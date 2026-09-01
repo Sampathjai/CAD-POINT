@@ -72,7 +72,9 @@ export function MobileCoursesView({ courses = [], onOpenAddModal, onEditCourse, 
 }
 
 /* --- MOBILE BATCHES VIEW --- */
-export function MobileBatchesView({ batches = [], onOpenAddModal, onOpenAssignBatchModal, onEditBatch, onDeleteBatch }) {
+export function MobileBatchesView({ batches = [], onOpenAddModal, onOpenAssignBatchModal, onEditBatch, onDeleteBatch, onOpenEditProgress }) {
+  const [expandedBatchId, setExpandedBatchId] = useState(null);
+
   return (
     <div className="mobile-generic-view">
       <div className="mobile-view-header">
@@ -91,47 +93,127 @@ export function MobileBatchesView({ batches = [], onOpenAddModal, onOpenAssignBa
       </div>
 
       <div className="mobile-card-list">
-        {batches.map((b) => (
-          <div key={b.id} className="mobile-card">
-            <div className="mobile-card-top">
-              <div>
-                <span className="mobile-adm-code">{b.batchCode}</span>
-                <h3 className="mobile-card-title">{b.name}</h3>
-              </div>
-              <span className="mobile-status-badge status-confirmed">{b.progress || 'In Progress'}</span>
-            </div>
+        {batches.map((b) => {
+          const isExpanded = expandedBatchId === b.id;
+          const assignedStudents = b.admissions || [];
+          const sylPct = typeof b.syllabusProgress === 'number' ? b.syllabusProgress : 0;
 
-            <div className="mobile-progress-block">
-              <div className="progress-label-row">
-                <span>Syllabus Progress</span>
-                <b>{b.syllabusProgress || 0}%</b>
+          return (
+            <div key={b.id} className="mobile-card">
+              <div className="mobile-card-top">
+                <div>
+                  <span className="mobile-adm-code">{b.batchCode}</span>
+                  <h3 className="mobile-card-title">{b.name}</h3>
+                </div>
+                <span className="mobile-status-badge status-confirmed">{b.progress || 'In Progress'}</span>
               </div>
-              <div className="progress-track">
-                <div className="progress-fill" style={{ width: `${Math.min(100, Math.max(0, b.syllabusProgress || 0))}%` }}></div>
-              </div>
-            </div>
 
-            <div className="mobile-card-meta-grid" style={{ marginTop: 10 }}>
-              <div>
-                <span className="meta-label">Course</span>
-                <span className="meta-val">{b.course?.name || 'N/A'}</span>
+              <div className="mobile-progress-block">
+                <div className="progress-label-row">
+                  <span>Batch Syllabus Progress</span>
+                  <b>{sylPct}%</b>
+                </div>
+                <div className="progress-track">
+                  <div className="progress-fill" style={{ width: `${Math.min(100, Math.max(0, sylPct))}%` }}></div>
+                </div>
               </div>
-              <div>
-                <span className="meta-label">Capacity</span>
-                <span className="meta-val">{(b.students?.length || 0)} / {b.capacity || 25}</span>
-              </div>
-            </div>
 
-            <div className="mobile-card-actions">
-              <button className="mobile-btn-edit" onClick={() => onEditBatch(b)}>
-                <Edit3 size={14} /> Edit
-              </button>
-              <button className="mobile-btn-danger" onClick={() => onDeleteBatch(b.id, b.name)} title="Delete Batch">
-                <Trash2 size={14} />
-              </button>
+              <div className="mobile-card-meta-grid" style={{ marginTop: 10 }}>
+                <div>
+                  <span className="meta-label">Course</span>
+                  <span className="meta-val">{b.course?.name || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="meta-label">Enrolled Students</span>
+                  <span className="meta-val">{assignedStudents.length} / {b.capacity || 25}</span>
+                </div>
+              </div>
+
+              <div className="mobile-card-actions" style={{ marginTop: 12 }}>
+                <button 
+                  className="mobile-btn-secondary" 
+                  style={{ flex: 1.2, padding: '8px 10px', fontSize: 12, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} 
+                  onClick={() => setExpandedBatchId(isExpanded ? null : b.id)}
+                >
+                  <Users size={14} /> {isExpanded ? 'Hide Students' : `Students (${assignedStudents.length})`}
+                </button>
+                <button className="mobile-btn-edit" onClick={() => onEditBatch(b)}>
+                  <Edit3 size={14} /> Edit
+                </button>
+                <button className="mobile-btn-danger" onClick={() => onDeleteBatch(b.id, b.name)} title="Delete Batch">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+
+              {/* INDIVIDUAL ENROLLED STUDENTS & COURSE COMPLETION */}
+              {isExpanded && (
+                <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <b style={{ fontSize: 13, color: '#0f172a' }}>Individual Student Progress</b>
+                    <span style={{ fontSize: 11, color: '#64748b' }}>{assignedStudents.length} enrolled</span>
+                  </div>
+
+                  {assignedStudents.length === 0 ? (
+                    <div style={{ padding: 12, textAlign: 'center', color: '#64748b', background: '#f8fafc', borderRadius: 8, fontSize: 12 }}>
+                      No students currently assigned to this batch.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {assignedStudents.map((adm) => {
+                        const stName = adm.student ? `${adm.student.firstName || ''} ${adm.student.lastName || ''}`.trim() : 'Student';
+                        const stCode = adm.student?.studentCode || 'STU';
+                        const stPct = typeof adm.completionPct === 'number' ? adm.completionPct : (adm.certificate?.completionPct || 0);
+                        const isDone = stPct === 100;
+                        const isStarted = stPct > 0;
+
+                        return (
+                          <div key={adm.id} style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                              <div>
+                                <span style={{ fontSize: 11, color: '#2563eb', fontWeight: 700 }}>#{stCode}</span>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{stName}</div>
+                              </div>
+                              <span style={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                padding: '2px 7px',
+                                borderRadius: 10,
+                                background: isDone ? '#dcfce7' : isStarted ? '#fef3c7' : '#f1f5f9',
+                                color: isDone ? '#15803d' : isStarted ? '#b45309' : '#475569'
+                              }}>
+                                {isDone ? '✓ Completed' : isStarted ? 'In Progress' : 'Not Started'}
+                              </span>
+                            </div>
+
+                            <div className="mobile-progress-block" style={{ margin: '6px 0 8px' }}>
+                              <div className="progress-label-row" style={{ fontSize: 11 }}>
+                                <span>Course Completion</span>
+                                <b>{stPct}%</b>
+                              </div>
+                              <div className="progress-track" style={{ height: 6 }}>
+                                <div className="progress-fill" style={{ width: `${Math.min(100, Math.max(0, stPct))}%`, background: isDone ? '#16a34a' : '#2563eb' }}></div>
+                              </div>
+                            </div>
+
+                            {onOpenEditProgress && (
+                              <button 
+                                className="mobile-btn-edit"
+                                style={{ width: '100%', minHeight: 32, padding: '4px 8px', fontSize: 11, justifyContent: 'center', marginTop: 4 }}
+                                onClick={() => onOpenEditProgress(adm)}
+                              >
+                                <Edit3 size={12} /> Update Progress ({stPct}%)
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

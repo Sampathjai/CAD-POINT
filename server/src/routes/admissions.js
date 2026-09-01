@@ -254,8 +254,8 @@ router.patch('/:id/installments', authenticate, authorize('SUPER_ADMIN', 'ADMIN'
   }
 });
 
-// PATCH /api/admissions/:id/progress - Update progress & certificate info (Trainers, Admins)
-router.patch('/:id/progress', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'TRAINER'), async (req, res) => {
+// PATCH /api/admissions/:id/progress - Update progress & certificate info (Super Admin, Admin, Counsellor, Trainer)
+router.patch('/:id/progress', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'COUNSELLOR', 'TRAINER'), async (req, res) => {
   try {
     const { id } = req.params;
     const { startDate, endDate, completionPct, certificateStatus, issueDate } = req.body;
@@ -263,15 +263,19 @@ router.patch('/:id/progress', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'T
     const admission = await prisma.admission.findUnique({ where: { id } });
     if (!admission) return res.status(404).json({ success: false, message: 'Admission record not found' });
 
-    if (startDate || endDate) {
-      await prisma.admission.update({
-        where: { id },
-        data: {
-          ...(startDate ? { startDate: new Date(startDate) } : {}),
-          ...(endDate ? { endDate: new Date(endDate) } : {})
-        }
-      });
-    }
+    // Validate and clamp percentage between 0 and 100
+    const parsedPct = parseInt(completionPct, 10);
+    const validPct = isNaN(parsedPct) ? 0 : Math.min(100, Math.max(0, parsedPct));
+
+    await prisma.admission.update({
+      where: { id },
+      data: {
+        completionPct: validPct,
+        ...(validPct === 100 ? { status: 'COMPLETED' } : {}),
+        ...(startDate ? { startDate: new Date(startDate) } : {}),
+        ...(endDate ? { endDate: new Date(endDate) } : {})
+      }
+    });
 
     const certificate = await prisma.certificate.upsert({
       where: { admissionId: id },
@@ -280,13 +284,13 @@ router.patch('/:id/progress', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'T
         studentId: admission.studentId,
         courseId: admission.courseId,
         certificateNumber: `CERT-${Date.now().toString(36).toUpperCase()}`,
-        completionPct: Number(completionPct) || 0,
-        status: certificateStatus || 'NOT_STARTED',
+        completionPct: validPct,
+        status: certificateStatus || (validPct === 100 ? 'COMPLETED' : validPct > 0 ? 'IN_PROGRESS' : 'NOT_STARTED'),
         issueDate: issueDate ? new Date(issueDate) : null
       },
       update: {
-        completionPct: Number(completionPct) || 0,
-        status: certificateStatus || 'NOT_STARTED',
+        completionPct: validPct,
+        status: certificateStatus || (validPct === 100 ? 'COMPLETED' : validPct > 0 ? 'IN_PROGRESS' : 'NOT_STARTED'),
         issueDate: issueDate ? new Date(issueDate) : null
       }
     });
@@ -296,7 +300,7 @@ router.patch('/:id/progress', authenticate, authorize('SUPER_ADMIN', 'ADMIN', 'T
       include: { student: true, course: true, certificate: true, branch: true }
     });
 
-    res.json({ success: true, data: updatedAdmission });
+    res.json({ success: true, data: updatedAdmission, message: `Course completion updated to ${validPct}%` });
   } catch (err) {
     console.error('admissions.progress.update', err);
     res.status(500).json({ success: false, message: err.message });

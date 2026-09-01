@@ -71,7 +71,7 @@ export function MobileAdmissionsView({
             const batchName = adm.batch?.name || 'No Batch';
             const agreedFee = Number(adm.agreedFee || adm.finalFee || 0);
             const certStatus = adm.certificate?.status || 'NOT_STARTED';
-            const completionPct = Number(adm.certificate?.completionPct || 0);
+            const completionPct = typeof adm.completionPct === 'number' ? adm.completionPct : (adm.certificate?.completionPct || 0);
 
             return (
               <div key={adm.id} className="mobile-card admission-card">
