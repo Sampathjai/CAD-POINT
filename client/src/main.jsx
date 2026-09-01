@@ -66,6 +66,8 @@ import {
   MobilePaymentsView, 
   MobileUsersView 
 } from './mobile/MobileGenericViews';
+import { MobileSettingsView } from './mobile/MobileSettingsView';
+import { MobileReportsView } from './mobile/MobileReportsView';
 
 const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL && String(import.meta.env.VITE_API_URL).trim())
     ? String(import.meta.env.VITE_API_URL).trim().replace(/\/+$/, '')
@@ -1237,6 +1239,30 @@ function App() {
                         onOpenAddModal={openAddModalForPage}
                         onEditUser={openEditUser}
                         onDeleteUser={deleteUser}
+                    />
+                ) : page === 'Settings' ? (
+                    <MobileSettingsView
+                        userRole={user?.role}
+                        user={user}
+                        token={token}
+                        theme={theme}
+                        toggleTheme={toggleTheme}
+                        sourcesList={sourcesList}
+                        refreshSources={() => fetchAllData()}
+                        usersList={usersList}
+                        currentUserId={user?.id}
+                        onOpenAddModal={openAddModalForPage}
+                        onEditUser={openEditUser}
+                        onDeleteUser={deleteUser}
+                        API_BASE={API_BASE}
+                    />
+                ) : page === 'Reports' ? (
+                    <MobileReportsView
+                        leads={leads}
+                        admissions={admissions}
+                        payments={payments}
+                        token={token}
+                        API_BASE={API_BASE}
                     />
                 ) : (
                     <Module
