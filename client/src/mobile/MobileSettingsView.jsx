@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Building, 
   Moon, 
@@ -35,28 +35,27 @@ export function MobileSettingsView({
   onOpenAddModal,
   onEditUser,
   onDeleteUser,
-  API_BASE,
-  primaryDevice,
-  authorizedDevices = [],
-  deviceLoading = false,
-  fetchDevices,
-  handleRegisterDeviceSubmit,
-  handleDeleteDevice,
+  API_BASE = '',
   getOrGenerateDeviceId,
   branchesList = []
 }) {
   const [activeSection, setActiveSection] = useState(null); // null = menu list, string = specific form page
   const [saving, setSaving] = useState(false);
 
-  // Device registration state
+  // Self-contained Device Registration State
+  const [primaryDevice, setPrimaryDevice] = useState(null);
+  const [authorizedDevices, setAuthorizedDevices] = useState([]);
+  const [deviceLoading, setDeviceLoading] = useState(false);
+  const [showDeviceRegisterForm, setShowDeviceRegisterForm] = useState(false);
+
   const currentDevInfo = typeof getOrGenerateDeviceId === 'function' ? getOrGenerateDeviceId() : { deviceId: 'DEV-MOBILE-CLIENT', suggestedName: 'Mobile Device', suggestedType: 'MOBILE' };
+
   const [deviceForm, setDeviceForm] = useState({
     deviceName: currentDevInfo.suggestedName || 'Mobile Phone',
     deviceType: currentDevInfo.suggestedType || 'MOBILE',
     deviceRole: 'AUTHORIZED',
     branchId: localStorage.getItem('cadpoint_branch') || 'gandhipuram'
   });
-  const [showDeviceRegisterForm, setShowDeviceRegisterForm] = useState(false);
 
   // Form states
   const [profileForm, setProfileForm] = useState({
@@ -83,8 +82,32 @@ export function MobileSettingsView({
 
   const [newSourceName, setNewSourceName] = useState('');
 
+  // Fetch devices when device section is active
+  const fetchDevices = useCallback(async () => {
+    if (!token) return;
+    setDeviceLoading(true);
+    try {
+      const activeBranch = localStorage.getItem('cadpoint_branch') || 'gandhipuram';
+      const res = await fetch(`${API_BASE}/devices?branchId=${activeBranch}`, {
+        headers: {
+          Authorization: 'Bearer ' + token,
+          'X-Device-Id': currentDevInfo.deviceId
+        }
+      });
+      const j = await res.json();
+      if (j.success && j.data) {
+        setPrimaryDevice(j.data.primaryDevice || null);
+        setAuthorizedDevices(Array.isArray(j.data.authorizedDevices) ? j.data.authorizedDevices : []);
+      }
+    } catch (e) {
+      console.error('Mobile fetchDevices error:', e);
+    } finally {
+      setDeviceLoading(false);
+    }
+  }, [token, API_BASE, currentDevInfo.deviceId]);
+
   useEffect(() => {
-    if (activeSection === 'devices' && typeof fetchDevices === 'function') {
+    if (activeSection === 'devices') {
       fetchDevices();
     }
   }, [activeSection, fetchDevices]);
@@ -107,15 +130,69 @@ export function MobileSettingsView({
     }, 600);
   }
 
-  async function submitRegisterDevice(e) {
-    e.preventDefault();
-    if (typeof handleRegisterDeviceSubmit === 'function') {
-      await handleRegisterDeviceSubmit(e);
-      setShowDeviceRegisterForm(false);
-      if (typeof fetchDevices === 'function') fetchDevices();
-    } else {
-      alert(`✅ Mobile device registered successfully as ${deviceForm.deviceName}`);
-      setShowDeviceRegisterForm(false);
+  async function submitRegisterDevice(e, forceReplace = false) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!token) return alert('Session expired.');
+    if (!deviceForm.deviceName.trim()) return alert('Please enter Device Name.');
+
+    setDeviceLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/devices/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token,
+          'X-Device-Id': currentDevInfo.deviceId
+        },
+        body: JSON.stringify({
+          deviceId: currentDevInfo.deviceId,
+          deviceName: deviceForm.deviceName.trim(),
+          deviceType: deviceForm.deviceType,
+          deviceRole: deviceForm.deviceRole,
+          branchId: deviceForm.branchId,
+          forceReplace
+        })
+      });
+      const j = await res.json();
+      if (j.success) {
+        alert('✅ Device registered successfully!');
+        setShowDeviceRegisterForm(false);
+        fetchDevices();
+      } else if (j.primaryExists) {
+        if (window.confirm(`⚠️ A primary master device already exists: ${j.existingMaster?.deviceName || 'Master Device'}. Do you want to replace it with this device?`)) {
+          submitRegisterDevice(e, true);
+        }
+      } else {
+        alert(j.message || 'Device registration failed.');
+      }
+    } catch (err) {
+      console.error('submitRegisterDevice error:', err);
+      alert('Failed to register device.');
+    } finally {
+      setDeviceLoading(false);
+    }
+  }
+
+  async function handleDeleteDevice(deviceId, deviceName) {
+    if (!window.confirm(`Are you sure you want to unregister device "${deviceName}"?`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/devices/${deviceId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: 'Bearer ' + token,
+          'X-Device-Id': currentDevInfo.deviceId
+        }
+      });
+      const j = await res.json();
+      if (j.success) {
+        alert('✅ Device unregistered successfully!');
+        fetchDevices();
+      } else {
+        alert(j.message || 'Failed to unregister device.');
+      }
+    } catch (err) {
+      console.error('handleDeleteDevice error:', err);
+      alert('Error unregistering device.');
     }
   }
 
@@ -131,9 +208,10 @@ export function MobileSettingsView({
     { id: 'system', title: 'System Info & Diagnostics', desc: 'App version, server environment & client info', icon: Laptop, color: 'text-indigo' }
   ];
 
-  // Check if current device is registered
-  const allRegDevices = [primaryDevice, ...(authorizedDevices || [])].filter(Boolean);
-  const isCurrentDeviceRegistered = allRegDevices.some(d => d.deviceId === currentDevInfo.deviceId);
+  // Check if current device is registered safely
+  const safeAuthDevices = Array.isArray(authorizedDevices) ? authorizedDevices : [];
+  const allRegDevices = [primaryDevice, ...safeAuthDevices].filter(Boolean);
+  const isCurrentDeviceRegistered = allRegDevices.some(d => d && d.deviceId === currentDevInfo.deviceId);
 
   // If a specific section is selected, render full-screen Mobile Form Page
   if (activeSection) {
@@ -285,17 +363,15 @@ export function MobileSettingsView({
                           </div>
                         </div>
 
-                        {typeof handleDeleteDevice === 'function' && (
-                          <div className="mobile-card-actions" style={{ marginTop: 10 }}>
-                            <button 
-                              className="mobile-btn-danger" 
-                              style={{ width: '100%' }}
-                              onClick={() => handleDeleteDevice(d.id, d.deviceName)}
-                            >
-                              <Trash2 size={14} /> Remove Registered Device
-                            </button>
-                          </div>
-                        )}
+                        <div className="mobile-card-actions" style={{ marginTop: 10 }}>
+                          <button 
+                            className="mobile-btn-danger" 
+                            style={{ width: '100%' }}
+                            onClick={() => handleDeleteDevice(d.id, d.deviceName)}
+                          >
+                            <Trash2 size={14} /> Remove Registered Device
+                          </button>
+                        </div>
                       </div>
                     );
                   })
