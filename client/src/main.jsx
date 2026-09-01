@@ -5,7 +5,7 @@ import { GlobalLoader } from './components/GlobalLoader';
 import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
 import { CardSkeleton, TableSkeleton, DashboardSkeleton } from './components/SkeletonLoader';
 import { CRMStateView } from './components/CRMStateView';
-import { hasPermission, getDefaultPageForRole } from './permissions';
+import { hasPermission, getDefaultPageForRole, ALL_CRM_MODULES, ROLE_PERMISSIONS } from './permissions';
 import {
     LayoutDashboard,
     Users,
@@ -231,6 +231,104 @@ function CertificateBadge({ status, issueDate }) {
   );
 }
 
+function UserPermissionsSelector({ selectedPermissions = [], onChange }) {
+    const groups = ['Core', 'Operations', 'Communication', 'Reports', 'Administration'];
+
+    const handleToggle = (key) => {
+        if (selectedPermissions.includes(key)) {
+            onChange(selectedPermissions.filter((k) => k !== key));
+        } else {
+            onChange([...selectedPermissions, key]);
+        }
+    };
+
+    const handleSelectAll = () => {
+        const allKeys = (ALL_CRM_MODULES || []).map((m) => m.key);
+        onChange(allKeys);
+    };
+
+    const handleClearAll = () => {
+        onChange([]);
+    };
+
+    return (
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border-color, #cbd5e1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+                <div>
+                    <label style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary, #0f172a)', margin: 0, display: 'block' }}>
+                        Access / Give Access To
+                    </label>
+                    <span style={{ fontSize: 11, color: '#64748b', display: 'block' }}>
+                        Select granular module permissions for this user.
+                    </span>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                        type="button"
+                        className="secondary"
+                        style={{ padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}
+                        onClick={handleSelectAll}
+                    >
+                        ✓ Select All
+                    </button>
+                    <button
+                        type="button"
+                        className="secondary"
+                        style={{ padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}
+                        onClick={handleClearAll}
+                    >
+                        ✕ Clear All
+                    </button>
+                </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--bg-surface, #f8fafc)', padding: 12, borderRadius: 8, border: '1px solid var(--border-color, #e2e8f0)' }}>
+                {groups.map((group) => {
+                    const modulesInGroup = (ALL_CRM_MODULES || []).filter((m) => m.group === group);
+                    if (modulesInGroup.length === 0) return null;
+                    return (
+                        <div key={group} style={{ marginBottom: 4 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
+                                {group}
+                            </span>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 6 }}>
+                                {modulesInGroup.map((m) => {
+                                    const checked = selectedPermissions.includes(m.key);
+                                    return (
+                                        <label
+                                            key={m.key}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 6,
+                                                fontSize: 12,
+                                                cursor: 'pointer',
+                                                background: checked ? 'rgba(34, 197, 94, 0.1)' : 'var(--bg-card, #ffffff)',
+                                                padding: '4px 8px',
+                                                borderRadius: 6,
+                                                border: `1px solid ${checked ? '#86efac' : '#cbd5e1'}`,
+                                                color: checked ? '#166534' : 'var(--text-primary, #334155)',
+                                                fontWeight: checked ? 600 : 400
+                                            }}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={checked}
+                                                onChange={() => handleToggle(m.key)}
+                                            />
+                                            {m.label}
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 function App() {
     const { isMobile } = useResponsive();
     const [page, setPage] = useState('Dashboard');
@@ -292,7 +390,7 @@ function App() {
     const [showAddPayment, setShowAddPayment] = useState(false);
     const [showAddUser, setShowAddUser] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
-    const [editUserForm, setEditUserForm] = useState({ id: '', name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true });
+    const [editUserForm, setEditUserForm] = useState({ id: '', name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true, customPermissions: ROLE_PERMISSIONS['COUNSELLOR'] || [] });
     const [editingCourse, setEditingCourse] = useState(null);
     const [editCourseForm, setEditCourseForm] = useState({ id: '', courseCode: '', name: '', description: '', standardFee: '', isActive: true });
     const [editingBatch, setEditingBatch] = useState(null);
@@ -326,7 +424,7 @@ function App() {
     const [studentSearchQuery, setStudentSearchQuery] = useState('');
     const [showStudentDropdown, setShowStudentDropdown] = useState(false);
     const [addPaymentForm, setAddPaymentForm] = useState({ admissionId: '', receiptNumber: '', amount: '', paymentMethod: 'UPI', transactionReference: '', remarks: '' });
-    const [addUserForm, setAddUserForm] = useState({ name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true });
+    const [addUserForm, setAddUserForm] = useState({ name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true, customPermissions: ROLE_PERMISSIONS['COUNSELLOR'] || [] });
 
 
     function handleStudentPhotoUpload(e) {
@@ -1017,7 +1115,7 @@ function App() {
             if (!j.success) return alert(j.message || 'Create user failed');
             fetchAllData();
             setShowAddUser(false);
-            setAddUserForm({ name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true });
+            setAddUserForm({ name: '', email: '', phone: '', password: '', role: 'COUNSELLOR', isActive: true, customPermissions: ROLE_PERMISSIONS['COUNSELLOR'] || [] });
         } catch (e) {
             console.error(e);
             alert('Create user failed');
@@ -1059,7 +1157,19 @@ function App() {
 
     function openEditUser(u) {
         setEditingUser(u);
-        setEditUserForm({ id: u.id, name: u.name, email: u.email, phone: u.phone || '', password: '', role: u.role, isActive: u.isActive });
+        const userPerms = Array.isArray(u.customPermissions) && u.customPermissions.length > 0
+            ? u.customPermissions
+            : (ROLE_PERMISSIONS[u.role] || []);
+        setEditUserForm({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            phone: u.phone || '',
+            password: '',
+            role: u.role,
+            isActive: u.isActive,
+            customPermissions: userPerms
+        });
     }
 
     function openEditCourse(c) {
@@ -1201,7 +1311,7 @@ function App() {
         ['Settings', Settings]
     ];
 
-    const nav = allNavItems.filter(([pageName]) => hasPermission(user?.role, pageName));
+    const nav = allNavItems.filter(([pageName]) => hasPermission(user, pageName));
 
     return (
         <>
@@ -1522,7 +1632,7 @@ function App() {
                 </header>
 
                 <ErrorBoundary key={page}>
-                    {!hasPermission(user?.role, page) ? (
+                    {!hasPermission(user, page) ? (
                         <div className="content" style={{ display: 'grid', placeItems: 'center', minHeight: '50vh' }}>
                             <div style={{ padding: 40, textAlign: 'center', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 12, maxWidth: 500 }}>
                                 <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#fee2e2', color: '#dc2626', display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}>
@@ -1850,7 +1960,11 @@ function App() {
                         <label className="checkbox-label">
                             <input type="checkbox" checked={editUserForm.isActive} onChange={(e) => setEditUserForm({ ...editUserForm, isActive: e.target.checked })} /> Active User Account
                         </label>
-                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                        <UserPermissionsSelector
+                            selectedPermissions={editUserForm.customPermissions || []}
+                            onChange={(perms) => setEditUserForm({ ...editUserForm, customPermissions: perms })}
+                        />
+                        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                             <button className="primary" type="submit">Save Changes</button>
                             <button type="button" onClick={() => setEditingUser(null)}>Cancel</button>
                         </div>
@@ -2938,7 +3052,13 @@ function App() {
                         </label>
                         <label>
                             Role
-                            <select value={addUserForm.role} onChange={(e) => setAddUserForm({ ...addUserForm, role: e.target.value })}>
+                            <select
+                                value={addUserForm.role}
+                                onChange={(e) => {
+                                    const r = e.target.value;
+                                    setAddUserForm({ ...addUserForm, role: r, customPermissions: ROLE_PERMISSIONS[r] || [] });
+                                }}
+                            >
                                 <option value="SUPER_ADMIN">SUPER_ADMIN</option>
                                 <option value="ADMIN">ADMIN</option>
                                 <option value="COUNSELLOR">COUNSELLOR</option>
@@ -2947,7 +3067,11 @@ function App() {
                                 <option value="RECEPTIONIST">RECEPTIONIST</option>
                             </select>
                         </label>
-                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                        <UserPermissionsSelector
+                            selectedPermissions={addUserForm.customPermissions || []}
+                            onChange={(perms) => setAddUserForm({ ...addUserForm, customPermissions: perms })}
+                        />
+                        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                             <button className="primary" type="submit">Create User</button>
                             <button type="button" onClick={() => setShowAddUser(false)}>Cancel</button>
                         </div>

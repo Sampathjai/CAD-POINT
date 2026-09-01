@@ -12,24 +12,37 @@ const createUserSchema = z.object({
   phone: z.string().optional(),
   password: z.string().min(8),
   role: z.enum(Roles).optional(),
-  isActive: z.boolean().optional()
+  isActive: z.boolean().optional(),
+  customPermissions: z.array(z.string()).optional()
 });
 
 // List users (requires authentication, admin roles recommended)
-router.get('/', authenticate, authorize('SUPER_ADMIN'), async (req, res) => {
-  const users = await prisma.user.findMany({ select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, createdAt: true } });
+router.get('/', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  const users = await prisma.user.findMany({
+    select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, customPermissions: true, createdAt: true }
+  });
   res.json({ success: true, data: users });
 });
 
 // Create user
-router.post('/', authenticate, authorize('SUPER_ADMIN'), async (req, res) => {
+router.post('/', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
     const data = createUserSchema.parse(req.body);
     const exists = await prisma.user.findUnique({ where: { email: data.email } });
     if (exists) return res.status(409).json({ success: false, message: 'Email already in use' });
     const hash = await bcrypt.hash(data.password, 12);
-    const user = await prisma.user.create({ data: { name: data.name, email: data.email, phone: data.phone, passwordHash: hash, role: data.role || 'COUNSELLOR', isActive: data.isActive ?? true } });
-    const safeUser = { id: user.id, name: user.name, email: user.email, role: user.role, isActive: user.isActive };
+    const user = await prisma.user.create({
+      data: {
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        passwordHash: hash,
+        role: data.role || 'COUNSELLOR',
+        isActive: data.isActive ?? true,
+        customPermissions: Array.isArray(data.customPermissions) ? data.customPermissions : []
+      }
+    });
+    const safeUser = { id: user.id, name: user.name, email: user.email, role: user.role, isActive: user.isActive, customPermissions: user.customPermissions };
     res.status(201).json({ success: true, data: safeUser });
   } catch (err) {
     if (err.name === 'ZodError') return res.status(400).json({ success: false, message: err.errors });
@@ -45,10 +58,11 @@ const updateUserSchema = z.object({
   phone: z.string().optional().nullable(),
   password: z.string().min(8).optional().or(z.literal('')),
   role: z.enum(Roles).optional(),
-  isActive: z.boolean().optional()
+  isActive: z.boolean().optional(),
+  customPermissions: z.array(z.string()).optional()
 });
 
-router.patch('/:id', authenticate, authorize('SUPER_ADMIN'), async (req, res) => {
+const handleUpdateUser = async (req, res) => {
   const { id } = req.params;
   try {
     const data = updateUserSchema.parse(req.body);
@@ -62,13 +76,14 @@ router.patch('/:id', authenticate, authorize('SUPER_ADMIN'), async (req, res) =>
     if (data.phone !== undefined) updateData.phone = data.phone;
     if (data.role !== undefined) updateData.role = data.role;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    if (Array.isArray(data.customPermissions)) updateData.customPermissions = data.customPermissions;
     if (data.password && data.password.trim().length >= 8) {
       updateData.passwordHash = await bcrypt.hash(data.password, 12);
     }
     const updated = await prisma.user.update({
       where: { id },
       data: updateData,
-      select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, createdAt: true }
+      select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, customPermissions: true, createdAt: true }
     });
     res.json({ success: true, data: updated });
   } catch (err) {
@@ -76,7 +91,10 @@ router.patch('/:id', authenticate, authorize('SUPER_ADMIN'), async (req, res) =>
     console.error('Update user error', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
-});
+};
+
+router.patch('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), handleUpdateUser);
+router.put('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), handleUpdateUser);
 
 // Delete user
 router.delete('/:id', authenticate, authorize('SUPER_ADMIN'), async (req, res) => {

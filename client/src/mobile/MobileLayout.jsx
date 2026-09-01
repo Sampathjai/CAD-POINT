@@ -65,7 +65,7 @@ export function MobileLayout({
     { name: 'Settings', label: 'Settings', icon: Settings }
   ];
 
-  const allowedNavItems = allNavItems.filter(item => hasPermission(user?.role, item.name));
+  const allowedNavItems = allNavItems.filter(item => hasPermission(user, item.name));
 
   function handleNavigate(targetPage) {
     setPage(targetPage);
@@ -129,7 +129,7 @@ export function MobileLayout({
 
       {/* Main Page View Container */}
       <main className="mobile-main-content">
-        {!hasPermission(user?.role, page) ? (
+        {!hasPermission(user, page) ? (
           <div className="mobile-restricted-view">
             <div className="mobile-restricted-card">
               <div className="mobile-restricted-icon">
@@ -231,7 +231,7 @@ export function MobileLayout({
         title="Quick Actions"
       >
         <div className="mobile-quick-add-grid">
-          {hasPermission(user?.role, 'Leads') && (
+          {hasPermission(user, 'Leads') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Leads')}>
               <div className="mobile-quick-add-icon bg-blue">
                 <UsersIcon size={20} />
@@ -244,7 +244,7 @@ export function MobileLayout({
             </button>
           )}
 
-          {hasPermission(user?.role, 'Follow-ups') && (
+          {hasPermission(user, 'Follow-ups') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Follow-ups')}>
               <div className="mobile-quick-add-icon bg-purple">
                 <CalendarDays size={20} />
@@ -257,7 +257,7 @@ export function MobileLayout({
             </button>
           )}
 
-          {hasPermission(user?.role, 'Students') && (
+          {hasPermission(user, 'Students') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Students')}>
               <div className="mobile-quick-add-icon bg-emerald">
                 <GraduationCap size={20} />
@@ -270,7 +270,7 @@ export function MobileLayout({
             </button>
           )}
 
-          {hasPermission(user?.role, 'Admissions') && (
+          {hasPermission(user, 'Admissions') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Admissions')}>
               <div className="mobile-quick-add-icon bg-amber">
                 <ArrowUpRight size={20} />
@@ -283,7 +283,7 @@ export function MobileLayout({
             </button>
           )}
 
-          {hasPermission(user?.role, 'Payments') && (
+          {hasPermission(user, 'Payments') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Payments')}>
               <div className="mobile-quick-add-icon bg-teal">
                 <WalletCards size={20} />
@@ -296,7 +296,7 @@ export function MobileLayout({
             </button>
           )}
 
-          {hasPermission(user?.role, 'Batches') && (
+          {hasPermission(user, 'Batches') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Batches')}>
               <div className="mobile-quick-add-icon bg-indigo">
                 <CalendarDays size={20} />

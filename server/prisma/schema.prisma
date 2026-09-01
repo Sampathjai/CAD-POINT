@@ -131,9 +131,10 @@ model User {
   email         String         @unique
   phone         String?
   passwordHash  String
-  role          UserRole       @default(COUNSELLOR)
-  isActive      Boolean        @default(true)
-  branchId      String?
+  role              UserRole       @default(COUNSELLOR)
+  isActive          Boolean        @default(true)
+  customPermissions String[]       @default([])
+  branchId          String?
   branch        Branch?        @relation(fields: [branchId], references: [id], onDelete: SetNull)
   leads         Lead[]         @relation("CounsellorLeads")
   followUps     FollowUp[]     @relation("CounsellorFollowUps")
