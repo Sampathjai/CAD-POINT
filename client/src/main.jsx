@@ -1410,8 +1410,8 @@ function App() {
             </aside>
 
             <main>
-                <header>
-                    <div className="headright">
+                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                    <div className="headright" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div className="search" style={{ position: 'relative' }}>
                             <Search size={17} />
                             <input
@@ -1518,6 +1518,12 @@ function App() {
                         <button className="user" onClick={logout} title="Click to Logout">
                             {(user && user.name && user.name.split(' ').map((s) => s[0]).slice(0, 2).join('')) || 'SK'}
                         </button>
+                    </div>
+
+                    <div className="headwelcome" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                            Welcome to CAD POINT, {user?.name || user?.email?.split('@')[0] || 'User'} 👋
+                        </h2>
                     </div>
                 </header>
 
