@@ -3141,9 +3141,17 @@ function WhatsAppModal({ data, onClose, token }) {
 
     const defaultMsg = data.defaultMessage || data.message || `Hello ${recipientName}! Thank you for contacting CADPOINT COIMBATORE. How can we assist your training goals today?`;
 
-    const [dbTemplates, setDbTemplates] = useState([]);
-    const [selectedTemplateId, setSelectedTemplateId] = useState(data.defaultMessage ? 'DEFAULT' : '');
-    const [messageText, setMessageText] = useState(defaultMsg);
+    const builtInTemplates = {
+        DEFAULT: defaultMsg,
+        WELCOME: `Hello ${recipientName}! Thank you for contacting CADPOINT COIMBATORE. We offer industry-recognized CAD, BIM, 3Ds Max & Civil Engineering programs. How can we assist your training goals today?`,
+        COURSE_FEE: `Hi ${recipientName}! Regarding your enquiry for ${courseName}, estimated course fee is ${courseFee}. Our upcoming batches offer flexible morning & evening schedules. Would you like to reserve a seat?`,
+        FOLLOWUP: `Hello ${recipientName}, this is a gentle follow-up from CADPOINT COIMBATORE regarding your course enquiry. Are you available for a brief discussion or demo session today?`,
+        DEMO_INVITE: `Hi ${recipientName}! We invite you to attend a free live demo session at CADPOINT COIMBATORE. Please reply with your convenient time slot!`
+    };
+
+    const [selectedTemplateKey, setSelectedTemplateKey] = useState(data.defaultMessage ? 'DEFAULT' : 'WELCOME');
+    const [messageText, setMessageText] = useState(data.defaultMessage ? defaultMsg : builtInTemplates.WELCOME);
+    const [customDbTemplates, setCustomDbTemplates] = useState([]);
 
     const [statusData, setStatusData] = useState({ loading: true, isConnected: false, branchName: 'Branch', displayPhoneNumber: '', errorMessage: '' });
     const [messages, setMessages] = useState([]);
@@ -3153,7 +3161,7 @@ function WhatsAppModal({ data, onClose, token }) {
     const [sendSuccess, setSendSuccess] = useState('');
     const [showHistory, setShowHistory] = useState(false);
 
-    // Fetch DB Templates
+    // Fetch DB Templates (Additive)
     useEffect(() => {
         let isMounted = true;
         fetch(`${API_BASE}/whatsapp/templates?activeOnly=true`, {
@@ -3162,25 +3170,23 @@ function WhatsAppModal({ data, onClose, token }) {
         .then(r => r.json())
         .then(j => {
             if (isMounted && j.success && Array.isArray(j.data)) {
-                setDbTemplates(j.data);
-                if (!data.defaultMessage && j.data.length > 0) {
-                    const firstTpl = j.data[0];
-                    setSelectedTemplateId(firstTpl.id);
-                    setMessageText(interpolateWhatsAppTemplate(firstTpl.content, data));
-                }
+                // Filter custom/added templates
+                const customOnly = j.data.filter(t => !t.isSystemTemplate);
+                setCustomDbTemplates(customOnly.length > 0 ? customOnly : j.data);
             }
         })
         .catch(err => console.error('Failed to load DB templates:', err));
 
         return () => { isMounted = false; };
-    }, [token, data]);
+    }, [token]);
 
-    function handleTemplateSelect(templateId) {
-        setSelectedTemplateId(templateId);
-        if (templateId === 'DEFAULT') {
-            setMessageText(defaultMsg);
-        } else {
-            const found = dbTemplates.find(t => t.id === templateId);
+    function handleTemplateChange(key) {
+        setSelectedTemplateKey(key);
+        if (builtInTemplates[key]) {
+            setMessageText(builtInTemplates[key]);
+        } else if (key.startsWith('DB_')) {
+            const dbId = key.replace('DB_', '');
+            const found = customDbTemplates.find(t => t.id === dbId);
             if (found) {
                 setMessageText(interpolateWhatsAppTemplate(found.content, data));
             }
@@ -3368,16 +3374,25 @@ function WhatsAppModal({ data, onClose, token }) {
                             Choose Message Template
                         </label>
                         <select
-                            value={selectedTemplateId}
-                            onChange={(e) => handleTemplateSelect(e.target.value)}
+                            value={selectedTemplateKey}
+                            onChange={(e) => handleTemplateChange(e.target.value)}
                             style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13 }}
                         >
                             {data.defaultMessage && <option value="DEFAULT">📋 Current Custom Message / Reminder</option>}
-                            {dbTemplates.map(t => (
-                                <option key={t.id} value={t.id}>
-                                    [{t.category}] {t.name}
-                                </option>
-                            ))}
+                            <option value="WELCOME">💬 Enquiry Welcome & Overview</option>
+                            <option value="COURSE_FEE">🎓 Course Fee & Batch Info</option>
+                            <option value="FOLLOWUP">⏰ Follow-up Reminder</option>
+                            <option value="DEMO_INVITE">✨ Free Demo Session Invitation</option>
+
+                            {customDbTemplates.length > 0 && (
+                                <optgroup label="Custom Added Templates">
+                                    {customDbTemplates.map(t => (
+                                        <option key={t.id} value={`DB_${t.id}`}>
+                                            ✨ [{t.category}] {t.name}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            )}
                         </select>
                     </div>
 
