@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 /**
  * Custom hook to detect window dimensions and viewport device type.
  * Breakpoints:
- * - Mobile: < 768px
+ * - Mobile: <= 767px
  * - Tablet: 768px - 1023px
  * - Desktop: >= 1024px
  */
@@ -19,8 +19,8 @@ export function useResponsive() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const isMobile = windowWidth < 768;
-  const isTablet = windowWidth >= 768 && windowWidth < 1024;
+  const isMobile = windowWidth <= 767;
+  const isTablet = windowWidth >= 768 && windowWidth <= 1023;
   const isDesktop = windowWidth >= 1024;
 
   return {
@@ -31,4 +31,3 @@ export function useResponsive() {
     screenType: isMobile ? 'mobile' : isTablet ? 'tablet' : 'desktop'
   };
 }
-

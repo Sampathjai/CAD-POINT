@@ -31,17 +31,34 @@ export function MobileLeadsView({
   onEditLead
 }) {
   const [search, setSearch] = useState('');
+  const [statusTab, setStatusTab] = useState('ALL');
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [selectedLeadForDetail, setSelectedLeadForDetail] = useState(null);
 
-  // Filters state
-  const [statusFilter, setStatusFilter] = useState('');
+  // Additional Filters
   const [counsellorFilter, setCounsellorFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
 
+  const statusTabs = [
+    { key: 'ALL', label: 'All' },
+    { key: 'NEW', label: 'New' },
+    { key: 'CONTACTED', label: 'Contacted' },
+    { key: 'FOLLOW_UP', label: 'Follow-up' },
+    { key: 'CONVERTED', label: 'Converted' },
+    { key: 'LOST', label: 'Lost' }
+  ];
+
   // Filtered leads
   const filteredLeads = leads.filter((l) => {
-    if (statusFilter && l.status !== statusFilter) return false;
+    if (statusTab !== 'ALL') {
+      const lStatus = (l.status || 'NEW').toUpperCase();
+      if (statusTab === 'FOLLOW_UP' && (lStatus === 'FOLLOW_UP' || lStatus === 'FOLLOWUP')) {
+        // match
+      } else if (lStatus !== statusTab) {
+        return false;
+      }
+    }
+
     if (counsellorFilter && l.assignedCounsellorId !== counsellorFilter) return false;
     if (typeFilter && l.leadType !== typeFilter) return false;
 
@@ -57,22 +74,23 @@ export function MobileLeadsView({
   });
 
   function resetFilters() {
-    setStatusFilter('');
+    setStatusTab('ALL');
     setCounsellorFilter('');
     setTypeFilter('');
+    setSearch('');
   }
 
-  const activeFilterCount = [statusFilter, counsellorFilter, typeFilter].filter(Boolean).length;
+  const activeFilterCount = (statusTab !== 'ALL' ? 1 : 0) + (counsellorFilter ? 1 : 0) + (typeFilter ? 1 : 0);
 
   return (
     <div className="mobile-leads-view">
-      {/* Search & Filter Top Bar */}
+      {/* Top Search Input Box */}
       <div className="mobile-search-bar-wrap">
         <div className="mobile-search-input-box">
           <Search size={16} className="search-icon" />
           <input
             type="text"
-            placeholder="Search leads by name, phone..."
+            placeholder="Search leads by name, phone, course..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -92,6 +110,19 @@ export function MobileLeadsView({
         </button>
       </div>
 
+      {/* Horizontal Scrolling Status Pills */}
+      <div className="mobile-status-tabs-scroll">
+        {statusTabs.map((tab) => (
+          <button
+            key={tab.key}
+            className={`mobile-status-tab-pill ${statusTab === tab.key ? 'active' : ''}`}
+            onClick={() => setStatusTab(tab.key)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Header Info & Add Button */}
       <div className="mobile-view-header">
         <div>
@@ -108,7 +139,7 @@ export function MobileLeadsView({
         <div className="mobile-empty-state">
           <User size={36} />
           <b>No leads found</b>
-          <p>Try adjusting your search query or filters.</p>
+          <p>Try adjusting your search query or status filter.</p>
           {activeFilterCount > 0 && (
             <button className="mobile-btn-secondary" onClick={resetFilters}>
               Reset Filters
@@ -185,8 +216,8 @@ export function MobileLeadsView({
         <div className="mobile-filter-form">
           <label className="mobile-form-label">
             Lead Status
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="mobile-form-select">
-              <option value="">All Statuses</option>
+            <select value={statusTab} onChange={(e) => setStatusTab(e.target.value)} className="mobile-form-select">
+              <option value="ALL">All Statuses</option>
               <option value="NEW">NEW</option>
               <option value="CONTACTED">CONTACTED</option>
               <option value="FOLLOW_UP">FOLLOW_UP</option>
@@ -304,4 +335,3 @@ export function MobileLeadsView({
     </div>
   );
 }
-

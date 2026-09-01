@@ -20,7 +20,9 @@ import {
   LogOut, 
   ChevronRight,
   ShieldCheck,
-  Building
+  Building,
+  Check,
+  ChevronDown
 } from 'lucide-react';
 import { MobileBottomSheet } from './MobileBottomSheet';
 import { hasPermission, getDefaultPageForRole } from '../permissions';
@@ -46,14 +48,15 @@ export function MobileLayout({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showQuickAddSheet, setShowQuickAddSheet] = useState(false);
   const [showNotificationsSheet, setShowNotificationsSheet] = useState(false);
+  const [showBranchSheet, setShowBranchSheet] = useState(false);
 
   const allNavItems = [
     { name: 'Dashboard', label: 'Home', icon: LayoutDashboard, primary: true },
     { name: 'Leads', label: 'Leads', icon: UsersIcon, primary: true, badge: leadsCount },
-    { name: 'Follow-ups', label: 'Alerts', icon: CalendarDays, primary: true, badge: followupsCount },
+    { name: 'Follow-ups', label: 'Follow-ups', icon: CalendarDays, primary: true, badge: followupsCount },
+    { name: 'Students', label: 'Students', icon: GraduationCap, primary: true },
     { name: 'Courses', label: 'Courses', icon: BookOpen },
     { name: 'Batches', label: 'Batches', icon: CalendarDays },
-    { name: 'Students', label: 'Students', icon: GraduationCap },
     { name: 'Admissions', label: 'Admissions', icon: ArrowUpRight },
     { name: 'Payments', label: 'Payments', icon: WalletCards },
     { name: 'Reports', label: 'Reports', icon: BarChart3 },
@@ -62,8 +65,6 @@ export function MobileLayout({
   ];
 
   const allowedNavItems = allNavItems.filter(item => hasPermission(user?.role, item.name));
-
-  const secondaryNavItems = allowedNavItems.filter(item => !item.primary || item.name === 'Follow-ups');
 
   function handleNavigate(targetPage) {
     setPage(targetPage);
@@ -75,44 +76,29 @@ export function MobileLayout({
     onOpenAddModal(targetPage);
   }
 
+  const activeBranchObj = (branchesList || []).find(b => (b.code ? b.code.toLowerCase() : b.id) === activeBranch);
+  const activeBranchName = activeBranch === 'all' ? 'All Branches' : (activeBranchObj ? activeBranchObj.name : (activeBranch === 'saravanapatti' ? 'Saravanapatti' : 'Gandhipuram'));
+
   const userInitials = (user?.name || 'SK').split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase();
 
   return (
     <div className="mobile-app">
-      {/* Mobile Top Header */}
+      {/* Mobile Top Sticky Header */}
       <header className="mobile-header">
         <div className="mobile-header-left">
           <div className="mobile-brand-logo">CP</div>
-          <div className="mobile-brand-info">
-            <span className="mobile-brand-title">CADPOINT</span>
-            <span className="mobile-brand-sub">COIMBATORE</span>
+          <div className="mobile-header-title-box">
+            <span className="mobile-header-page-title">{page === 'Dashboard' ? 'Dashboard' : page}</span>
+            {/* Branch Selector Pill */}
+            <button className="mobile-branch-pill-btn" onClick={() => setShowBranchSheet(true)}>
+              <Building size={11} />
+              <span>{activeBranchName}</span>
+              <ChevronDown size={11} />
+            </button>
           </div>
         </div>
 
         <div className="mobile-header-right">
-          {/* Branch Selector Pill */}
-          <div className="mobile-branch-select-wrapper">
-            <Building size={13} className="mobile-branch-icon" />
-            <select
-              value={activeBranch}
-              onChange={(e) => {
-                setActiveBranch(e.target.value);
-                localStorage.setItem('cadpoint_branch', e.target.value);
-              }}
-              className="mobile-branch-select"
-            >
-              {(branchesList && branchesList.length > 0 ? branchesList : [
-                { id: 'gandhipuram', name: 'Gandhipuram', code: 'gandhipuram' },
-                { id: 'saravanapatti', name: 'Saravanapatti', code: 'saravanapatti' }
-              ]).map((b) => (
-                <option key={b.id} value={b.code ? b.code.toLowerCase() : b.id}>
-                  {b.name}
-                </option>
-              ))}
-              {user?.role === 'SUPER_ADMIN' && <option value="all">All Branches</option>}
-            </select>
-          </div>
-
           {/* Search Button */}
           <button className="mobile-header-btn" onClick={onOpenSearch} aria-label="Search">
             <Search size={18} />
@@ -128,10 +114,10 @@ export function MobileLayout({
             {notifications.length > 0 && <span className="mobile-notif-badge">{notifications.length}</span>}
           </button>
 
-          {/* Theme Toggle */}
-          <button className="mobile-header-btn" onClick={toggleTheme} aria-label="Toggle theme">
-            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
+          {/* User Profile Avatar */}
+          <div className="mobile-header-avatar" onClick={() => setShowMoreMenu(true)}>
+            {userInitials}
+          </div>
         </div>
       </header>
 
@@ -199,18 +185,79 @@ export function MobileLayout({
               <CalendarDays size={20} />
               {followupsCount > 0 && <span className="mobile-nav-badge">{followupsCount}</span>}
             </div>
-            <span>Alerts</span>
+            <span>Follow-ups</span>
+          </button>
+        )}
+
+        {hasPermission(user?.role, 'Students') && (
+          <button 
+            className={`mobile-nav-item ${page === 'Students' ? 'active' : ''}`}
+            onClick={() => handleNavigate('Students')}
+          >
+            <GraduationCap size={20} />
+            <span>Students</span>
           </button>
         )}
 
         <button 
-          className={`mobile-nav-item ${showMoreMenu || !['Dashboard', 'Leads', 'Follow-ups'].includes(page) ? 'active' : ''}`}
+          className={`mobile-nav-item ${showMoreMenu || !['Dashboard', 'Leads', 'Follow-ups', 'Students'].includes(page) ? 'active' : ''}`}
           onClick={() => setShowMoreMenu(true)}
         >
           <Menu size={20} />
           <span>More</span>
         </button>
       </nav>
+
+      {/* Branch Selection Bottom Sheet */}
+      <MobileBottomSheet
+        isOpen={showBranchSheet}
+        onClose={() => setShowBranchSheet(false)}
+        title="Select Active Branch"
+      >
+        <div className="mobile-branch-list">
+          {(branchesList && branchesList.length > 0 ? branchesList : [
+            { id: 'gandhipuram', name: 'Gandhipuram Branch', code: 'gandhipuram' },
+            { id: 'saravanapatti', name: 'Saravanapatti Branch', code: 'saravanapatti' }
+          ]).map((b) => {
+            const bCode = (b.code ? b.code.toLowerCase() : b.id);
+            const isSelected = activeBranch === bCode;
+            return (
+              <button
+                key={b.id}
+                className={`mobile-branch-item ${isSelected ? 'selected' : ''}`}
+                onClick={() => {
+                  setActiveBranch(bCode);
+                  localStorage.setItem('cadpoint_branch', bCode);
+                  setShowBranchSheet(false);
+                }}
+              >
+                <div className="mobile-branch-item-text">
+                  <Building size={16} />
+                  <b>{b.name}</b>
+                </div>
+                {isSelected && <Check size={18} className="text-emerald" />}
+              </button>
+            );
+          })}
+
+          {user?.role === 'SUPER_ADMIN' && (
+            <button
+              className={`mobile-branch-item ${activeBranch === 'all' ? 'selected' : ''}`}
+              onClick={() => {
+                setActiveBranch('all');
+                localStorage.setItem('cadpoint_branch', 'all');
+                setShowBranchSheet(false);
+              }}
+            >
+              <div className="mobile-branch-item-text">
+                <Building size={16} />
+                <b>All Branches (Combined)</b>
+              </div>
+              {activeBranch === 'all' && <Check size={18} className="text-emerald" />}
+            </button>
+          )}
+        </div>
+      </MobileBottomSheet>
 
       {/* Quick Add Bottom Sheet */}
       <MobileBottomSheet 
@@ -299,7 +346,7 @@ export function MobileLayout({
           </button>
         </div>
 
-        <div className="mobile-menu-section-title">ALL MODULES</div>
+        <div className="mobile-menu-section-title">WORKSPACE MODULES</div>
 
         <div className="mobile-menu-list">
           {allowedNavItems.map((item) => {
@@ -325,13 +372,23 @@ export function MobileLayout({
             );
           })}
         </div>
+
+        <div className="mobile-menu-section-title" style={{ marginTop: 16 }}>SYSTEM & THEME</div>
+        <div className="mobile-menu-list">
+          <button className="mobile-menu-item" onClick={toggleTheme}>
+            <div className="mobile-menu-item-left">
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              <span>Theme: <b>{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</b></span>
+            </div>
+          </button>
+        </div>
       </MobileBottomSheet>
 
       {/* Notifications Bottom Sheet */}
       <MobileBottomSheet
         isOpen={showNotificationsSheet}
         onClose={() => setShowNotificationsSheet(false)}
-        title="System Notifications"
+        title="Notifications"
       >
         <div className="mobile-notif-list">
           {notifications.length === 0 ? (
@@ -353,4 +410,3 @@ export function MobileLayout({
     </div>
   );
 }
-

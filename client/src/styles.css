@@ -1672,9 +1672,497 @@ button, select, input[type="text"], input[type="email"], input[type="tel"], inpu
     color: #f8fafc !important;
 }
 
-/* ==========================================================================
-   MOBILE-FIRST CRM UI STYLES (Dedicated Mobile Presentation Layer)
-   ========================================================================== */
+/* --- Mobile Header Title Box & Branch Selector Pill --- */
+.mobile-header-title-box {
+    display: flex;
+    flex-direction: column;
+}
+
+.mobile-header-page-title {
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+.mobile-branch-pill-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(22, 163, 74, 0.12);
+    color: #15803d;
+    padding: 2px 8px;
+    border-radius: 12px;
+    border: none;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 2px;
+}
+
+[data-theme="dark"] .mobile-branch-pill-btn {
+    background: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+}
+
+.mobile-header-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #111827;
+    color: #ffffff;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+/* --- Month Filter Bar --- */
+.mobile-month-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    padding: 8px 12px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    font-size: 12px;
+}
+
+[data-theme="dark"] .mobile-month-filter-bar {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.mobile-month-filter-bar .filter-label {
+    font-weight: 700;
+    color: #64748b;
+}
+
+.mobile-month-select {
+    border: none;
+    background: transparent;
+    font-size: 12px;
+    font-weight: 700;
+    color: inherit;
+    outline: none;
+    flex: 1;
+    cursor: pointer;
+}
+
+/* --- Horizontally Scrollable Metric Card Carousel --- */
+.mobile-carousel-container {
+    margin-bottom: 16px;
+}
+
+.mobile-metric-carousel {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.mobile-metric-carousel::-webkit-scrollbar {
+    display: none;
+}
+
+.mobile-carousel-card {
+    flex: 0 0 78%;
+    scroll-snap-align: start;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .mobile-carousel-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.mobile-carousel-card.blue { border-left: 4px solid #2563eb; }
+.mobile-carousel-card.purple { border-left: 4px solid #9333ea; }
+.mobile-carousel-card.emerald { border-left: 4px solid #059669; }
+.mobile-carousel-card.amber { border-left: 4px solid #d97706; }
+.mobile-carousel-card.red { border-left: 4px solid #ef4444; }
+
+.mobile-carousel-card .card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+    margin-bottom: 8px;
+}
+
+.mobile-carousel-card .card-val {
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 4px;
+}
+
+.mobile-carousel-card .card-sub {
+    font-size: 11px;
+    font-weight: 700;
+    color: #059669;
+}
+
+.mobile-carousel-card .card-foot {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+
+.mobile-carousel-hint {
+    font-size: 10px;
+    color: #94a3b8;
+    text-align: center;
+    margin-top: 4px;
+    font-weight: 600;
+}
+
+/* --- Mobile Chart Stack (Full-width Cards) --- */
+.mobile-chart-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+.mobile-chart-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .mobile-chart-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.chart-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+[data-theme="dark"] .chart-card-header {
+    border-bottom-color: #334155;
+}
+
+.chart-card-header h4 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.chart-card-header span {
+    font-size: 11px;
+    color: #64748b;
+}
+
+/* Bar Chart */
+.mobile-bar-chart {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    height: 150px;
+    padding-top: 10px;
+}
+
+.mobile-bar-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    max-width: 48px;
+    cursor: pointer;
+}
+
+.mobile-bar-col .bar-val {
+    font-size: 10px;
+    font-weight: 700;
+    color: #64748b;
+}
+
+.mobile-bar-col .bar-fill {
+    width: 100%;
+    background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+    border-radius: 6px 6px 0 0;
+    transition: all 0.2s ease;
+}
+
+.mobile-bar-col.selected .bar-fill {
+    background: linear-gradient(180deg, #16a34a 0%, #15803d 100%);
+    box-shadow: 0 0 10px rgba(22, 163, 74, 0.5);
+}
+
+.mobile-bar-col .bar-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.mobile-bar-col.selected .bar-label {
+    color: #16a34a;
+    font-weight: 800;
+}
+
+/* Funnel Stack */
+.mobile-funnel-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.mobile-funnel-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.funnel-label-line {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+}
+
+.funnel-label-line span { color: #64748b; }
+.funnel-label-line b { font-weight: 700; }
+
+.funnel-track {
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+[data-theme="dark"] .funnel-track {
+    background: #334155;
+}
+
+.funnel-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #2563eb, #3b82f6);
+    border-radius: 4px;
+}
+
+/* Month Cards List (Replacing Table on Mobile) */
+.mobile-month-cards-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.mobile-month-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px;
+}
+
+[data-theme="dark"] .mobile-month-card {
+    background: #0f172a;
+    border-color: #334155;
+}
+
+.mobile-month-card.selected {
+    border-color: #16a34a;
+    background: rgba(22, 163, 74, 0.04);
+}
+
+.month-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.month-card-header b {
+    font-size: 14px;
+}
+
+.current-badge {
+    font-size: 9px;
+    font-weight: 800;
+    background: #dcfce7;
+    color: #15803d;
+    padding: 1px 6px;
+    border-radius: 8px;
+    margin-left: 6px;
+}
+
+.select-month-btn {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #334155;
+    cursor: pointer;
+}
+
+.select-month-btn.active {
+    background: #16a34a;
+    color: #ffffff;
+    border-color: #16a34a;
+}
+
+.month-card-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    font-size: 11px;
+    text-align: center;
+}
+
+.month-card-grid span {
+    display: block;
+    color: #64748b;
+    font-size: 10px;
+}
+
+.month-card-grid b {
+    display: block;
+    font-size: 12px;
+    margin-top: 2px;
+}
+
+/* Recent Lead List Item */
+.mobile-recent-lead-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    padding: 10px 14px;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+[data-theme="dark"] .mobile-recent-lead-item {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.lead-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #dbeafe;
+    color: #1d4ed8;
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.lead-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.lead-info b { font-size: 14px; }
+.lead-info span { font-size: 11px; color: #64748b; }
+
+.lead-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Horizontal Status Filter Tabs for Leads */
+.mobile-status-tabs-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.mobile-status-tabs-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.mobile-status-tab-pill {
+    flex: 0 0 auto;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+[data-theme="dark"] .mobile-status-tab-pill {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+}
+
+.mobile-status-tab-pill.active {
+    background: #2563eb;
+    color: #ffffff;
+    border-color: #2563eb;
+}
+
+/* Branch Selector Bottom Sheet */
+.mobile-branch-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mobile-branch-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    cursor: pointer;
+}
+
+[data-theme="dark"] .mobile-branch-item {
+    background: #1e293b;
+    border-color: #334155;
+    color: #f8fafc;
+}
+
+.mobile-branch-item.selected {
+    border-color: #16a34a;
+    background: rgba(22, 163, 74, 0.05);
+}
+
+.mobile-branch-item-text {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+}
+
 
 .mobile-app {
     display: flex;
