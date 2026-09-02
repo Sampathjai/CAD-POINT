@@ -1,34 +1,159 @@
-# CAD Point CRM
+# CAD Points CRM
 
-Production-ready CRM for CAD Point training institute. This repository contains a React (Vite) frontend and Node.js + Express backend with PostgreSQL (Prisma) persistence.
+> **Full-Stack Customer Relationship & Business Management Platform**
 
-Requirements
-- Node 22
-- PostgreSQL 14+
+![License](https://img.shields.io/badge/Access-Private%20%2F%20Commercial-blue?style=for-the-badge&logo=github)
+![Status](https://img.shields.io/badge/Status-Production%20Ready-success?style=for-the-badge)
+![Stack](https://img.shields.io/badge/Stack-React%20%7C%20Node.js%20%7C%20PostgreSQL-indigo?style=for-the-badge)
+![Architecture](https://img.shields.io/badge/Architecture-REST%20API%20%7C%20RBAC-purple?style=for-the-badge)
 
-Quick start (development)
+---
 
-Client
-```bash
-cd client
-npm ci
-npm run dev
+> 🔒 **Source Code Notice:** This repository is kept **PRIVATE** because the project was developed for a commercial/client use case. The repository contains proprietary implementation details, internal workflow logic, and business configurations, therefore the source code is not publicly available. A project walkthrough and live demonstration can be provided upon request.
+
+---
+
+## 📌 Project Overview
+
+**CAD Points CRM** is a production-oriented Customer Relationship Management and enterprise operations platform designed specifically for vocational training and educational institutes. The system streamlines end-to-end customer lifecycles—from initial lead acquisition and scheduled follow-ups to student admissions, course batch allocations, fee collection, multi-branch reporting, and hardware device registration.
+
+Built with a modern decoupled full-stack architecture, the CRM delivers a high-performance desktop experience alongside an optimized mobile application UI for staff on the go.
+
+---
+
+## ✨ Key Features
+
+* **Customer & Student Management**: Centralized profiles, student code generation, course enrollments, and academic batch progress tracking.
+* **Lead Pipeline & Prospect Tracking**: Multi-channel lead capture, lead disposition status tracking, and 1-tap conversion to active student admissions.
+* **Follow-up & Reminder System**: Automated follow-up calendar, scheduled call/meeting reminders, and direct 1-tap WhatsApp messaging integration.
+* **Admission & Revenue Management**: Final fee agreement tracking, payment installment collection, pending balance computation, and automated fee receipts.
+* **Business Reports & Analytics**: Real-time revenue analytics, branch performance comparison, enrollment metrics, and instant 1-tap Excel data exports.
+* **Role-Based Access Control (RBAC)**: Fine-grained permission matrix tailored for `Super Admin`, `Admin`, `Counsellor`, `Trainer`, `Accountant`, `Accounts`, and `Receptionist` roles.
+* **Multi-Branch Management**: Multi-location support (Gandhipuram, Saravanapatti, All Branches) with isolated branch datasets and unified administrative controls.
+* **Device Security & Registration**: Authorized device registration system restricting CRM access to validated hardware devices.
+* **Excel & Data Export**: High-performance client-side Excel report generation for admissions, fee collections, and lead analytics.
+* **Authentication & Security**: Secure JSON Web Token (JWT) authorization, salted bcrypt password hashing, and Zod input schema validation.
+* **Responsive Mobile Experience**: Native-feeling mobile app interface with quick action sheets, bottom navigation bar, and PWA (Progressive Web App) manifest support.
+
+---
+
+## 🛠️ Technology Stack
+
+| Layer | Technologies & Tools Used |
+| :--- | :--- |
+| **Frontend UI / UX** | React 18, Vite 5, Lucide React Icons, Custom CSS3 / Responsive Layouts, HTML5 PWA Manifest |
+| **Backend & API Layer** | Node.js, Express.js REST API, Prisma ORM, Zod Schema Validation, Bcrypt.js, JSON Web Tokens (JWT) |
+| **Database & Security** | PostgreSQL (Supabase Managed), Multi-Branch Data Schema, Salted Hashing, Hardware Device Binding |
+| **Testing & CI/CD** | Vitest Test Runner, GitHub Actions CI, Vercel (Frontend Deployment), Render (Backend API Deployment) |
+
+---
+
+## 📸 UI Showcase & Screenshots
+
+### 📊 Executive Dashboard
+*Comprehensive real-time view of daily leads, follow-ups, active batches, revenue metrics, and branch selection.*
+
+![CAD Points CRM Dashboard](screenshots/dashboard.png)
+
+---
+
+### 👥 Lead & Follow-up Pipeline
+*Streamlined prospect management with 1-tap WhatsApp messaging and status updates.*
+
+![Lead & Follow-up Management](screenshots/leads.png)
+
+---
+
+### 🎓 Admissions & Student Progress
+*Complete student onboarding, batch assignment, and course completion progress tracking.*
+
+![Student Admissions](screenshots/admissions.png)
+
+---
+
+### 📈 Reports & Revenue Analytics
+*Detailed financial summaries, outstanding balance breakdown, and 1-tap Excel export.*
+
+![Reports and Revenue](screenshots/reports.png)
+
+---
+
+### ⚙️ Settings & Device Control
+*Granular user role permissions, institute details, and authorized device registration.*
+
+![Settings and Access Control](screenshots/settings.png)
+
+---
+
+### 📱 Mobile Experience
+*Touch-optimized mobile quick actions for staff managing operations on mobile devices.*
+
+![Mobile Experience](screenshots/mobile.png)
+
+---
+
+## 🏗️ Architecture Overview
+
+The platform uses a decoupled client-server architecture designed for reliability, responsiveness, and secure data isolation:
+
+```
+┌────────────────────────────────────────────────────────┐
+│               CAD Points CRM Frontend                  │
+│       React 18 + Vite + PWA Mobile Optimization        │
+└───────────────────────────┬────────────────────────────┘
+                            │  HTTPS REST API (JWT)
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│                 Node.js / Express API                  │
+│      Auth Middleware + Zod Validation + RBAC Rules     │
+└───────────────────────────┬────────────────────────────┘
+                            │  Prisma ORM
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│               PostgreSQL Database                      │
+│        Multi-Branch Tables + Device Registry           │
+└────────────────────────────────────────────────────────┘
 ```
 
-Server
-```bash
-cd server
-npm ci
-cp .env.example .env
-# Edit .env and set DATABASE_URL and JWT_SECRET
-npm run dev
-```
+---
 
-Default ports
-- Client: http://localhost:3000
-- API: http://localhost:5001
+## 👨‍💻 My Contribution
 
-Frontend API configuration
-- Use `VITE_API_URL` (see `client/.env.example`) to point the frontend to the backend API, e.g. `VITE_API_URL=http://localhost:5001/api`.
+As the **Primary Full-Stack Developer**, I engineered and delivered this CRM platform from concept to production:
 
-For production build and deployment see `PRODUCTION.md` and `docs/`.
+* Designed and built the responsive frontend single-page application using React 18 and Vite.
+* Developed the RESTful backend API using Node.js, Express.js, and Prisma ORM.
+* Implemented the Role-Based Access Control (RBAC) matrix for 7 distinct user roles.
+* Designed the database schema and branch isolation logic in PostgreSQL.
+* Built the mobile-optimized UI architecture and Progressive Web App (PWA) configuration.
+* Integrated Excel report generation and 1-tap WhatsApp communication links.
+* Implemented the hardware device registration system for security compliance.
+* Set up automated testing pipelines and deployed the production application on Vercel and Render.
+
+---
+
+## 🧪 Testing & Quality Assurance
+
+The application underwent rigorous quality verification across multiple dimensions:
+
+* **Automated Unit Testing**: Vitest test suites verifying core client and server modules.
+* **RBAC Security Audits**: Verification of endpoint authorization across all 7 user roles.
+* **Mobile Breakpoint Verification**: Responsive layout testing across 375px (iPhone), 412px (Android), 768px (iPad), and 1024px+ (Desktop).
+* **Data Validation & Error Guarding**: Defensive null guards and Zod schema parsing on incoming payloads.
+
+---
+
+## 🚀 Deployment & Demo Status
+
+* **Frontend Hosting**: Vercel (Continuous Deployment from `main`)
+* **Backend API Hosting**: Render (Node.js Environment)
+* **Database**: Managed PostgreSQL on Supabase
+* **Live Demo**: **Available upon request**
+
+---
+
+## 📩 Contact & Inquiries
+
+For project walkthroughs, live demonstrations, or professional inquiries, please reach out via GitHub or official contact channels.
+
+*Developed with focus on performance, usability, and business efficiency.*
