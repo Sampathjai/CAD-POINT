@@ -87,7 +87,11 @@ export function MobileLayout({
       {/* Mobile Top Sticky Header */}
       <header className="mobile-header">
         <div className="mobile-header-left">
-          <div className="mobile-brand-logo">CP</div>
+          <img
+            src="/branding/cadpoint-logo.png"
+            alt="CADPOINT Logo"
+            style={{ height: 26, maxWidth: 90, objectFit: 'contain' }}
+          />
           <div className="mobile-header-title-box">
             <span className="mobile-header-page-title">{page === 'Dashboard' ? 'Dashboard' : page}</span>
             {/* Branch Selector Pill */}

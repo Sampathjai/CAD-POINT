@@ -1154,9 +1154,16 @@ function App() {
         return (
             <div className="login">
                 <div className="loginbox">
-                    <div className="logo big">CP</div>
-                    <h1>CADPOINT COIMBATORE</h1>
-                    <p>CRM Platform</p>
+                    <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                        <img
+                            src="/branding/cadpoint-logo.png"
+                            alt="CADPOINT Authorized Training Centre"
+                            style={{ maxWidth: 280, width: '100%', height: 'auto', display: 'block', margin: '0 auto 12px' }}
+                        />
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: 1 }}>
+                            Official CRM Platform
+                        </p>
+                    </div>
                     <form onSubmit={(e) => { e.preventDefault(); doLogin(); }}>
                         <label>
                             Email
