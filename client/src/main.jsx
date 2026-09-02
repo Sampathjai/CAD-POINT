@@ -7551,10 +7551,10 @@ function SettingsView({ userRole, user, token, theme, toggleTheme, sourcesList =
     const allTabs = [
         { id: 'Profile', label: 'Institute Profile', icon: ShieldCheck, perm: 'settings.profile' },
         { id: 'Appearance', label: 'Appearance & Theme', icon: Sun, perm: 'settings.appearance' },
+        { id: 'Storage & Database', label: 'Register & Manage Devices', icon: Laptop, perm: 'settings.devices' },
         { id: 'User Control', label: 'User Control & Roles', icon: UserCheck, perm: 'settings.users' },
         { id: 'Branch Management', label: 'Branch Management', icon: Database, perm: 'settings.branches' },
         { id: 'WhatsApp & API', label: 'WhatsApp & API', icon: MessageCircle, perm: 'settings.whatsapp' },
-        { id: 'Storage & Database', label: 'Storage & Database', icon: Database, perm: 'settings.whatsapp' },
         { id: 'Enquiry Sources', label: 'Enquiry Sources', icon: Plus, perm: 'settings.whatsapp' },
         { id: 'System Info', label: 'System Info', icon: Laptop, perm: 'settings.profile' }
     ];

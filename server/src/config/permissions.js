@@ -46,14 +46,16 @@ const ROLE_PERMISSIONS = {
     'admissions',
     'settings',
     'settings.profile',
-    'settings.appearance'
+    'settings.appearance',
+    'settings.devices'
   ],
   TRAINER: [
     'courses',
     'batches',
     'settings',
     'settings.profile',
-    'settings.appearance'
+    'settings.appearance',
+    'settings.devices'
   ],
   ACCOUNTANT: [
     'dashboard',
@@ -61,7 +63,8 @@ const ROLE_PERMISSIONS = {
     'reports',
     'settings',
     'settings.profile',
-    'settings.appearance'
+    'settings.appearance',
+    'settings.devices'
   ],
   ACCOUNTS: [
     'dashboard',
@@ -69,7 +72,8 @@ const ROLE_PERMISSIONS = {
     'reports',
     'settings',
     'settings.profile',
-    'settings.appearance'
+    'settings.appearance',
+    'settings.devices'
   ],
   RECEPTIONIST: [
     'leads',
@@ -77,7 +81,8 @@ const ROLE_PERMISSIONS = {
     'batches',
     'settings',
     'settings.profile',
-    'settings.appearance'
+    'settings.appearance',
+    'settings.devices'
   ]
 };
 

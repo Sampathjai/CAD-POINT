@@ -48,14 +48,16 @@ export const ROLE_PERMISSIONS = {
     'students',
     'settings',
     'settings.profile',
-    'settings.appearance'
+    'settings.appearance',
+    'settings.devices'
   ],
   TRAINER: [
     'courses',
     'batches',
     'settings',
     'settings.profile',
-    'settings.appearance'
+    'settings.appearance',
+    'settings.devices'
   ],
   ACCOUNTANT: [
     'dashboard',
@@ -63,7 +65,8 @@ export const ROLE_PERMISSIONS = {
     'reports',
     'settings',
     'settings.profile',
-    'settings.appearance'
+    'settings.appearance',
+    'settings.devices'
   ],
   ACCOUNTS: [
     'dashboard',
@@ -71,7 +74,8 @@ export const ROLE_PERMISSIONS = {
     'reports',
     'settings',
     'settings.profile',
-    'settings.appearance'
+    'settings.appearance',
+    'settings.devices'
   ],
   RECEPTIONIST: [
     'leads',
@@ -80,7 +84,8 @@ export const ROLE_PERMISSIONS = {
     'students',
     'settings',
     'settings.profile',
-    'settings.appearance'
+    'settings.appearance',
+    'settings.devices'
   ]
 };
 
