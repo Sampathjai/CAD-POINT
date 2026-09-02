@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const prisma = require('../config/prisma');
 const { authenticate, authorize } = require('../middleware/auth');
 
-const Roles = ['SUPER_ADMIN','ADMIN','COUNSELLOR','TRAINER','ACCOUNTS','RECEPTIONIST'];
+const Roles = ['SUPER_ADMIN','ADMIN','COUNSELLOR','TRAINER','ACCOUNTS','ACCOUNTANT','RECEPTIONIST'];
 const createUserSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
@@ -15,20 +15,22 @@ const createUserSchema = z.object({
   isActive: z.boolean().optional()
 });
 
-// List users (requires authentication, admin roles recommended)
-router.get('/', authenticate, authorize('SUPER_ADMIN'), async (req, res) => {
+// List users (requires authentication, admin roles)
+router.get('/', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   const users = await prisma.user.findMany({ select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, createdAt: true } });
   res.json({ success: true, data: users });
 });
 
 // Create user
-router.post('/', authenticate, authorize('SUPER_ADMIN'), async (req, res) => {
+router.post('/', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
     const data = createUserSchema.parse(req.body);
     const exists = await prisma.user.findUnique({ where: { email: data.email } });
     if (exists) return res.status(409).json({ success: false, message: 'Email already in use' });
     const hash = await bcrypt.hash(data.password, 12);
-    const user = await prisma.user.create({ data: { name: data.name, email: data.email, phone: data.phone, passwordHash: hash, role: data.role || 'COUNSELLOR', isActive: data.isActive ?? true } });
+    let roleVal = data.role ? (data.role + '').toUpperCase().trim() : 'COUNSELLOR';
+    if (roleVal === 'ACCOUNTANT') roleVal = 'ACCOUNTS';
+    const user = await prisma.user.create({ data: { name: data.name, email: data.email, phone: data.phone, passwordHash: hash, role: roleVal, isActive: data.isActive ?? true } });
     const safeUser = { id: user.id, name: user.name, email: user.email, role: user.role, isActive: user.isActive };
     res.status(201).json({ success: true, data: safeUser });
   } catch (err) {
@@ -48,7 +50,7 @@ const updateUserSchema = z.object({
   isActive: z.boolean().optional()
 });
 
-router.patch('/:id', authenticate, authorize('SUPER_ADMIN'), async (req, res) => {
+async function handleUserUpdate(req, res) {
   const { id } = req.params;
   try {
     const data = updateUserSchema.parse(req.body);
@@ -60,7 +62,11 @@ router.patch('/:id', authenticate, authorize('SUPER_ADMIN'), async (req, res) =>
       updateData.email = data.email;
     }
     if (data.phone !== undefined) updateData.phone = data.phone;
-    if (data.role !== undefined) updateData.role = data.role;
+    if (data.role !== undefined) {
+      let r = (data.role + '').toUpperCase().trim();
+      if (r === 'ACCOUNTANT') r = 'ACCOUNTS';
+      updateData.role = r;
+    }
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
     if (data.password && data.password.trim().length >= 8) {
       updateData.passwordHash = await bcrypt.hash(data.password, 12);
@@ -76,10 +82,13 @@ router.patch('/:id', authenticate, authorize('SUPER_ADMIN'), async (req, res) =>
     console.error('Update user error', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
-});
+}
+
+router.put('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), handleUserUpdate);
+router.patch('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), handleUserUpdate);
 
 // Delete user
-router.delete('/:id', authenticate, authorize('SUPER_ADMIN'), async (req, res) => {
+router.delete('/:id', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   const { id } = req.params;
   if (req.user.id === id) {
     return res.status(400).json({ success: false, message: 'Cannot delete your own account' });
@@ -94,14 +103,14 @@ router.delete('/:id', authenticate, authorize('SUPER_ADMIN'), async (req, res) =
 });
 
 // Activate / Deactivate user
-router.patch('/:id/activate', authenticate, authorize('SUPER_ADMIN'), async (req, res) => {
+router.patch('/:id/activate', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   const { id } = req.params;
   if (req.user.id === id) return res.status(400).json({ success: false, message: 'Cannot change own activation status' });
   const user = await prisma.user.update({ where: { id }, data: { isActive: true } });
   res.json({ success: true, data: { id: user.id, isActive: user.isActive } });
 });
 
-router.patch('/:id/deactivate', authenticate, authorize('SUPER_ADMIN'), async (req, res) => {
+router.patch('/:id/deactivate', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   const { id } = req.params;
   if (req.user.id === id) return res.status(400).json({ success: false, message: 'Cannot change own activation status' });
   const user = await prisma.user.update({ where: { id }, data: { isActive: false } });
@@ -109,7 +118,7 @@ router.patch('/:id/deactivate', authenticate, authorize('SUPER_ADMIN'), async (r
 });
 
 // Reset password
-router.post('/:id/reset-password', authenticate, authorize('SUPER_ADMIN'), async (req, res) => {
+router.post('/:id/reset-password', authenticate, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   const { id } = req.params;
   const newPassword = Math.random().toString(36).slice(-10) + 'A1!';
   const hash = await bcrypt.hash(newPassword, 12);
