@@ -2857,20 +2857,27 @@ button, select, input[type="text"], input[type="email"], input[type="tel"], inpu
 }
 
 .mobile-quick-add-icon {
-    width: 40px;
-    height: 40px;
+    width: 42px;
+    height: 42px;
     border-radius: 12px;
     display: grid;
     place-items: center;
     flex-shrink: 0;
+    color: #ffffff !important;
+    transition: transform 0.15s ease;
 }
 
-.mobile-quick-add-icon.bg-blue { background: #dbeafe; color: #2563eb; }
-.mobile-quick-add-icon.bg-purple { background: #f3e8ff; color: #9333ea; }
-.mobile-quick-add-icon.bg-emerald { background: #d1fae5; color: #059669; }
-.mobile-quick-add-icon.bg-amber { background: #fef3c7; color: #d97706; }
-.mobile-quick-add-icon.bg-teal { background: #ccfbf1; color: #0d9488; }
-.mobile-quick-add-icon.bg-indigo { background: #e0e7ff; color: #4f46e5; }
+.mobile-quick-add-icon svg {
+    stroke: #ffffff !important;
+    color: #ffffff !important;
+}
+
+.mobile-quick-add-icon.bg-blue { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3); }
+.mobile-quick-add-icon.bg-purple { background: linear-gradient(135deg, #9333ea 0%, #7e22ce 100%); box-shadow: 0 4px 10px rgba(147, 51, 234, 0.3); }
+.mobile-quick-add-icon.bg-emerald { background: linear-gradient(135deg, #059669 0%, #047857 100%); box-shadow: 0 4px 10px rgba(5, 150, 105, 0.3); }
+.mobile-quick-add-icon.bg-amber { background: linear-gradient(135deg, #d97706 0%, #b45309 100%); box-shadow: 0 4px 10px rgba(217, 119, 6, 0.3); }
+.mobile-quick-add-icon.bg-teal { background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); box-shadow: 0 4px 10px rgba(13, 148, 136, 0.3); }
+.mobile-quick-add-icon.bg-indigo { background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%); box-shadow: 0 4px 10px rgba(79, 70, 229, 0.3); }
 
 .mobile-quick-add-text {
     flex: 1;

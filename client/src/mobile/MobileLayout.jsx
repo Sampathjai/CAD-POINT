@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { 
   LayoutDashboard, 
   Users as UsersIcon, 
+  UserPlus,
   CalendarDays, 
   BookOpen, 
   GraduationCap, 
@@ -238,7 +239,7 @@ export function MobileLayout({
           {hasPermission(user?.role, 'Leads') && (
             <button className="mobile-quick-add-card" onClick={() => handleQuickAdd('Leads')}>
               <div className="mobile-quick-add-icon bg-blue">
-                <UsersIcon size={20} />
+                <UserPlus size={20} />
               </div>
               <div className="mobile-quick-add-text">
                 <b>Add New Lead</b>
