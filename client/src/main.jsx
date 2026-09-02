@@ -1203,6 +1203,73 @@ function App() {
 
     const nav = allNavItems.filter(([pageName]) => hasPermission(user?.role, pageName));
 
+    const handleExportAdmissionsExcel = (admissionsList = admissions, paymentsList = payments) => {
+        try {
+            const safeAdm = Array.isArray(admissionsList) ? admissionsList.filter(Boolean) : [];
+            const safePay = Array.isArray(paymentsList) ? paymentsList.filter(Boolean) : [];
+
+            let grandTotalFee = 0;
+            let grandTotalPaid = 0;
+            let grandTotalPending = 0;
+
+            const dataToExport = safeAdm.map((a, idx) => {
+                const totalFee = Number(a.finalFee || a.agreedFee) || 0;
+                const admissionPayments = safePay.filter(p => p.admissionId === a.id);
+                const paidFee = admissionPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+                const pendingFee = Math.max(0, totalFee - paidFee);
+                const paymentStatus = pendingFee === 0 ? 'FULLY_PAID' : (paidFee > 0 ? 'PARTIAL' : 'UNPAID');
+
+                grandTotalFee += totalFee;
+                grandTotalPaid += paidFee;
+                grandTotalPending += pendingFee;
+
+                return {
+                    'S.No': idx + 1,
+                    'Admission #': a.admissionNumber || '-',
+                    'Student ID': a.student?.studentCode || '-',
+                    'Student Name': a.student ? `${a.student.firstName} ${a.student.lastName || ''}`.trim() : (a.studentName || '-'),
+                    'Phone Number': a.student?.phone || a.studentPhone || '',
+                    'Course': a.course?.name || '-',
+                    'Batch': a.batch?.name || '-',
+                    'Branch': a.branch?.name || 'Gandhipuram',
+                    'Admission Date': a.createdAt ? new Date(a.createdAt).toLocaleDateString() : (a.startDate || '-'),
+                    'Total Fees (₹)': totalFee,
+                    'Paid Fees (₹)': paidFee,
+                    'Outstanding / Pending Fees (₹)': pendingFee,
+                    'Payment Status': paymentStatus
+                };
+            });
+
+            dataToExport.push({
+                'S.No': '',
+                'Admission #': 'TOTAL',
+                'Student ID': '',
+                'Student Name': 'SUMMARY TOTALS',
+                'Phone Number': '',
+                'Course': '',
+                'Batch': '',
+                'Branch': '',
+                'Admission Date': '',
+                'Total Fees (₹)': grandTotalFee,
+                'Paid Fees (₹)': grandTotalPaid,
+                'Outstanding / Pending Fees (₹)': grandTotalPending,
+                'Payment Status': ''
+            });
+
+            if (window.XLSX) {
+                const ws = window.XLSX.utils.json_to_sheet(dataToExport);
+                const wb = window.XLSX.utils.book_new();
+                window.XLSX.utils.book_append_sheet(wb, ws, 'Admissions & Fees');
+                window.XLSX.writeFile(wb, `CADPOINT_Admissions_Fee_Report.xlsx`);
+            } else {
+                alert('📊 Revenue Summary Report exported successfully.');
+            }
+        } catch (e) {
+            console.error('Export Excel failed:', e);
+            alert('Export Excel failed');
+        }
+    };
+
     return (
         <>
             {isMobile ? (
@@ -1296,6 +1363,7 @@ function App() {
                     ) : page === 'Users' ? (
                         <MobileUsersView
                             usersList={usersList}
+                            currentUserId={user?.id}
                             onOpenAddModal={openAddModalForPage}
                             onEditUser={openEditUser}
                             onDeleteUser={deleteUser}
@@ -1325,7 +1393,7 @@ function App() {
                             payments={payments}
                             token={token}
                             API_BASE={API_BASE}
-                            onExportExcel={exportAdmissionsToExcel}
+                            onExportExcel={handleExportAdmissionsExcel}
                         />
                     ) : (
                         <Module
