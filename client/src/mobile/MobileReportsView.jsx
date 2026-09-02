@@ -24,24 +24,19 @@ export function MobileReportsView({
 }) {
   const [period, setPeriod] = useState('6_months');
 
-  const safeLeads = Array.isArray(leads) ? leads.filter(Boolean) : [];
-  const safeAdmissions = Array.isArray(admissions) ? admissions.filter(Boolean) : [];
-  const safePayments = Array.isArray(payments) ? payments.filter(Boolean) : [];
-
-  const totalLeads = safeLeads.length;
-  const totalAdmissions = safeAdmissions.length;
+  const totalLeads = leads.length;
+  const totalAdmissions = admissions.length;
 
   // Real Business Revenue Calculations
-  const totalBusinessValue = safeAdmissions.reduce((sum, adm) => sum + (Number(adm?.finalFee || adm?.agreedFee) || 0), 0);
-  const collectedRevenue = safePayments.reduce((sum, p) => sum + (Number(p?.amount) || 0), 0);
+  const totalBusinessValue = admissions.reduce((sum, adm) => sum + (Number(adm.finalFee || adm.agreedFee) || 0), 0);
+  const collectedRevenue = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   const pendingRevenue = Math.max(0, totalBusinessValue - collectedRevenue);
   const collectionRate = totalBusinessValue > 0 ? Math.round((collectedRevenue / totalBusinessValue) * 100) : 100;
   const conversionRate = totalLeads > 0 ? Math.round((totalAdmissions / totalLeads) * 100) : 0;
 
   // Revenue Breakdown by Payment Method
   const methodMap = {};
-  safePayments.forEach((p) => {
-    if (!p) return;
+  payments.forEach((p) => {
     const method = (p.paymentMethod || p.method || 'OTHER').toUpperCase().replace('_', ' ');
     const amt = Number(p.amount) || 0;
     methodMap[method] = (methodMap[method] || 0) + amt;
@@ -49,8 +44,7 @@ export function MobileReportsView({
 
   // Revenue Breakdown by Course
   const courseRevenueMap = {};
-  safeAdmissions.forEach((adm) => {
-    if (!adm) return;
+  admissions.forEach((adm) => {
     const courseName = adm.course?.name || 'General Course';
     const fee = Number(adm.finalFee || adm.agreedFee) || 0;
     courseRevenueMap[courseName] = (courseRevenueMap[courseName] || 0) + fee;
@@ -58,7 +52,7 @@ export function MobileReportsView({
 
   const handleExport = () => {
     if (typeof onExportExcel === 'function') {
-      onExportExcel(safeAdmissions, safePayments);
+      onExportExcel();
     } else {
       alert('📊 Exporting Revenue Summary Excel Report...');
     }

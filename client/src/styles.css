@@ -3012,8 +3012,79 @@ button, select, input[type="text"], input[type="email"], input[type="tel"], inpu
 
 .mobile-quick-actions-row {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     margin-bottom: 16px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.mobile-quick-action-btn {
+    flex: 1;
+    min-width: 100px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    border: 1px solid transparent;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    transition: transform 0.12s ease, background 0.15s ease, box-shadow 0.15s ease;
+    box-sizing: border-box;
+}
+
+.mobile-quick-action-btn:active {
+    transform: scale(0.97);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.mobile-quick-action-btn .action-icon-circle {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: rgba(255, 255, 255, 0.25);
+    flex-shrink: 0;
+}
+
+.mobile-quick-action-btn.primary {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+.mobile-quick-action-btn.secondary {
+    background: #f1f5f9;
+    border-color: #e2e8f0;
+    color: #0f172a;
+}
+
+[data-theme="dark"] .mobile-quick-action-btn.secondary {
+    background: #1e293b;
+    border-color: #334155;
+    color: #f8fafc;
+}
+
+.mobile-quick-action-btn.secondary .action-icon-circle {
+    background: #e2e8f0;
+    color: #2563eb;
+}
+
+[data-theme="dark"] .mobile-quick-action-btn.secondary .action-icon-circle {
+    background: #334155;
+    color: #60a5fa;
+}
+
+.mobile-quick-action-btn.whatsapp {
+    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);
 }
 
 .mobile-action-pill {
@@ -3023,12 +3094,19 @@ button, select, input[type="text"], input[type="email"], input[type="tel"], inpu
     justify-content: center;
     gap: 6px;
     padding: 10px 14px;
+    min-height: 40px;
     border-radius: 12px;
     font-size: 13px;
     font-weight: 700;
     border: none;
     cursor: pointer;
     text-decoration: none;
+    box-sizing: border-box;
+    transition: transform 0.1s ease, opacity 0.15s ease;
+}
+
+.mobile-action-pill:active {
+    transform: scale(0.97);
 }
 
 .mobile-action-pill.primary {

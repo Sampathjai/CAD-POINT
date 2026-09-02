@@ -163,12 +163,20 @@ export function MobileDashboard({
 
       {/* Quick Action Row */}
       <div className="mobile-quick-actions-row">
-        <button className="mobile-btn-primary" style={{ flex: 1 }} onClick={onAddLead}>
-          <Plus size={16} /> Add Lead
+        <button className="mobile-quick-action-btn primary" onClick={onAddLead}>
+          <div className="action-icon-circle"><Plus size={16} /></div>
+          <span>Add Lead</span>
         </button>
-        <button className="mobile-btn-secondary" style={{ flex: 1 }} onClick={onSchedule}>
-          <CalendarDays size={16} /> Schedule
+        <button className="mobile-quick-action-btn secondary" onClick={onSchedule}>
+          <div className="action-icon-circle"><CalendarDays size={16} /></div>
+          <span>Schedule</span>
         </button>
+        {typeof onOpenWhatsApp === 'function' && (
+          <button className="mobile-quick-action-btn whatsapp" onClick={() => onOpenWhatsApp(null, null)}>
+            <div className="action-icon-circle"><MessageSquare size={16} /></div>
+            <span>WhatsApp</span>
+          </button>
+        )}
       </div>
 
       {/* Horizontally Scrollable Metric Card Carousel */}
