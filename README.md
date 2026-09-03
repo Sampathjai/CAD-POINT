@@ -2,7 +2,7 @@
 
 > **Full-Stack Customer Relationship & Business Management Platform**
 
-![License](https://img.shields.io/badge/Access-Private%20%2F%20Commercial-blue?style=for-the-badge&logo=github)
+![Access](https://img.shields.io/badge/Access-Private%20%2F%20Commercial-blue?style=for-the-badge&logo=github)
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-success?style=for-the-badge)
 ![Stack](https://img.shields.io/badge/Stack-React%20%7C%20Node.js%20%7C%20PostgreSQL-indigo?style=for-the-badge)
 ![Architecture](https://img.shields.io/badge/Architecture-REST%20API%20%7C%20RBAC-purple?style=for-the-badge)
@@ -15,7 +15,7 @@
 
 ## 📌 Project Overview
 
-**CAD Points CRM** is a production-oriented Customer Relationship Management and enterprise operations platform designed specifically for vocational training and educational institutes. The system streamlines end-to-end customer lifecycles—from initial lead acquisition and scheduled follow-ups to student admissions, course batch allocations, fee collection, multi-branch reporting, and hardware device registration.
+**CAD Points CRM** is a production-oriented Customer Relationship Management and enterprise operations platform designed specifically for vocational training and educational institutes. The system streamlines end-to-end customer lifecycles—from initial lead acquisition and scheduled follow-ups to student admissions, course batch allocations, fee collection, multi-branch reporting, Meta WhatsApp API configuration, and hardware device registration.
 
 Built with a modern decoupled full-stack architecture, the CRM delivers a high-performance desktop experience alongside an optimized mobile application UI for staff on the go.
 
@@ -26,12 +26,13 @@ Built with a modern decoupled full-stack architecture, the CRM delivers a high-p
 * **Customer & Student Management**: Centralized profiles, student code generation, course enrollments, and academic batch progress tracking.
 * **Lead Pipeline & Prospect Tracking**: Multi-channel lead capture, lead disposition status tracking, and 1-tap conversion to active student admissions.
 * **Follow-up & Reminder System**: Automated follow-up calendar, scheduled call/meeting reminders, and direct 1-tap WhatsApp messaging integration.
-* **Admission & Revenue Management**: Final fee agreement tracking, payment installment collection, pending balance computation, and automated fee receipts.
-* **Business Reports & Analytics**: Real-time revenue analytics, branch performance comparison, enrollment metrics, and instant 1-tap Excel data exports.
+* **Admission & Installment Management**: Final fee agreement tracking, 3-installment payment schedules, pending balance computation, and automated fee receipts.
+* **Business Reports & Analytics**: Real-time revenue analytics, branch performance comparison, enrollment metrics, custom date range filtering, and instant 1-tap Excel data exports.
 * **Role-Based Access Control (RBAC)**: Fine-grained permission matrix tailored for `Super Admin`, `Admin`, `Counsellor`, `Trainer`, `Accountant`, `Accounts`, and `Receptionist` roles.
+* **Multi-Branch WhatsApp Business Integration**: Dedicated WhatsApp Business API configuration per branch with Meta OAuth signup integration.
 * **Multi-Branch Management**: Multi-location support (Gandhipuram, Saravanapatti, All Branches) with isolated branch datasets and unified administrative controls.
-* **Device Security & Registration**: Authorized device registration system restricting CRM access to validated hardware devices.
-* **Excel & Data Export**: High-performance client-side Excel report generation for admissions, fee collections, and lead analytics.
+* **Device Security & Registration**: Authorized device registration system restricting CRM access to validated hardware devices binding to central PostgreSQL database.
+* **Excel Data Center**: High-performance client-side Excel report generation for admissions, fee collections, student registries, and lead analytics.
 * **Authentication & Security**: Secure JSON Web Token (JWT) authorization, salted bcrypt password hashing, and Zod input schema validation.
 * **Responsive Mobile Experience**: Native-feeling mobile app interface with quick action sheets, bottom navigation bar, and PWA (Progressive Web App) manifest support.
 
@@ -53,42 +54,49 @@ Built with a modern decoupled full-stack architecture, the CRM delivers a high-p
 ### 📊 Executive Dashboard
 *Comprehensive real-time view of daily leads, follow-ups, active batches, revenue metrics, and branch selection.*
 
-![CAD Points CRM Dashboard](screenshots/dashboard.png)
+![CAD Points CRM Dashboard](docs/screenshots/executive_dashboard.png)
 
 ---
 
-### 👥 Lead & Follow-up Pipeline
-*Streamlined prospect management with 1-tap WhatsApp messaging and status updates.*
+### 🎓 Student Admissions & Installment Schedule
+*Complete student onboarding, payment progress tracking, course information, and 3-installment payment schedule.*
 
-![Lead & Follow-up Management](screenshots/leads.png)
-
----
-
-### 🎓 Admissions & Student Progress
-*Complete student onboarding, batch assignment, and course completion progress tracking.*
-
-![Student Admissions](screenshots/admissions.png)
+![Student Admissions & Payment Installments](docs/screenshots/admission_installments.png)
 
 ---
 
-### 📈 Reports & Revenue Analytics
-*Detailed financial summaries, outstanding balance breakdown, and 1-tap Excel export.*
+### 📈 Reports & Excel Data Center
+*Custom date range filtering, outstanding fee breakdown, and 1-tap Excel data exports for students, leads, admissions, and payments.*
 
-![Reports and Revenue](screenshots/reports.png)
-
----
-
-### ⚙️ Settings & Device Control
-*Granular user role permissions, institute details, and authorized device registration.*
-
-![Settings and Access Control](screenshots/settings.png)
+![Reports & Excel Data Center](docs/screenshots/reports_analytics.png)
 
 ---
 
-### 📱 Mobile Experience
-*Touch-optimized mobile quick actions for staff managing operations on mobile devices.*
+### 💬 Multi-Branch WhatsApp Business Integration
+*Individual Meta WhatsApp Business Account setup per branch with 1-click signup integration.*
 
-![Mobile Experience](screenshots/mobile.png)
+![Multi-Branch WhatsApp Integration](docs/screenshots/whatsapp_integration.png)
+
+---
+
+### 🔒 Device Security & Authorized Devices
+*Authorized hardware device management restricting CRM access to central authoritative PostgreSQL database.*
+
+![Authorized Devices & Central Database](docs/screenshots/device_security.png)
+
+---
+
+### 👥 User & Role Management
+*Fine-grained role assignment and user access configuration for administrative controls.*
+
+![User & Role Management](docs/screenshots/user_management.png)
+
+---
+
+### 📱 Mobile UI Experience
+*Touch-optimized quick actions, floating navigation, and mobile drawer sheets.*
+
+![Mobile Experience](docs/screenshots/mobile_ui.png)
 
 ---
 
@@ -112,7 +120,7 @@ The platform uses a decoupled client-server architecture designed for reliabilit
 ┌────────────────────────────────────────────────────────┐
 │               PostgreSQL Database                      │
 │        Multi-Branch Tables + Device Registry           │
-└────────────────────────────────────────────────────────┘
+└───────────────────────────┴────────────────────────────┘
 ```
 
 ---
@@ -124,9 +132,9 @@ As the **Primary Full-Stack Developer**, I engineered and delivered this CRM pla
 * Designed and built the responsive frontend single-page application using React 18 and Vite.
 * Developed the RESTful backend API using Node.js, Express.js, and Prisma ORM.
 * Implemented the Role-Based Access Control (RBAC) matrix for 7 distinct user roles.
-* Designed the database schema and branch isolation logic in PostgreSQL.
+* Designed the database schema, device binding, and branch isolation logic in PostgreSQL.
 * Built the mobile-optimized UI architecture and Progressive Web App (PWA) configuration.
-* Integrated Excel report generation and 1-tap WhatsApp communication links.
+* Integrated Excel report generation, Meta WhatsApp Business API integration, and 1-tap communication links.
 * Implemented the hardware device registration system for security compliance.
 * Set up automated testing pipelines and deployed the production application on Vercel and Render.
 
