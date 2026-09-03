@@ -51,22 +51,29 @@ Built with a modern decoupled full-stack architecture, the CRM delivers a high-p
 
 ## 📸 UI Showcase & Screenshots
 
-### 📊 Executive Dashboard
-*Comprehensive real-time view of daily leads, follow-ups, active batches, revenue metrics, and branch selection.*
+### 🔑 Authentication & Login Page
+*Official CADPOINT branded login portal with secure authentication.*
+
+![CAD Points CRM Login](docs/screenshots/login_page.png)
+
+---
+
+### 📊 Executive Dashboard & Analytics
+*Comprehensive real-time overview of monthly enquiries, admissions, collection revenue, and 6-month trend analysis.*
 
 ![CAD Points CRM Dashboard](docs/screenshots/executive_dashboard.png)
 
 ---
 
-### 🎓 Student Admissions & Installment Schedule
-*Complete student onboarding, payment progress tracking, course information, and 3-installment payment schedule.*
+### 🎓 Admissions & 3-Installment Payment Schedule
+*Detailed student enrollment record, payment progress bar, course info, and 3-installment payment schedule.*
 
 ![Student Admissions & Payment Installments](docs/screenshots/admission_installments.png)
 
 ---
 
 ### 📈 Reports & Excel Data Center
-*Custom date range filtering, outstanding fee breakdown, and 1-tap Excel data exports for students, leads, admissions, and payments.*
+*Custom date range filtering, outstanding fee breakdown, and 1-tap Excel exports for students, leads, admissions, and payments.*
 
 ![Reports & Excel Data Center](docs/screenshots/reports_analytics.png)
 
@@ -86,7 +93,7 @@ Built with a modern decoupled full-stack architecture, the CRM delivers a high-p
 
 ---
 
-### 👥 User & Role Management
+### 👥 User Control & Role Management
 *Fine-grained role assignment and user access configuration for administrative controls.*
 
 ![User & Role Management](docs/screenshots/user_management.png)
