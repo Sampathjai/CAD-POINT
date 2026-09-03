@@ -65,6 +65,15 @@ Built with a modern decoupled full-stack architecture, the CRM delivers a high-p
 
 ---
 
+### 📱 Mobile Experience & PWA Interface
+*Native-feeling mobile app interface with responsive top sticky header, quick-action pills, 1-tap WhatsApp communication, and bottom sheet drawer.*
+
+| Mobile Dashboard & Analytics | Mobile Quick Actions Drawer |
+| :---: | :---: |
+| <img src="docs/screenshots/mobile_dashboard.png" width="340" alt="Mobile Dashboard" /> | <img src="docs/screenshots/mobile_quick_actions.png" width="340" alt="Mobile Quick Actions Drawer" /> |
+
+---
+
 ### 🎓 Admissions & 3-Installment Payment Schedule
 *Detailed student enrollment record, payment progress bar, course info, and 3-installment payment schedule.*
 
@@ -96,17 +105,9 @@ Built with a modern decoupled full-stack architecture, the CRM delivers a high-p
 ### 👥 User Control & Role Management
 *Fine-grained role assignment and user access configuration for administrative controls.*
 
-
-
----
-
-### 📱 Mobile UI Experience
-*Touch-optimized quick actions, floating navigation, and mobile drawer sheets.*
-
-
+![User & Role Management](docs/screenshots/user_management.png)
 
 ---
-
 ## 🏗️ Architecture Overview
 
 The platform uses a decoupled client-server architecture designed for reliability, responsiveness, and secure data isolation:
