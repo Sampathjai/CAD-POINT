@@ -105,7 +105,7 @@ Built with a modern decoupled full-stack architecture, the CRM delivers a high-p
 ### 👥 User Control & Role Management
 *Fine-grained role assignment and user access configuration for administrative controls.*
 
-![User & Role Management](docs/screenshots/user_management.png)
+
 
 ---
 ## 🏗️ Architecture Overview
