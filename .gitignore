@@ -25,3 +25,7 @@ server/dist/
 scratch/
 tmp/
 *.tmp
+brag-output/
+.agents/
+skills-lock.json
+
