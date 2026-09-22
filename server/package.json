@@ -2,7 +2,7 @@
   "name": "cad-point-crm-api",
   "private": true,
   "scripts": {
-    "dev": "node --watch src/server.js",
+    "dev": "node --watch --watch-path=src src/server.js",
     "build": "node scripts/build.js",
     "start": "node src/server.js",
     "lint": "echo \"No linter configured yet\"",
