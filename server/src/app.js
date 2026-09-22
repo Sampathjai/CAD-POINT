@@ -1,4 +1,25 @@
 require('dotenv').config();
+
+function sanitizeDatabaseUrl(url) {
+  if (!url) return url;
+  let res = url.trim();
+  if (res.includes('Sam@7373660953')) {
+    res = res.replace('Sam@7373660953', 'Sam%407373660953');
+  }
+  if (res.includes('db.khnrcfvczwhoklkokrbl.supabase.co')) {
+    res = res.replace('db.khnrcfvczwhoklkokrbl.supabase.co:5432', 'aws-0-ap-northeast-1.pooler.supabase.com:5432');
+    res = res.replace('postgresql://postgres:', 'postgresql://postgres.khnrcfvczwhoklkokrbl:');
+  }
+  return res;
+}
+
+if (process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = sanitizeDatabaseUrl(process.env.DATABASE_URL);
+}
+if (process.env.DIRECT_URL) {
+  process.env.DIRECT_URL = sanitizeDatabaseUrl(process.env.DIRECT_URL);
+}
+
 const express=require('express');
 const cors=require('cors');
 const prisma=require('./config/prisma');
