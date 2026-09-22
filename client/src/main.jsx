@@ -76,7 +76,9 @@ import { MobileReportsView } from './mobile/MobileReportsView';
 
 const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL && String(import.meta.env.VITE_API_URL).trim())
     ? String(import.meta.env.VITE_API_URL).trim().replace(/\/+$/, '')
-    : '/api';
+    : (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+        ? '/api'
+        : 'https://cad-point.onrender.com/api';
 
 function StudentPhotoWithFallback({ src, alt = 'Student Photo', style = {}, className = '' }) {
     const [imgError, setImgError] = useState(false);
