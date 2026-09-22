@@ -12,7 +12,7 @@
 
 Watch the complete CADPOINT CRM walkthrough:
 
-[▶️ Watch CADPOINT CRM Demo](./final_20260922_035841.mp4)
+[▶️ Watch CADPOINT CRM Demo](final_20260922_035841.mp4)
 
 > 🔒 **Source Code Notice:** This repository is kept **PRIVATE** because the project was developed for a commercial/client use case. The repository contains proprietary implementation details, internal workflow logic, and business configurations, therefore the source code is not publicly available. A project walkthrough and live demonstration can be provided upon request.
 
