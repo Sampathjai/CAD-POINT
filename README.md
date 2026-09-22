@@ -8,6 +8,11 @@
 ![Architecture](https://img.shields.io/badge/Architecture-REST%20API%20%7C%20RBAC-purple?style=for-the-badge)
 
 ---
+🎬 CRM Demo
+
+Watch the complete CADPOINT CRM walkthrough:
+
+[▶️ Watch CADPOINT CRM Demo](./final_20260922_035841.mp4)
 
 > 🔒 **Source Code Notice:** This repository is kept **PRIVATE** because the project was developed for a commercial/client use case. The repository contains proprietary implementation details, internal workflow logic, and business configurations, therefore the source code is not publicly available. A project walkthrough and live demonstration can be provided upon request.
 
